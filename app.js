@@ -135,8 +135,7 @@ const state = {
   paymentSubmitting: false,
   splitCount: 2,
   groupPayments: [],
-  splitQrUrls: [],
-  splitQrIndex: 0,
+  lastSplitQrUrl: '',
 };
 
 /* ── Utilidades ── */
@@ -431,61 +430,50 @@ function getPagarBaseUrl() {
   return 'https://menuqr-virid.vercel.app/pagar';
 }
 
-function buildSplitPaymentUrl(monto, parte) {
+function buildSplitPaymentUrl(monto) {
   const params = new URLSearchParams({
     monto: String(monto),
     sesion: state.sesionId,
-    parte: String(parte),
   });
   if (RESTAURANTE_SLUG) params.set('slug', RESTAURANTE_SLUG);
   return `${getPagarBaseUrl()}?${params.toString()}`;
 }
 
-function buildSplitQrUrls(deliveredTotal, count) {
-  const shareAmount = getSplitShareAmount(deliveredTotal, count);
-  return Array.from({ length: count }, (_, index) => {
-    const parte = index + 1;
-    return {
-      parte,
-      monto: shareAmount,
-      url: buildSplitPaymentUrl(shareAmount, parte),
-    };
-  });
-}
-
 function hideSplitQrViewer() {
   const viewer = document.getElementById('splitQrViewer');
+  const canvas = document.getElementById('splitQrCanvas');
   if (viewer) viewer.hidden = true;
-  state.splitQrUrls = [];
-  state.splitQrIndex = 0;
+  if (canvas) canvas.innerHTML = '';
+  state.lastSplitQrUrl = '';
 }
 
-function renderSplitQrAt(index) {
+function renderSplitQr(shareAmount) {
   const viewer = document.getElementById('splitQrViewer');
-  const indicator = document.getElementById('splitQrIndicator');
   const canvas = document.getElementById('splitQrCanvas');
-  const prevBtn = document.getElementById('splitQrPrev');
-  const nextBtn = document.getElementById('splitQrNext');
 
-  if (!viewer || !canvas || !state.splitQrUrls.length) return;
-
-  const safeIndex = Math.max(0, Math.min(index, state.splitQrUrls.length - 1));
-  state.splitQrIndex = safeIndex;
-
-  const current = state.splitQrUrls[safeIndex];
-  if (indicator) {
-    indicator.textContent = `Persona ${current.parte} de ${state.splitQrUrls.length}`;
+  if (!viewer || !canvas || !state.sesionId || shareAmount <= 0) {
+    hideSplitQrViewer();
+    return;
   }
 
+  const url = buildSplitPaymentUrl(shareAmount);
+
+  if (url === state.lastSplitQrUrl && canvas.childNodes.length > 0) {
+    viewer.hidden = false;
+    return;
+  }
+
+  state.lastSplitQrUrl = url;
   canvas.innerHTML = '';
 
   if (typeof QRCode === 'undefined') {
     canvas.textContent = 'No se pudo cargar el generador de QR.';
+    viewer.hidden = false;
     return;
   }
 
   new QRCode(canvas, {
-    text: current.url,
+    text: url,
     width: 220,
     height: 220,
     colorDark: '#0a0a0c',
@@ -493,8 +481,6 @@ function renderSplitQrAt(index) {
     correctLevel: QRCode.CorrectLevel.M,
   });
 
-  if (prevBtn) prevBtn.disabled = safeIndex === 0;
-  if (nextBtn) nextBtn.disabled = safeIndex === state.splitQrUrls.length - 1;
   viewer.hidden = false;
 }
 
@@ -503,7 +489,6 @@ function updateSplitBillUI(deliveredTotal) {
   const splitShareEl = document.getElementById('splitShareAmount');
   const splitProgressEl = document.getElementById('splitPaymentProgress');
   const splitInput = document.getElementById('splitCountInput');
-  const generateQrBtn = document.getElementById('generateQrBtn');
   const minusBtn = document.getElementById('splitCountMinus');
   const plusBtn = document.getElementById('splitCountPlus');
 
@@ -538,10 +523,12 @@ function updateSplitBillUI(deliveredTotal) {
     }
   }
 
-  if (generateQrBtn) {
-    generateQrBtn.disabled =
-      state.paymentSubmitting || shareAmount <= 0 || paidTotal >= deliveredTotal;
+  if (paidTotal >= deliveredTotal) {
+    hideSplitQrViewer();
+    return;
   }
+
+  renderSplitQr(shareAmount);
 }
 
 const WOMPI_PUBLIC_KEY = 'pub_test_sLvY32q8txNx6ygl0BrYaNo5w1aUkfMT';
@@ -1109,16 +1096,12 @@ function initWompiPayment() {
 function initSplitBill() {
   const minusBtn = document.getElementById('splitCountMinus');
   const plusBtn = document.getElementById('splitCountPlus');
-  const generateQrBtn = document.getElementById('generateQrBtn');
-  const prevBtn = document.getElementById('splitQrPrev');
-  const nextBtn = document.getElementById('splitQrNext');
 
   if (minusBtn && !minusBtn.dataset.bound) {
     minusBtn.dataset.bound = 'true';
     minusBtn.addEventListener('click', () => {
       if (state.splitCount <= 2) return;
       state.splitCount -= 1;
-      hideSplitQrViewer();
       updateSplitBillUI(getAccountDeliveredTotal());
     });
   }
@@ -1128,51 +1111,7 @@ function initSplitBill() {
     plusBtn.addEventListener('click', () => {
       if (state.splitCount >= 20) return;
       state.splitCount += 1;
-      hideSplitQrViewer();
       updateSplitBillUI(getAccountDeliveredTotal());
-    });
-  }
-
-  if (generateQrBtn && !generateQrBtn.dataset.bound) {
-    generateQrBtn.dataset.bound = 'true';
-    generateQrBtn.addEventListener('click', () => {
-      if (!state.sesionId) {
-        showToast('No se pudo identificar tu sesión.', 'error');
-        return;
-      }
-
-      if (typeof QRCode === 'undefined') {
-        showToast('No se pudo cargar el generador de QR. Recarga la página.', 'error');
-        return;
-      }
-
-      const deliveredTotal = getAccountDeliveredTotal();
-      const paidTotal = getGroupPaidTotal();
-
-      if (paidTotal >= deliveredTotal) {
-        showToast('La cuenta ya está cubierta.', 'success');
-        return;
-      }
-
-      state.splitQrUrls = buildSplitQrUrls(deliveredTotal, state.splitCount);
-      state.splitQrIndex = 0;
-      renderSplitQrAt(0);
-    });
-  }
-
-  if (prevBtn && !prevBtn.dataset.bound) {
-    prevBtn.dataset.bound = 'true';
-    prevBtn.addEventListener('click', () => {
-      if (state.splitQrIndex <= 0) return;
-      renderSplitQrAt(state.splitQrIndex - 1);
-    });
-  }
-
-  if (nextBtn && !nextBtn.dataset.bound) {
-    nextBtn.dataset.bound = 'true';
-    nextBtn.addEventListener('click', () => {
-      if (state.splitQrIndex >= state.splitQrUrls.length - 1) return;
-      renderSplitQrAt(state.splitQrIndex + 1);
     });
   }
 }

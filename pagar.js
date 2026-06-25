@@ -114,7 +114,9 @@ async function openWompiCheckout({ monto, sesionId, parte, publicKey, restaurant
 
   await markPaymentInProgress(sesionId);
 
-  const reference = `sesion-${sesionId}-parte-${parte}-${Date.now()}`;
+  const reference = parte
+    ? `sesion-${sesionId}-parte-${parte}-${Date.now()}`
+    : `sesion-${sesionId}-${Date.now()}`;
   const checkout = new WidgetCheckout({
     currency: 'COP',
     amountInCents: Math.round(monto * 100),
@@ -148,7 +150,7 @@ async function initPagar() {
   const sesionId = params.get('sesion');
   const parte = params.get('parte');
 
-  if (!monto || monto <= 0 || !sesionId || !parte) {
+  if (!monto || monto <= 0 || !sesionId) {
     setPagarMessage('error', 'Enlace de pago inválido.');
     return;
   }

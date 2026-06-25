@@ -1227,19 +1227,12 @@ ul {
 }
 
 .account__split-qr {
-  margin-top: 20px;
+  margin-top: 16px;
   padding: 20px 16px;
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   text-align: center;
-}
-
-.account__split-qr-indicator {
-  font-size: 1rem;
-  font-weight: 700;
-  margin-bottom: 16px;
-  color: var(--text);
 }
 
 .account__split-qr-canvas {
@@ -1258,36 +1251,9 @@ ul {
 }
 
 .account__split-qr-hint {
-  font-size: 0.8125rem;
-  color: var(--text-muted);
-  margin-bottom: 16px;
-  line-height: 1.45;
-}
-
-.account__split-qr-nav {
-  display: flex;
-  gap: 10px;
-}
-
-.account__split-qr-nav-btn {
-  flex: 1;
-  padding: 12px 14px;
-  border-radius: var(--radius-sm);
   font-size: 0.875rem;
-  font-weight: 600;
-  color: var(--text);
-  background: var(--bg-hover);
-  border: 1px solid var(--border);
-  transition: background 0.15s ease;
-}
-
-.account__split-qr-nav-btn:active:not(:disabled) {
-  background: var(--accent-soft);
-}
-
-.account__split-qr-nav-btn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
+  color: var(--text-muted);
+  line-height: 1.45;
 }
 
 /* ── Página pagar ── */
