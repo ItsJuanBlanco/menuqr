@@ -500,10 +500,9 @@ function clearSplitQrCanvas() {
 
 function updatePaymentExtrasUI(deliveredTotal) {
   const section = document.getElementById('paymentExtrasSection');
-  const serviceToggle = document.getElementById('serviceChargeToggle');
-  const serviceLabel = document.getElementById('serviceChargeLabel');
   const tipCustomField = document.getElementById('tipCustomField');
   const tipCustomInput = document.getElementById('tipCustomInput');
+  const serviceRemoveConfirm = document.getElementById('serviceRemoveConfirm');
 
   if (!section) return;
 
@@ -513,14 +512,12 @@ function updatePaymentExtrasUI(deliveredTotal) {
   const accountTotal = document.getElementById('accountTotal');
   if (accountTotal) accountTotal.hidden = showExtras || deliveredTotal <= 0;
 
-  if (!showExtras) return;
+  if (!showExtras) {
+    if (serviceRemoveConfirm) serviceRemoveConfirm.hidden = true;
+    return;
+  }
 
   const breakdown = getPaymentBreakdown(deliveredTotal);
-
-  if (serviceToggle) serviceToggle.checked = state.serviceChargeEnabled;
-  if (serviceLabel) {
-    serviceLabel.textContent = `Cargo por servicio ${state.serviceChargePercent}% — ${formatCOP(breakdown.cargoServicio)}`;
-  }
 
   document.querySelectorAll('[data-tip-percent]').forEach((btn) => {
     const percent = Number(btn.dataset.tipPercent);
@@ -546,22 +543,30 @@ function updatePaymentExtrasUI(deliveredTotal) {
   document.getElementById('summarySubtotal').textContent = formatCOP(breakdown.subtotal);
 
   const serviceRow = document.getElementById('summaryServiceRow');
+  const optionalLink = document.getElementById('serviceOptionalLink');
   if (serviceRow) serviceRow.hidden = !state.serviceChargeEnabled;
   document.getElementById('summaryServiceLabel').textContent =
-    `Cargo por servicio (${state.serviceChargePercent}%)`;
+    `Servicio (${state.serviceChargePercent}%)`;
   document.getElementById('summaryServiceAmount').textContent = formatCOP(breakdown.cargoServicio);
+  if (optionalLink) optionalLink.hidden = !state.serviceChargeEnabled;
+  if (serviceRemoveConfirm && !state.serviceChargeEnabled) serviceRemoveConfirm.hidden = true;
 
   const tipRow = document.getElementById('summaryTipRow');
   if (tipRow) tipRow.hidden = breakdown.propina <= 0;
   if (breakdown.propina > 0) {
     const tipLabel = breakdown.propinaLabel === 'Otra'
-      ? 'Propina (otra)'
+      ? 'Propina'
       : `Propina (${breakdown.propinaLabel})`;
     document.getElementById('summaryTipLabel').textContent = tipLabel;
     document.getElementById('summaryTipAmount').textContent = formatCOP(breakdown.propina);
   }
 
   document.getElementById('summaryTotal').textContent = formatCOP(breakdown.total);
+}
+
+function hideServiceRemoveConfirm() {
+  const confirm = document.getElementById('serviceRemoveConfirm');
+  if (confirm) confirm.hidden = true;
 }
 
 function refreshPaymentUi() {
@@ -1250,13 +1255,34 @@ async function openWompiCheckout(amount, options = {}) {
 }
 
 function initPaymentExtras() {
-  const serviceToggle = document.getElementById('serviceChargeToggle');
-  if (serviceToggle && !serviceToggle.dataset.bound) {
-    serviceToggle.dataset.bound = 'true';
-    serviceToggle.addEventListener('change', () => {
-      state.serviceChargeEnabled = serviceToggle.checked;
-      state.lastSplitQrUrl = '';
-      refreshPaymentUi();
+  const optionalLink = document.getElementById('serviceOptionalLink');
+  const serviceRemoveConfirm = document.getElementById('serviceRemoveConfirm');
+
+  if (optionalLink && !optionalLink.dataset.bound) {
+    optionalLink.dataset.bound = 'true';
+    optionalLink.addEventListener('click', () => {
+      if (!state.serviceChargeEnabled || !serviceRemoveConfirm) return;
+      serviceRemoveConfirm.hidden = false;
+    });
+  }
+
+  if (serviceRemoveConfirm && !serviceRemoveConfirm.dataset.bound) {
+    serviceRemoveConfirm.dataset.bound = 'true';
+    serviceRemoveConfirm.addEventListener('click', (event) => {
+      const btn = event.target.closest('[data-action]');
+      if (!btn) return;
+
+      if (btn.dataset.action === 'confirm-remove-service') {
+        state.serviceChargeEnabled = false;
+        state.lastSplitQrUrl = '';
+        hideServiceRemoveConfirm();
+        refreshPaymentUi();
+        return;
+      }
+
+      if (btn.dataset.action === 'cancel-remove-service') {
+        hideServiceRemoveConfirm();
+      }
     });
   }
 

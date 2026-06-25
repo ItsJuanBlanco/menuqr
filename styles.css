@@ -633,140 +633,16 @@ ul {
   color: var(--accent);
 }
 
-/* ── Propina y servicio ── */
+/* ── Resumen de pago (subtle) ── */
 .account__extras {
-  margin-top: 20px;
-  padding-top: 20px;
-  border-top: 1px dashed var(--border);
-}
-
-.account__service-toggle {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 14px 16px;
-  margin-bottom: 18px;
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-}
-
-.account__service-toggle-input {
-  position: absolute;
-  opacity: 0;
-  pointer-events: none;
-}
-
-.account__service-toggle-ui {
-  width: 44px;
-  height: 26px;
-  border-radius: 999px;
-  background: var(--bg-hover);
-  border: 1px solid var(--border);
-  position: relative;
-  flex-shrink: 0;
-  transition: background 0.2s ease;
-}
-
-.account__service-toggle-ui::after {
-  content: '';
-  position: absolute;
-  top: 2px;
-  left: 2px;
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  background: #fff;
-  transition: transform 0.2s ease;
-}
-
-.account__service-toggle-input:checked + .account__service-toggle-ui {
-  background: var(--accent);
-  border-color: var(--accent);
-}
-
-.account__service-toggle-input:checked + .account__service-toggle-ui::after {
-  transform: translateX(18px);
-}
-
-.account__service-toggle-text {
-  font-size: 0.9375rem;
-  font-weight: 600;
-  color: var(--text);
-  line-height: 1.35;
-}
-
-.account__tip {
-  margin-bottom: 18px;
-}
-
-.account__tip-label {
-  font-size: 0.8125rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--text-muted);
-  margin-bottom: 10px;
-}
-
-.account__tip-options {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.account__tip-btn {
-  min-width: 52px;
-  padding: 10px 12px;
-  border-radius: 999px;
-  font-size: 0.875rem;
-  font-weight: 700;
-  color: var(--text);
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
-}
-
-.account__tip-btn--active {
-  color: #fff;
-  background: var(--accent);
-  border-color: var(--accent);
-}
-
-.account__tip-custom {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-top: 12px;
-  font-size: 0.8125rem;
-  color: var(--text-muted);
-}
-
-.account__tip-custom-input {
-  width: 100%;
-  padding: 12px 14px;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--border);
-  background: var(--bg-card);
-  color: var(--text);
-  font-size: 1rem;
-  font-weight: 600;
-}
-
-.account__tip-custom-input:focus {
-  outline: none;
-  border-color: var(--accent);
+  margin-top: 16px;
 }
 
 .account__payment-summary {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding: 16px;
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
+  gap: 8px;
+  margin: 0;
 }
 
 .account__payment-summary-row {
@@ -774,7 +650,77 @@ ul {
   align-items: baseline;
   justify-content: space-between;
   gap: 12px;
-  font-size: 0.9375rem;
+  font-size: 0.875rem;
+}
+
+.account__payment-summary-row--service {
+  font-size: 0.8125rem;
+}
+
+.account__payment-summary-service-label {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  flex-wrap: wrap;
+  color: var(--text-dim);
+}
+
+.account__optional-link {
+  padding: 0;
+  border: none;
+  background: none;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  color: var(--text-dim);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+  opacity: 0.85;
+}
+
+.account__optional-link:hover {
+  color: var(--text-muted);
+}
+
+.account__service-confirm {
+  margin: 2px 0 4px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+}
+
+.account__service-confirm-text {
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+  line-height: 1.4;
+  margin-bottom: 10px;
+}
+
+.account__service-confirm-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.account__service-confirm-btn {
+  flex: 1;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #fff;
+  background: var(--bg-hover);
+  border: 1px solid var(--border);
+}
+
+.account__service-confirm-btn:first-child {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.account__service-confirm-btn--ghost {
+  color: var(--text-muted);
+  background: transparent;
 }
 
 .account__payment-summary-row dt {
@@ -782,26 +728,86 @@ ul {
 }
 
 .account__payment-summary-row dd {
-  font-weight: 700;
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
   color: var(--text);
 }
 
+.account__payment-summary-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 4px 0 2px;
+}
+
 .account__payment-summary-row--total {
-  margin-top: 4px;
-  padding-top: 12px;
-  border-top: 1px dashed var(--border);
+  font-size: 0.9375rem;
 }
 
-.account__payment-summary-row--total dt,
-.account__payment-summary-row--total dd {
-  font-size: 1rem;
+.account__payment-summary-row--total dt {
   color: var(--text);
+  font-weight: 600;
 }
 
 .account__payment-summary-row--total dd {
-  font-size: 1.25rem;
+  font-size: 1.125rem;
+  font-weight: 700;
   color: var(--accent);
+}
+
+.account__tip--subtle {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+
+.account__tip-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.account__tip-btn {
+  min-width: 0;
+  padding: 5px 10px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-dim);
+  background: transparent;
+  border: 1px solid transparent;
+  transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+
+.account__tip-btn:hover {
+  color: var(--text-muted);
+  border-color: var(--border);
+}
+
+.account__tip-btn--active {
+  color: var(--text);
+  background: var(--bg-card);
+  border-color: var(--border);
+}
+
+.account__tip-custom {
+  display: block;
+  margin-top: 8px;
+}
+
+.account__tip-custom-input {
+  width: 100%;
+  max-width: 140px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text);
+  font-size: 0.8125rem;
+}
+
+.account__tip-custom-input:focus {
+  outline: none;
+  border-color: var(--accent);
 }
 
 .account__switch {
