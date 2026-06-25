@@ -169,7 +169,7 @@ function slugifyCategory(name) {
     .replace(/(^-|-$)/g, '');
 }
 
-const TOAST_DISMISS_MS = 10000;
+const TOAST_DISMISS_MS = 5000;
 
 function showToast(message, type = '', duration = TOAST_DISMISS_MS) {
   const toast = document.getElementById('toast');
