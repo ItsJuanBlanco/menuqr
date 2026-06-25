@@ -3,6 +3,8 @@ const PEDIDO_ESTADOS_ACTIVOS = ['pendiente', 'en_preparacion'];
 let orders = [];
 let mesas = [];
 let mesaAccounts = {};
+let mesaSessionBreakdown = {};
+let mesaSessionItems = {};
 let activePanel = 'pedidos';
 let updating = new Set();
 let listClickBound = false;
@@ -55,6 +57,44 @@ function formatMesaEstado(estado) {
   return estado || 'Libre';
 }
 
+function formatSessionCode(numero) {
+  if (numero == null || numero === '') return null;
+  return String(numero).padStart(4, '0');
+}
+
+function formatOrderMesaLabel(order) {
+  const mesaNum = order.mesas?.numero ?? '?';
+  const sessionNum = order.sesiones?.numero;
+
+  if (sessionNum != null && sessionNum !== '') {
+    return `Mesa ${mesaNum} · #${String(sessionNum).padStart(4, '0')}`;
+  }
+
+  return `Mesa ${mesaNum}`;
+}
+
+async function attachSessionDataToOrders(orderRows) {
+  const rows = orderRows || [];
+  const sesionIds = [...new Set(rows.map((order) => order.sesion_id).filter(Boolean))];
+
+  if (sesionIds.length === 0) return rows;
+
+  const { data: sesionesData, error: sesionesError } = await supabaseClient
+    .from('sesiones')
+    .select('id, numero, tipo')
+    .eq('restaurante_id', RESTAURANTE_ID)
+    .in('id', sesionIds);
+
+  if (sesionesError) throw sesionesError;
+
+  const sessionById = new Map((sesionesData || []).map((session) => [session.id, session]));
+
+  return rows.map((order) => ({
+    ...order,
+    sesiones: order.sesion_id ? sessionById.get(order.sesion_id) || null : null,
+  }));
+}
+
 function normalizeItemEstado(estado) {
   return estado || 'pendiente';
 }
@@ -65,6 +105,37 @@ function isItemDelivered(item) {
 
 function orderHasPendingItems(order) {
   return (order.pedido_items || []).some((item) => !isItemDelivered(item));
+}
+
+function formatSessionLineLabel(session) {
+  if (!session) return 'Cuenta';
+  if (session.tipo === 'grupal') return 'Cuenta Grupal';
+  const code = formatSessionCode(session.numero);
+  return code ? `#${code}` : 'Cuenta';
+}
+
+function buildMesaSessionBreakdown(items, sesionById) {
+  const totals = new Map();
+
+  items.forEach((item) => {
+    if (!item.sesionId) return;
+    totals.set(item.sesionId, (totals.get(item.sesionId) || 0) + item.subtotal);
+  });
+
+  return [...totals.entries()]
+    .map(([sesionId, total]) => ({
+      id: sesionId,
+      sesionId,
+      label: formatSessionLineLabel(sesionById.get(sesionId)),
+      total,
+      numero: sesionById.get(sesionId)?.numero ?? null,
+      tipo: sesionById.get(sesionId)?.tipo ?? 'individual',
+    }))
+    .sort((a, b) => {
+      if (a.tipo === 'grupal' && b.tipo !== 'grupal') return 1;
+      if (a.tipo !== 'grupal' && b.tipo === 'grupal') return -1;
+      return (a.numero ?? 0) - (b.numero ?? 0);
+    });
 }
 
 function groupDeliveredItems(items) {
@@ -138,6 +209,7 @@ async function fetchOrders() {
       total,
       created_at,
       archivado,
+      sesion_id,
       mesas ( numero ),
       pedido_items (
         id,
@@ -154,7 +226,8 @@ async function fetchOrders() {
 
   if (error) throw error;
 
-  orders = (data || []).filter(orderHasPendingItems);
+  const rowsWithSessions = await attachSessionDataToOrders(data);
+  orders = rowsWithSessions.filter(orderHasPendingItems);
   renderOrders();
   updateHeaderCount();
 }
@@ -172,7 +245,7 @@ function renderOrders() {
 
   list.innerHTML = orders
     .map((order) => {
-      const mesaNum = order.mesas?.numero ?? '?';
+      const mesaLabel = formatOrderMesaLabel(order);
       const items = (order.pedido_items || []).slice().sort((a, b) => {
         const rank = (item) => {
           if (isItemDelivered(item)) return 3;
@@ -234,7 +307,7 @@ function renderOrders() {
       return `
         <article class="order-card" data-pedido-id="${order.id}">
           <header class="order-card__head">
-            <span class="order-card__mesa">Mesa ${mesaNum}</span>
+            <span class="order-card__mesa">${escapeHtml(mesaLabel)}</span>
             <div class="order-card__meta">
               <p class="order-card__time">${formatTime(order.created_at)}</p>
               <span class="order-card__status order-card__status--${order.estado}">${formatPedidoEstado(order.estado)}</span>
@@ -320,20 +393,7 @@ async function fetchMesas() {
         .select('id, numero, estado, mesero_requerido')
         .eq('restaurante_id', RESTAURANTE_ID)
         .order('numero'),
-      supabaseClient
-        .from('pedido_items')
-        .select(`
-          cantidad,
-          subtotal,
-          precio_unitario,
-          confirmado_por_mesero,
-          producto_id,
-          productos ( nombre ),
-          pedidos!inner ( mesa_id, archivado, restaurante_id )
-        `)
-        .eq('confirmado_por_mesero', true)
-        .eq('pedidos.archivado', false)
-        .eq('pedidos.restaurante_id', RESTAURANTE_ID),
+      supabaseClient.rpc('get_mesa_items', { p_restaurante_id: RESTAURANTE_ID }),
     ]);
 
   if (mesasError) throw mesasError;
@@ -341,17 +401,47 @@ async function fetchMesas() {
 
   mesas = mesasData || [];
   mesaAccounts = {};
+  mesaSessionBreakdown = {};
+  mesaSessionItems = {};
+
+  const sesionIds = [...new Set((itemsData || []).map((item) => item.sesion_id).filter(Boolean))];
+  let sesionById = new Map();
+
+  if (sesionIds.length > 0) {
+    const { data: sesionesData, error: sesionesError } = await supabaseClient
+      .from('sesiones')
+      .select('id, numero, tipo')
+      .in('id', sesionIds);
+
+    if (sesionesError) throw sesionesError;
+    sesionById = new Map((sesionesData || []).map((sesion) => [sesion.id, sesion]));
+  }
 
   (itemsData || []).forEach((item) => {
-    const mesaId = item.pedidos.mesa_id;
+    const mesaId = item.mesa_id;
+    if (!mesaId) return;
     if (!mesaAccounts[mesaId]) mesaAccounts[mesaId] = [];
+    if (!mesaSessionItems[mesaId]) mesaSessionItems[mesaId] = {};
 
-    mesaAccounts[mesaId].push({
+    const entry = {
+      sesionId: item.sesion_id,
       productoId: item.producto_id,
-      name: item.productos?.nombre || 'Producto',
+      name: item.producto_nombre || 'Producto',
       qty: item.cantidad,
       subtotal: Number(item.subtotal ?? item.precio_unitario * item.cantidad),
-    });
+    };
+
+    mesaAccounts[mesaId].push(entry);
+
+    if (item.sesion_id) {
+      if (!mesaSessionItems[mesaId][item.sesion_id]) mesaSessionItems[mesaId][item.sesion_id] = [];
+      mesaSessionItems[mesaId][item.sesion_id].push(entry);
+    }
+  });
+
+  mesas.forEach((mesa) => {
+    if (!mesaSessionItems[mesa.id]) mesaSessionItems[mesa.id] = {};
+    mesaSessionBreakdown[mesa.id] = buildMesaSessionBreakdown(mesaAccounts[mesa.id] || [], sesionById);
   });
 
   renderMesas();
@@ -390,9 +480,25 @@ function renderMesas() {
   list.innerHTML = mesas
     .map((mesa) => {
       const accountItems = mesaAccounts[mesa.id] || [];
+      const sessions = mesaSessionBreakdown[mesa.id] || [];
       const grouped = groupDeliveredItems(accountItems);
-      const total = grouped.reduce((sum, g) => sum + g.subtotal, 0);
+      const total = sessions.length
+        ? sessions.reduce((sum, session) => sum + session.total, 0)
+        : grouped.reduce((sum, g) => sum + g.subtotal, 0);
       const estado = mesa.estado || 'libre';
+      const sessionsHtml =
+        sessions.length === 0
+          ? '<p class="mesa-card__sessions-empty">Sin cuentas activas</p>'
+          : `<ul class="mesa-card__session-lines">${sessions
+              .map(
+                (session) => `
+                  <li class="mesa-card__session-line">
+                    <span class="mesa-card__session-label">${escapeHtml(session.label)}</span>
+                    <span class="mesa-card__session-amount">${formatCOP(session.total)}</span>
+                  </li>
+                `
+              )
+              .join('')}</ul>`;
       const waiterAlert = mesa.mesero_requerido
         ? `<div class="mesa-card__alert">
             <span class="mesa-card__alert-icon" aria-hidden="true">🔔</span>
@@ -408,12 +514,14 @@ function renderMesas() {
             <span class="mesa-card__status mesa-card__status--${estado}">${formatMesaEstado(estado)}</span>
           </header>
           ${waiterAlert}
+          <div class="mesa-card__body">${sessionsHtml}</div>
           <div class="mesa-card__total">
             <span class="mesa-card__total-label">Total acumulado</span>
             <strong class="mesa-card__total-amount">${formatCOP(total)}</strong>
           </div>
           <div class="mesa-card__actions">
-            <button type="button" class="mesa-card__btn mesa-card__btn--view" data-action="ver-cuenta" data-mesa-id="${mesa.id}" data-mesa-num="${mesa.numero}" ${grouped.length === 0 ? 'disabled' : ''}>Ver cuenta</button>
+            <button type="button" class="mesa-card__btn mesa-card__btn--new" data-action="nueva-orden" data-mesa-id="${mesa.id}" data-mesa-num="${mesa.numero}">Nueva orden</button>
+            <button type="button" class="mesa-card__btn mesa-card__btn--view" data-action="ver-cuenta" data-mesa-id="${mesa.id}" data-mesa-num="${mesa.numero}" ${sessions.length === 0 ? 'disabled' : ''}>Ver cuenta</button>
             <button type="button" class="mesa-card__btn mesa-card__btn--close" data-action="cerrar-mesa" data-mesa-id="${mesa.id}" data-mesa-num="${mesa.numero}">Cerrar mesa</button>
           </div>
         </article>
@@ -432,6 +540,7 @@ function bindMesasActions() {
     const { action, mesaId, mesaNum } = btn.dataset;
 
     if (action === 'ver-cuenta') openAccountModal(mesaId, mesaNum);
+    else if (action === 'nueva-orden') openNewOrderModal(mesaId, mesaNum);
     else if (action === 'cerrar-mesa') closeMesa(mesaId, mesaNum);
     else if (action === 'atender-mesero') markWaiterAttended(mesaId);
   });
@@ -439,27 +548,56 @@ function bindMesasActions() {
   mesasClickBound = true;
 }
 
+function formatAccountSessionHeading(session) {
+  if (session.tipo === 'grupal') return 'Cuenta Grupal';
+  if (session.numero != null && session.numero !== '') {
+    return `#${String(session.numero).padStart(4, '0')}`;
+  }
+  return session.label || 'Cuenta';
+}
+
 function openAccountModal(mesaId, mesaNum) {
-  const items = mesaAccounts[mesaId] || [];
-  const grouped = groupDeliveredItems(items);
-  const total = grouped.reduce((sum, g) => sum + g.subtotal, 0);
+  const sessions = mesaSessionBreakdown[mesaId] || [];
+  const sessionItems = mesaSessionItems[mesaId] || {};
+  const total = sessions.reduce((sum, session) => sum + session.total, 0);
 
   document.getElementById('modalTitle').textContent = `Cuenta · Mesa ${mesaNum}`;
   document.getElementById('modalTotal').textContent = formatCOP(total);
 
   const list = document.getElementById('modalInvoice');
   list.innerHTML =
-    grouped.length === 0
+    sessions.length === 0
       ? '<li class="modal__invoice-line"><span>Sin productos entregados</span></li>'
-      : grouped
-          .map(
-            (g) => `
-              <li class="modal__invoice-line">
-                <span>x${g.qty} ${escapeHtml(g.name)}</span>
-                <span>— ${formatCOP(g.subtotal)}</span>
+      : sessions
+          .map((session) => {
+            const items = sessionItems[session.sesionId] || [];
+            const grouped = groupDeliveredItems(items);
+            const heading = formatAccountSessionHeading(session);
+
+            return `
+              <li class="modal__invoice-group">
+                <div class="modal__invoice-group-head modal__invoice-group-head--title">
+                  <strong>${escapeHtml(heading)}</strong>
+                </div>
+                <ul class="modal__invoice-sublist">
+                  ${grouped
+                    .map(
+                      (item) => `
+                        <li class="modal__invoice-line modal__invoice-line--nested">
+                          <span>x${item.qty} ${escapeHtml(item.name)}</span>
+                          <span>— ${formatCOP(item.subtotal)}</span>
+                        </li>
+                      `
+                    )
+                    .join('')}
+                </ul>
+                <div class="modal__invoice-group-head modal__invoice-group-head--subtotal">
+                  <span>Subtotal</span>
+                  <span>— ${formatCOP(session.total)}</span>
+                </div>
               </li>
-            `
-          )
+            `;
+          })
           .join('');
 
   const modal = document.getElementById('accountModal');
@@ -739,13 +877,515 @@ async function markItemEntregado(itemId, pedidoId) {
   }
 }
 
+/* ── Nueva orden (mesero) ── */
+let newOrderState = {
+  mesaId: null,
+  mesaNum: null,
+  step: 'account',
+  selectedSessionId: null,
+  selectedSessionNumero: null,
+  selectedSessionTipo: null,
+  createNewSession: false,
+  cart: {},
+  products: [],
+  categories: [],
+  activeCategory: null,
+  submitting: false,
+};
+
+let newOrderModalBound = false;
+
+function formatNewOrderSessionOption(session) {
+  if (session.tipo === 'grupal') return 'Cuenta Grupal';
+  const code = formatSessionCode(session.numero);
+  return code ? `#${code} (Personal)` : 'Cuenta (Personal)';
+}
+
+function showNewOrderAccountStep() {
+  document.getElementById('newOrderAccountStep').hidden = false;
+  document.getElementById('newOrderMenuStep').hidden = true;
+}
+
+function showNewOrderMenuStep() {
+  document.getElementById('newOrderAccountStep').hidden = true;
+  document.getElementById('newOrderMenuStep').hidden = false;
+}
+
+function renderNewOrderAccountStep() {
+  const list = document.getElementById('newOrderAccountList');
+  if (!list) return;
+
+  const sessions = mesaSessionBreakdown[newOrderState.mesaId] || [];
+
+  list.innerHTML = `
+    ${sessions
+      .map(
+        (session) => `
+          <li>
+            <button
+              type="button"
+              class="new-order-card__account-btn"
+              data-select-session="${session.id}"
+              data-session-numero="${session.numero ?? ''}"
+              data-session-tipo="${session.tipo || 'individual'}"
+            >${escapeHtml(formatNewOrderSessionOption(session))}</button>
+          </li>
+        `
+      )
+      .join('')}
+    <li>
+      <button type="button" class="new-order-card__account-btn new-order-card__account-btn--new" data-select-session="new">
+        Nueva cuenta
+      </button>
+    </li>
+  `;
+}
+
+async function selectNewOrderAccount(option) {
+  if (option === 'new') {
+    newOrderState.createNewSession = true;
+    newOrderState.selectedSessionId = null;
+    newOrderState.selectedSessionNumero = null;
+    newOrderState.selectedSessionTipo = null;
+  } else {
+    newOrderState.createNewSession = false;
+    newOrderState.selectedSessionId = option.id;
+    newOrderState.selectedSessionNumero = option.numero;
+    newOrderState.selectedSessionTipo = option.tipo;
+  }
+
+  newOrderState.step = 'menu';
+  newOrderState.cart = {};
+  showNewOrderMenuStep();
+  await loadNewOrderMenuContent();
+}
+
+async function loadNewOrderMenuContent() {
+  document.getElementById('newOrderTabs').innerHTML = '';
+  document.getElementById('newOrderProducts').innerHTML = '';
+  document.getElementById('newOrderEmpty').hidden = false;
+  document.getElementById('newOrderEmpty').textContent = 'Cargando carta…';
+  renderNewOrderSummary();
+
+  try {
+    await loadNewOrderProducts();
+    newOrderState.categories = buildNewOrderCategories(newOrderState.products);
+    newOrderState.activeCategory = newOrderState.categories[0]?.id || null;
+    renderNewOrderTabs();
+    renderNewOrderProducts();
+    renderNewOrderSummary();
+  } catch (error) {
+    console.error(error);
+    document.getElementById('newOrderTabs').innerHTML = '';
+    document.getElementById('newOrderProducts').innerHTML = '';
+    document.getElementById('newOrderEmpty').hidden = false;
+    document.getElementById('newOrderEmpty').textContent = 'No se pudo cargar la carta.';
+    showToast(error.message || 'Error cargando productos.', 'error');
+  }
+}
+
+async function getNextSessionNumeroForMesa(mesaId) {
+  const { data, error } = await supabaseClient
+    .from('sesiones')
+    .select('numero')
+    .eq('mesa_id', mesaId)
+    .order('numero', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) throw error;
+  return (data?.numero ?? 0) + 1;
+}
+
+async function createPanelIndividualSession(mesaId) {
+  const { data, error } = await supabaseClient
+    .from('sesiones')
+    .insert({
+      mesa_id: mesaId,
+      restaurante_id: RESTAURANTE_ID,
+      session_token: crypto.randomUUID(),
+      tipo: 'individual',
+      numero: await getNextSessionNumeroForMesa(mesaId),
+      activa: true,
+    })
+    .select('id, numero, tipo')
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+async function loadNewOrderProducts() {
+  const { data, error } = await supabaseClient
+    .from('productos')
+    .select('id, nombre, descripcion, precio, categoria')
+    .eq('restaurante_id', RESTAURANTE_ID)
+    .eq('disponible', true)
+    .order('categoria', { ascending: true })
+    .order('nombre', { ascending: true });
+
+  if (error) throw error;
+  newOrderState.products = data || [];
+}
+
+function groupNewOrderProducts(products) {
+  const groups = new Map();
+
+  products.forEach((product) => {
+    const category = product.categoria?.trim() || 'Sin categoría';
+    if (!groups.has(category)) groups.set(category, []);
+    groups.get(category).push(product);
+  });
+
+  return [...groups.entries()].sort(([a], [b]) => a.localeCompare(b, 'es'));
+}
+
+function buildNewOrderCategories(products) {
+  const groups = groupNewOrderProducts(products);
+  return groups.map(([name, items], index) => ({
+    id: `cat-${index}`,
+    name,
+    items,
+  }));
+}
+
+function getNewOrderActiveCategory() {
+  return newOrderState.categories.find((c) => c.id === newOrderState.activeCategory) || null;
+}
+
+function setNewOrderActiveCategory(categoryId) {
+  newOrderState.activeCategory = categoryId;
+  renderNewOrderTabs();
+  renderNewOrderProducts();
+}
+
+function getNewOrderCartEntries() {
+  return Object.entries(newOrderState.cart)
+    .map(([productId, entry]) => {
+      const product = newOrderState.products.find((p) => p.id === productId);
+      if (!product || entry.qty <= 0) return null;
+      const unitPrice = Number(product.precio);
+      return {
+        productId,
+        name: product.nombre,
+        qty: entry.qty,
+        unitPrice,
+        subtotal: unitPrice * entry.qty,
+      };
+    })
+    .filter(Boolean);
+}
+
+function getNewOrderCartTotal() {
+  return getNewOrderCartEntries().reduce((sum, item) => sum + item.subtotal, 0);
+}
+
+function addToNewOrderCart(productId) {
+  if (!newOrderState.cart[productId]) {
+    newOrderState.cart[productId] = { qty: 0 };
+  }
+  newOrderState.cart[productId].qty += 1;
+  renderNewOrderProducts();
+  renderNewOrderSummary();
+}
+
+function removeFromNewOrderCart(productId) {
+  if (!newOrderState.cart[productId]) return;
+  newOrderState.cart[productId].qty -= 1;
+  if (newOrderState.cart[productId].qty <= 0) {
+    delete newOrderState.cart[productId];
+  }
+  renderNewOrderProducts();
+  renderNewOrderSummary();
+}
+
+function renderNewOrderTabs() {
+  const container = document.getElementById('newOrderTabs');
+  if (!container) return;
+
+  if (newOrderState.categories.length === 0) {
+    container.innerHTML = '';
+    container.hidden = true;
+    return;
+  }
+
+  container.hidden = false;
+  container.innerHTML = newOrderState.categories
+    .map(
+      (category) => `
+        <button
+          type="button"
+          class="new-order-card__tab${category.id === newOrderState.activeCategory ? ' new-order-card__tab--active' : ''}"
+          data-category-id="${category.id}"
+          role="tab"
+          aria-selected="${category.id === newOrderState.activeCategory}"
+        >${escapeHtml(category.name)}</button>
+      `
+    )
+    .join('');
+}
+
+function renderNewOrderProducts() {
+  const list = document.getElementById('newOrderProducts');
+  const empty = document.getElementById('newOrderEmpty');
+  if (!list || !empty) return;
+
+  if (newOrderState.products.length === 0) {
+    list.innerHTML = '';
+    empty.hidden = false;
+    empty.textContent = 'No hay productos disponibles.';
+    return;
+  }
+
+  const category = getNewOrderActiveCategory();
+  const items = category?.items || [];
+
+  if (items.length === 0) {
+    list.innerHTML = '';
+    empty.hidden = false;
+    empty.textContent = 'No hay productos en esta categoría.';
+    return;
+  }
+
+  empty.hidden = true;
+  list.innerHTML = items
+    .map((product) => {
+      const qty = newOrderState.cart[product.id]?.qty || 0;
+      return `
+        <li class="item-row new-order-card__item">
+          <div class="item-row__info">
+            <p class="item-row__name">${escapeHtml(product.nombre)}</p>
+            ${product.descripcion ? `<p class="item-row__qty">${escapeHtml(product.descripcion)}</p>` : ''}
+            <p class="new-order-card__price">${formatCOP(Number(product.precio))}</p>
+          </div>
+          <div class="item-row__actions">
+            <div class="new-order-card__qty">
+              <button
+                type="button"
+                class="new-order-card__qty-btn"
+                data-remove-product="${product.id}"
+                aria-label="Quitar uno de ${escapeHtml(product.nombre)}"
+                ${qty === 0 ? 'disabled' : ''}
+              >−</button>
+              <span class="new-order-card__qty-num">${qty}</span>
+              <button
+                type="button"
+                class="new-order-card__qty-btn"
+                data-add-product="${product.id}"
+                aria-label="Agregar uno de ${escapeHtml(product.nombre)}"
+              >+</button>
+            </div>
+          </div>
+        </li>
+      `;
+    })
+    .join('');
+}
+
+function renderNewOrderSummary() {
+  const list = document.getElementById('newOrderSummary');
+  const totalEl = document.getElementById('newOrderTotal');
+  const confirmBtn = document.getElementById('newOrderConfirmBtn');
+  const entries = getNewOrderCartEntries();
+
+  if (!list || !totalEl || !confirmBtn) return;
+
+  list.innerHTML =
+    entries.length === 0
+      ? '<li class="mesa-card__sessions-empty">Sin productos seleccionados</li>'
+      : entries
+          .map(
+            (item) => `
+              <li class="mesa-card__session-line">
+                <span class="mesa-card__session-label">x${item.qty} ${escapeHtml(item.name)}</span>
+                <span class="mesa-card__session-amount">${formatCOP(item.subtotal)}</span>
+              </li>
+            `
+          )
+          .join('');
+
+  totalEl.textContent = formatCOP(getNewOrderCartTotal());
+  confirmBtn.disabled = entries.length === 0 || newOrderState.submitting;
+}
+
+async function openNewOrderModal(mesaId, mesaNum) {
+  newOrderState.mesaId = mesaId;
+  newOrderState.mesaNum = mesaNum;
+  newOrderState.step = 'account';
+  newOrderState.selectedSessionId = null;
+  newOrderState.selectedSessionNumero = null;
+  newOrderState.selectedSessionTipo = null;
+  newOrderState.createNewSession = false;
+  newOrderState.cart = {};
+  newOrderState.products = [];
+  newOrderState.categories = [];
+  newOrderState.activeCategory = null;
+  newOrderState.submitting = false;
+
+  document.getElementById('newOrderMesaNum').textContent = `Mesa ${mesaNum}`;
+
+  const modal = document.getElementById('newOrderModal');
+  modal.hidden = false;
+  modal.setAttribute('aria-hidden', 'false');
+
+  showNewOrderAccountStep();
+  renderNewOrderAccountStep();
+}
+
+function closeNewOrderModal() {
+  const modal = document.getElementById('newOrderModal');
+  modal.hidden = true;
+  modal.setAttribute('aria-hidden', 'true');
+  newOrderState.mesaId = null;
+  newOrderState.mesaNum = null;
+  newOrderState.step = 'account';
+  newOrderState.selectedSessionId = null;
+  newOrderState.selectedSessionNumero = null;
+  newOrderState.selectedSessionTipo = null;
+  newOrderState.createNewSession = false;
+  newOrderState.cart = {};
+  newOrderState.products = [];
+  newOrderState.categories = [];
+  newOrderState.activeCategory = null;
+  newOrderState.submitting = false;
+}
+
+async function confirmNewOrder() {
+  const entries = getNewOrderCartEntries();
+  if (
+    entries.length === 0 ||
+    newOrderState.submitting ||
+    !newOrderState.mesaId ||
+    newOrderState.step !== 'menu'
+  ) {
+    return;
+  }
+
+  if (!newOrderState.createNewSession && !newOrderState.selectedSessionId) {
+    showToast('Seleccioná una cuenta.', 'error');
+    return;
+  }
+
+  const confirmBtn = document.getElementById('newOrderConfirmBtn');
+  newOrderState.submitting = true;
+  confirmBtn.disabled = true;
+  confirmBtn.textContent = 'Enviando…';
+
+  try {
+    let session;
+
+    if (newOrderState.createNewSession) {
+      session = await createPanelIndividualSession(newOrderState.mesaId);
+    } else {
+      session = {
+        id: newOrderState.selectedSessionId,
+        numero: newOrderState.selectedSessionNumero,
+        tipo: newOrderState.selectedSessionTipo,
+      };
+    }
+
+    const total = getNewOrderCartTotal();
+
+    const { data: pedido, error: pedidoError } = await supabaseClient
+      .from('pedidos')
+      .insert({
+        mesa_id: newOrderState.mesaId,
+        sesion_id: session.id,
+        restaurante_id: RESTAURANTE_ID,
+        estado: 'pendiente',
+        total,
+        archivado: false,
+      })
+      .select('id')
+      .single();
+
+    if (pedidoError) throw pedidoError;
+
+    const items = entries.map((item) => ({
+      pedido_id: pedido.id,
+      producto_id: item.productId,
+      cantidad: item.qty,
+      precio_unitario: item.unitPrice,
+      subtotal: item.subtotal,
+      estado: 'pendiente',
+      confirmado_por_mesero: false,
+    }));
+
+    const { error: itemsError } = await supabaseClient.from('pedido_items').insert(items);
+    if (itemsError) throw itemsError;
+
+    await supabaseClient
+      .from('mesas')
+      .update({ estado: 'ocupada' })
+      .eq('id', newOrderState.mesaId);
+
+    const sessionCode = String(session.numero).padStart(4, '0');
+    const mesaNum = newOrderState.mesaNum;
+    closeNewOrderModal();
+    showToast(`Orden creada · Mesa ${mesaNum} · #${sessionCode}`, 'success');
+
+    await refreshPanelData();
+    switchPanel('pedidos');
+  } catch (error) {
+    console.error(error);
+    showToast(error.message || 'No se pudo crear la orden.', 'error');
+  } finally {
+    newOrderState.submitting = false;
+    if (confirmBtn) {
+      confirmBtn.textContent = 'Confirmar orden';
+      renderNewOrderSummary();
+    }
+  }
+}
+
+function initNewOrderModal() {
+  if (newOrderModalBound) return;
+
+  document.querySelectorAll('[data-close-new-order]').forEach((el) => {
+    el.addEventListener('click', closeNewOrderModal);
+  });
+
+  document.getElementById('newOrderConfirmBtn')?.addEventListener('click', confirmNewOrder);
+
+  document.getElementById('newOrderAccountList')?.addEventListener('click', (event) => {
+    const btn = event.target.closest('[data-select-session]');
+    if (!btn) return;
+
+    if (btn.dataset.selectSession === 'new') {
+      selectNewOrderAccount('new');
+      return;
+    }
+
+    selectNewOrderAccount({
+      id: btn.dataset.selectSession,
+      numero: btn.dataset.sessionNumero !== '' ? Number(btn.dataset.sessionNumero) : null,
+      tipo: btn.dataset.sessionTipo || 'individual',
+    });
+  });
+
+  document.getElementById('newOrderTabs')?.addEventListener('click', (event) => {
+    const tab = event.target.closest('[data-category-id]');
+    if (!tab) return;
+    setNewOrderActiveCategory(tab.dataset.categoryId);
+  });
+
+  document.getElementById('newOrderProducts')?.addEventListener('click', (event) => {
+    const addBtn = event.target.closest('[data-add-product]');
+    const removeBtn = event.target.closest('[data-remove-product]');
+    if (addBtn) addToNewOrderCart(addBtn.dataset.addProduct);
+    else if (removeBtn && !removeBtn.disabled) removeFromNewOrderCart(removeBtn.dataset.removeProduct);
+  });
+
+  newOrderModalBound = true;
+}
+
 function subscribeToRealtime() {
   if (realtimeChannel) {
     supabaseClient.removeChannel(realtimeChannel);
     realtimeChannel = null;
   }
 
-  const tables = ['pedidos', 'pedido_items', 'mesas', 'productos'];
+  const tables = ['pedidos', 'pedido_items', 'mesas', 'productos', 'sesiones'];
   realtimeChannel = supabaseClient.channel('panel-live-sync');
 
   tables.forEach((table) => {
@@ -774,6 +1414,7 @@ async function init() {
 
   initTabs();
   initModal();
+  initNewOrderModal();
   bindListActions();
   bindMesasActions();
 

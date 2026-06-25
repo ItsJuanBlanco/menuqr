@@ -633,6 +633,60 @@ ul {
   color: var(--accent);
 }
 
+.account__switch {
+  margin-top: 8px;
+  padding-top: 24px;
+  border-top: 1px solid var(--border);
+}
+
+.account__switch-hint {
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+  margin-bottom: 14px;
+  line-height: 1.45;
+}
+
+.account__switch-form {
+  display: flex;
+  gap: 10px;
+}
+
+.account__switch-input {
+  flex: 1;
+  min-width: 0;
+  padding: 14px 16px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 1.125rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-align: center;
+}
+
+.account__switch-input:focus {
+  outline: none;
+  border-color: rgba(249, 115, 22, 0.5);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.account__switch-btn {
+  padding: 14px 16px;
+  border-radius: var(--radius-sm);
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: #fff;
+  background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+  white-space: nowrap;
+}
+
+.account__switch-btn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
 /* ── Waiter tab ── */
 .waiter {
   display: flex;

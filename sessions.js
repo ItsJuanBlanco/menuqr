@@ -158,7 +158,7 @@ async function joinOrCreateGroupSession(mesaId) {
   return data;
 }
 
-async function joinSessionByCode(mesaId, codeInput) {
+async function findActiveSessionByCode(mesaId, codeInput) {
   const digits = String(codeInput).replace(/\D/g, '');
   if (digits.length === 0 || digits.length > 4) {
     throw new Error('Ingresá un código de 4 dígitos.');
@@ -180,13 +180,45 @@ async function joinSessionByCode(mesaId, codeInput) {
   if (error) throw error;
   if (!data) throw new Error('No encontramos una cuenta con ese código en esta mesa.');
 
+  return data;
+}
+
+async function joinSessionByCode(mesaId, codeInput) {
+  const data = await findActiveSessionByCode(mesaId, codeInput);
+
   saveStoredSession(mesaId, {
     sesionId: data.id,
-    sessionToken: data.session_token || null,
+    sessionToken: data.session_token,
     tipo: data.tipo,
   });
 
   return data;
+}
+
+async function switchSessionByCode(mesaId, currentSesionId, codeInput) {
+  const destSession = await findActiveSessionByCode(mesaId, codeInput);
+
+  if (destSession.id === currentSesionId) {
+    throw new Error('Ya estás en esa cuenta.');
+  }
+
+  const { error } = await supabaseClient
+    .from('pedidos')
+    .update({ sesion_id: destSession.id })
+    .eq('sesion_id', currentSesionId)
+    .eq('mesa_id', mesaId)
+    .eq('restaurante_id', RESTAURANTE_ID)
+    .eq('archivado', false);
+
+  if (error) throw error;
+
+  saveStoredSession(mesaId, {
+    sesionId: destSession.id,
+    sessionToken: destSession.session_token,
+    tipo: destSession.tipo,
+  });
+
+  return destSession;
 }
 
 function setSessionGateLoading(isLoading) {
@@ -322,6 +354,11 @@ async function startSessionFlow(mesaId, mesaNumero) {
   const session = await waitForSessionChoice(mesaId);
   hideSessionGate();
   return session;
+}
+
+function formatSessionLabel(session) {
+  if (session.tipo === 'grupal') return 'Cuenta Grupal';
+  return `Cuenta ${session.numero} (Personal)`;
 }
 
 function updateSessionBadge(session) {

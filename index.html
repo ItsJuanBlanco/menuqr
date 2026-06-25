@@ -125,6 +125,25 @@
               <strong id="totalAmount">$0</strong>
             </div>
           </section>
+
+          <section class="account__switch" id="accountSwitchSection">
+            <h3 class="account__section-title">Cambiar a otra cuenta</h3>
+            <p class="account__switch-hint">Ingresá el código de 4 dígitos para unirte a otra cuenta. Tus pedidos activos se moverán a esa cuenta.</p>
+            <form class="account__switch-form" id="accountSwitchForm">
+              <input
+                type="text"
+                class="account__switch-input"
+                id="accountSwitchCode"
+                inputmode="numeric"
+                pattern="[0-9]*"
+                maxlength="4"
+                placeholder="0000"
+                autocomplete="one-time-code"
+                aria-label="Código de cuenta destino"
+              >
+              <button type="submit" class="account__switch-btn" id="accountSwitchBtn">Confirmar cambio</button>
+            </form>
+          </section>
         </div>
       </section>
 

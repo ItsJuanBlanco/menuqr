@@ -45,6 +45,9 @@
 
       <!-- Mesas -->
       <section class="panel-view" id="viewMesas" role="tabpanel" aria-labelledby="tabMesas" hidden>
+        <div class="mesas-toolbar">
+          <p class="mesas-toolbar__hint">Desglose por cuenta activa (productos confirmados por mesero)</p>
+        </div>
         <div class="panel-mesas" id="mesasList"></div>
       </section>
 
@@ -68,7 +71,7 @@
         </header>
         <ul class="modal__invoice" id="modalInvoice"></ul>
         <div class="modal__total">
-          <span>Total</span>
+          <span>TOTAL</span>
           <strong id="modalTotal">$0</strong>
         </div>
       </div>
@@ -111,6 +114,45 @@
             <button type="submit" class="product-form__btn product-form__btn--primary" id="productSaveBtn">Guardar</button>
           </div>
         </form>
+      </div>
+    </div>
+
+    <!-- Modal nueva orden -->
+    <div class="modal" id="newOrderModal" hidden aria-hidden="true">
+      <div class="modal__backdrop" data-close-new-order></div>
+      <div class="modal__box modal__box--order" role="dialog" aria-labelledby="newOrderMesaNum">
+        <article class="mesa-card new-order-card">
+          <header class="mesa-card__head">
+            <span class="mesa-card__num" id="newOrderMesaNum">Mesa 1</span>
+            <div class="new-order-card__head-actions">
+              <span class="mesa-card__status mesa-card__status--ocupada">Nueva orden</span>
+              <button type="button" class="modal__close new-order-card__close" data-close-new-order aria-label="Cerrar">×</button>
+            </div>
+          </header>
+          <div class="new-order-card__step" id="newOrderAccountStep">
+            <p class="new-order-card__step-title">Seleccioná la cuenta</p>
+            <ul class="new-order-card__accounts" id="newOrderAccountList"></ul>
+          </div>
+          <div class="new-order-card__step" id="newOrderMenuStep" hidden>
+          <nav class="new-order-card__tabs" id="newOrderTabs" role="tablist" aria-label="Categorías"></nav>
+          <div class="new-order-card__menu">
+            <ul class="new-order-card__products" id="newOrderProducts"></ul>
+            <p class="mesa-card__sessions-empty" id="newOrderEmpty" hidden>No hay productos en esta categoría.</p>
+          </div>
+          <div class="mesa-card__body new-order-card__summary">
+            <ul class="mesa-card__session-lines" id="newOrderSummary"></ul>
+          </div>
+          <div class="mesa-card__total">
+            <span class="mesa-card__total-label">Total pedido</span>
+            <strong class="mesa-card__total-amount" id="newOrderTotal">$0</strong>
+          </div>
+          <div class="mesa-card__actions">
+            <button type="button" class="mesa-card__btn mesa-card__btn--new" id="newOrderConfirmBtn" disabled>
+              Confirmar orden
+            </button>
+          </div>
+          </div>
+        </article>
       </div>
     </div>
 

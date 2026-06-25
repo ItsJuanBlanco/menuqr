@@ -721,6 +721,55 @@ function renderAccount() {
   badge.textContent = inProgressCount;
 }
 
+function getSessionSwitchSuccessMessage(session) {
+  const label =
+    session.tipo === 'grupal'
+      ? 'Cuenta Grupal'
+      : `Cuenta ${formatSessionCode(session.numero)} (Personal)`;
+  return `Cambio exitoso — ahora estás en ${label}. Tus pedidos activos fueron transferidos.`;
+}
+
+function initAccountSwitch() {
+  const form = document.getElementById('accountSwitchForm');
+  if (!form || form.dataset.bound) return;
+  form.dataset.bound = 'true';
+
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+
+    if (!state.mesaId || !state.sesionId) {
+      showToast('No se pudo identificar tu sesión. Recarga la página.', 'error');
+      return;
+    }
+
+    const codeInput = document.getElementById('accountSwitchCode');
+    const btn = document.getElementById('accountSwitchBtn');
+    const code = codeInput?.value?.trim();
+
+    if (!code) {
+      showToast('Ingresá el código de 4 dígitos.', 'error');
+      return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = 'Cambiando…';
+
+    try {
+      const session = await switchSessionByCode(state.mesaId, state.sesionId, code);
+      applySession(session);
+      if (codeInput) codeInput.value = '';
+      await loadAccountItems();
+      showToast(getSessionSwitchSuccessMessage(session), 'success', 5000);
+    } catch (error) {
+      console.error(error);
+      showToast(error.message || 'No se pudo cambiar de cuenta.', 'error');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Confirmar cambio';
+    }
+  });
+}
+
 /* ── Tabs ── */
 function switchTab(tabId) {
   state.activeTab = tabId;
@@ -811,6 +860,7 @@ async function init() {
     renderProducts();
     updateCartBar();
     initWaiterButtons();
+    initAccountSwitch();
     handleInitialRoute();
 
     document.querySelectorAll('.bottom-nav__item').forEach((btn) => {
