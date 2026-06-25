@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#f4f4f5">
+  <title>Panel · La Brasa</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="panel.css">
+</head>
+<body>
+  <div class="panel-app">
+    <header class="panel-header">
+      <div class="panel-header__left">
+        <h1 class="panel-header__title">Panel de pedidos</h1>
+        <p class="panel-header__subtitle">Mesero · Cocina</p>
+      </div>
+      <div class="panel-header__right">
+        <span class="panel-header__live" id="liveIndicator">
+          <span class="panel-header__dot" aria-hidden="true"></span>
+          En vivo
+        </span>
+        <span class="panel-header__count" id="orderCount">0 pedidos</span>
+      </div>
+    </header>
+
+    <main class="panel-main">
+      <div class="panel-empty" id="emptyState" hidden>
+        <span class="panel-empty__icon" aria-hidden="true">✓</span>
+        <p class="panel-empty__title">Sin pedidos activos</p>
+        <p class="panel-empty__text">Los nuevos pedidos aparecerán aquí automáticamente.</p>
+      </div>
+      <div class="panel-orders" id="ordersList"></div>
+    </main>
+
+    <div class="panel-toast" id="toast" role="status" aria-live="polite"></div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="config.js"></script>
+  <script src="panel.js"></script>
+</body>
+</html>

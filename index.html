@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#0a0a0c">
+  <meta name="description" content="Carta digital — La Brasa Gastrobar, Medellín">
+  <title>La Brasa Gastrobar · Carta</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app">
+    <header class="header">
+      <div class="header__brand">
+        <span class="header__logo" aria-hidden="true">🔥</span>
+        <div>
+          <h1 class="header__title">Test</h1>
+          <p class="header__subtitle">App · Medellín</p>
+        </div>
+      </div>
+      <div class="header__table" id="tableBadge">Mesa 1</div>
+    </header>
+
+    <main class="main">
+      <!-- Tab: Carta -->
+      <section class="panel panel--active" id="panel-carta" role="tabpanel" aria-labelledby="tab-carta">
+        <div class="categories" id="categories" role="tablist" aria-label="Categorías"></div>
+        <div class="products" id="products"></div>
+      </section>
+
+      <!-- Tab: Mi cuenta -->
+      <section class="panel" id="panel-cuenta" role="tabpanel" aria-labelledby="tab-cuenta" hidden>
+        <div class="account">
+          <div class="account__header">
+            <h2 class="account__title">Tu cuenta</h2>
+            <p class="account__hint">Productos confirmados por el mesero</p>
+          </div>
+          <ul class="account__list" id="confirmedList"></ul>
+          <div class="account__empty" id="accountEmpty">
+            <span class="account__empty-icon" aria-hidden="true">🍽️</span>
+            <p>Aún no hay productos confirmados.</p>
+            <p class="account__empty-sub">Agrega items desde la carta y espera la confirmación del mesero.</p>
+          </div>
+          <div class="account__total" id="accountTotal" hidden>
+            <span>Total acumulado</span>
+            <strong id="totalAmount">$0</strong>
+          </div>
+        </div>
+      </section>
+
+      <!-- Tab: Llamar mesero -->
+      <section class="panel" id="panel-mesero" role="tabpanel" aria-labelledby="tab-mesero" hidden>
+        <div class="waiter">
+          <div class="waiter__icon" aria-hidden="true">🛎️</div>
+          <h2 class="waiter__title">¿Necesitas ayuda?</h2>
+          <p class="waiter__text">Presiona el botón y un mesero llegará a tu mesa en unos momentos.</p>
+          <button type="button" class="waiter__btn" id="callWaiterBtn">
+            <span class="waiter__btn-icon" aria-hidden="true">🔔</span>
+            Llamar mesero
+          </button>
+          <p class="waiter__status" id="waiterStatus" aria-live="polite"></p>
+        </div>
+      </section>
+    </main>
+
+    <!-- Carrito flotante (pedido pendiente) -->
+    <aside class="cart-bar" id="cartBar" hidden>
+      <div class="cart-bar__info">
+        <span class="cart-bar__count" id="cartCount">0 items</span>
+        <span class="cart-bar__total" id="cartTotal">$0</span>
+      </div>
+      <button type="button" class="cart-bar__btn" id="sendOrderBtn">Enviar pedido</button>
+    </aside>
+
+    <nav class="bottom-nav" role="tablist" aria-label="Navegación principal">
+      <button type="button" class="bottom-nav__item bottom-nav__item--active" id="tab-carta" role="tab" aria-selected="true" aria-controls="panel-carta" data-tab="carta">
+        <svg class="bottom-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+          <path d="M4 6h16M4 12h16M4 18h10"/>
+        </svg>
+        <span>Carta</span>
+      </button>
+      <button type="button" class="bottom-nav__item" id="tab-cuenta" role="tab" aria-selected="false" aria-controls="panel-cuenta" data-tab="cuenta">
+        <svg class="bottom-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+          <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/>
+          <rect x="9" y="3" width="6" height="4" rx="1"/>
+        </svg>
+        <span>Mi cuenta</span>
+        <span class="bottom-nav__badge" id="accountBadge" hidden>0</span>
+      </button>
+      <button type="button" class="bottom-nav__item" id="tab-mesero" role="tab" aria-selected="false" aria-controls="panel-mesero" data-tab="mesero">
+        <svg class="bottom-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+          <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/>
+          <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+        </svg>
+        <span>Llamar mesero</span>
+      </button>
+    </nav>
+
+    <!-- Toast -->
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
