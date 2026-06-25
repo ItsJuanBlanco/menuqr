@@ -88,6 +88,12 @@ function updateHeaderCount() {
   if (activePanel === 'mesas') {
     const waiterCalls = mesas.filter((m) => m.mesero_requerido).length;
     el.textContent = `${mesas.length} mesas${waiterCalls ? ` · ${waiterCalls} llamando` : ''}`;
+  } else if (activePanel === 'menu') {
+    const available = typeof menuProducts !== 'undefined'
+      ? menuProducts.filter((p) => p.disponible !== false).length
+      : 0;
+    const total = typeof menuProducts !== 'undefined' ? menuProducts.length : 0;
+    el.textContent = `${total} producto${total !== 1 ? 's' : ''} · ${available} disponible${available !== 1 ? 's' : ''}`;
   } else {
     el.textContent = `${orders.length} pedido${orders.length !== 1 ? 's' : ''}`;
   }
@@ -113,6 +119,7 @@ function switchPanel(panelId) {
 
   if (panelId === 'pedidos') renderOrders();
   if (panelId === 'mesas') renderMesas();
+  if (panelId === 'menu' && typeof fetchMenuProducts === 'function') fetchMenuProducts();
 }
 
 function initTabs() {
@@ -358,6 +365,14 @@ function scheduleRealtimeRefresh() {
     refreshPanelData().catch((error) => {
       console.error('Error refrescando panel (realtime):', error);
     });
+
+    if (menuSaving || menuReloading) return;
+
+    if (typeof reloadMenuProducts === 'function') {
+      reloadMenuProducts().catch((error) => {
+        console.error('Error refrescando menú (realtime):', error);
+      });
+    }
   }, 250);
 }
 
@@ -717,7 +732,7 @@ function subscribeToRealtime() {
     realtimeChannel = null;
   }
 
-  const tables = ['pedidos', 'pedido_items', 'mesas'];
+  const tables = ['pedidos', 'pedido_items', 'mesas', 'productos'];
   realtimeChannel = supabaseClient.channel('panel-live-sync');
 
   tables.forEach((table) => {
@@ -747,7 +762,11 @@ async function init() {
   bindMesasActions();
 
   try {
-    await Promise.all([fetchOrders(), fetchMesas()]);
+    await Promise.all([
+      fetchOrders(),
+      fetchMesas(),
+      typeof fetchMenuProducts === 'function' ? fetchMenuProducts() : Promise.resolve(),
+    ]);
     renderOrders();
     renderMesas();
     subscribeToRealtime();

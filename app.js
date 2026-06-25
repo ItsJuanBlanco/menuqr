@@ -267,6 +267,8 @@ async function loadMenuFromSupabase() {
   const { data, error } = await supabaseClient
     .from('productos')
     .select('id, nombre, descripcion, precio, categoria, imagen_url')
+    .eq('restaurante_id', RESTAURANTE_ID)
+    .eq('disponible', true)
     .order('nombre');
 
   if (error) throw error;
@@ -279,7 +281,8 @@ async function loadMenuFromSupabase() {
 async function seedProductsIfEmpty() {
   const { count, error: countError } = await supabaseClient
     .from('productos')
-    .select('*', { count: 'exact', head: true });
+    .select('*', { count: 'exact', head: true })
+    .eq('restaurante_id', RESTAURANTE_ID);
 
   if (countError) throw countError;
   if (count > 0) return false;
@@ -292,6 +295,8 @@ async function seedProductsIfEmpty() {
     precio: p.price,
     categoria: categoryById[p.category] || p.category,
     imagen_url: p.image,
+    disponible: true,
+    restaurante_id: RESTAURANTE_ID,
   }));
 
   const { error: insertError } = await supabaseClient.from('productos').insert(rows);

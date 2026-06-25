@@ -29,6 +29,7 @@
     <nav class="panel-tabs" role="tablist" aria-label="Secciones del panel">
       <button type="button" class="panel-tabs__btn panel-tabs__btn--active" id="tabPedidos" role="tab" aria-selected="true" data-panel="pedidos">Pedidos</button>
       <button type="button" class="panel-tabs__btn" id="tabMesas" role="tab" aria-selected="false" data-panel="mesas">Mesas</button>
+      <button type="button" class="panel-tabs__btn" id="tabMenu" role="tab" aria-selected="false" data-panel="menu">Menú</button>
     </nav>
 
     <main class="panel-main">
@@ -45,6 +46,15 @@
       <!-- Mesas -->
       <section class="panel-view" id="viewMesas" role="tabpanel" aria-labelledby="tabMesas" hidden>
         <div class="panel-mesas" id="mesasList"></div>
+      </section>
+
+      <!-- Menú -->
+      <section class="panel-view" id="viewMenu" role="tabpanel" aria-labelledby="tabMenu" hidden>
+        <div class="menu-toolbar">
+          <p class="menu-toolbar__hint">Productos del restaurante</p>
+          <button type="button" class="menu-toolbar__btn" id="addProductBtn">+ Agregar producto</button>
+        </div>
+        <div class="menu-sections" id="menuList"></div>
       </section>
     </main>
 
@@ -64,11 +74,52 @@
       </div>
     </div>
 
+    <!-- Modal producto -->
+    <div class="modal" id="productModal" hidden aria-hidden="true">
+      <div class="modal__backdrop" data-close-product-modal></div>
+      <div class="modal__box modal__box--form" role="dialog" aria-labelledby="productModalTitle">
+        <header class="modal__head">
+          <h2 class="modal__title" id="productModalTitle">Agregar producto</h2>
+          <button type="button" class="modal__close" data-close-product-modal aria-label="Cerrar">×</button>
+        </header>
+        <form class="product-form" id="productForm">
+          <input type="hidden" id="productId">
+          <label class="product-form__field">
+            <span>Nombre</span>
+            <input type="text" id="productNombre" required maxlength="120">
+          </label>
+          <label class="product-form__field">
+            <span>Descripción</span>
+            <textarea id="productDescripcion" rows="3" maxlength="500"></textarea>
+          </label>
+          <div class="product-form__row">
+            <label class="product-form__field">
+              <span>Precio (COP)</span>
+              <input type="number" id="productPrecio" required min="0" step="100">
+            </label>
+            <label class="product-form__field">
+              <span>Categoría</span>
+              <input type="text" id="productCategoria" required maxlength="60" placeholder="Ej: Entradas">
+            </label>
+          </div>
+          <label class="product-form__toggle">
+            <input type="checkbox" id="productDisponible" checked>
+            <span>Disponible en la carta</span>
+          </label>
+          <div class="product-form__actions">
+            <button type="button" class="product-form__btn product-form__btn--ghost" data-close-product-modal>Cancelar</button>
+            <button type="submit" class="product-form__btn product-form__btn--primary" id="productSaveBtn">Guardar</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
     <div class="panel-toast" id="toast" role="status" aria-live="polite"></div>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="config.js"></script>
   <script src="panel.js"></script>
+  <script src="panel-menu.js"></script>
 </body>
 </html>

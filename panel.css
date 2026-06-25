@@ -420,6 +420,10 @@ button {
   background: #dc2626;
 }
 
+.panel-toast--success {
+  background: var(--ready);
+}
+
 /* Mesa cards */
 .mesa-card {
   background: var(--bg-card);
@@ -630,6 +634,220 @@ button {
   font-weight: 700;
 }
 
+/* Menú admin */
+.menu-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.menu-toolbar__hint {
+  font-size: 0.9375rem;
+  color: var(--text-muted);
+}
+
+.menu-toolbar__btn {
+  padding: 10px 18px;
+  border-radius: var(--radius-sm);
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: #fff;
+  background: var(--accent);
+}
+
+.menu-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.menu-section__title {
+  font-size: 0.8125rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  margin-bottom: 10px;
+}
+
+.menu-section__list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.menu-product {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 18px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+.menu-product--off {
+  opacity: 0.72;
+}
+
+.menu-product__info {
+  flex: 1;
+  min-width: 0;
+}
+
+.menu-product__name {
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.menu-product__desc {
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+.menu-product__price {
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: var(--accent);
+  margin-top: 8px;
+}
+
+.menu-product__actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.menu-product__badge {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 4px 8px;
+  border-radius: 999px;
+}
+
+.menu-product__badge--on {
+  background: var(--ready-soft);
+  color: var(--ready);
+}
+
+.menu-product__badge--off {
+  background: #fef2f2;
+  color: #dc2626;
+}
+
+.menu-product__btn {
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: var(--bg);
+  border: 1px solid var(--border);
+}
+
+.menu-product__btn--edit {
+  color: var(--prep);
+  border-color: #bfdbfe;
+  background: var(--prep-soft);
+}
+
+.menu-product__btn--delete {
+  color: #dc2626;
+  border-color: #fecaca;
+  background: #fef2f2;
+}
+
+.modal__box--form {
+  max-width: 480px;
+}
+
+.product-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.product-form__field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.product-form__field span {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.product-form__field input,
+.product-form__field textarea {
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-family: inherit;
+  font-size: 0.9375rem;
+}
+
+.product-form__field input:focus,
+.product-form__field textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.product-form__row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.product-form__toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.9375rem;
+  font-weight: 500;
+}
+
+.product-form__toggle input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent);
+}
+
+.product-form__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.product-form__btn {
+  padding: 10px 18px;
+  border-radius: var(--radius-sm);
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+
+.product-form__btn--ghost {
+  background: var(--bg);
+  border: 1px solid var(--border);
+}
+
+.product-form__btn--primary {
+  color: #fff;
+  background: var(--accent);
+}
+
 @media (max-width: 640px) {
   .panel-header {
     flex-direction: column;
@@ -638,6 +856,21 @@ button {
 
   .panel-orders,
   .panel-mesas {
+    grid-template-columns: 1fr;
+  }
+
+  .menu-product {
+    flex-direction: column;
+  }
+
+  .menu-product__actions {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    width: 100%;
+  }
+
+  .product-form__row {
     grid-template-columns: 1fr;
   }
 }
