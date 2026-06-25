@@ -212,13 +212,27 @@ async function switchSessionByCode(mesaId, currentSesionId, codeInput) {
 
   if (error) throw error;
 
+  let finalSession = destSession;
+
+  if (destSession.tipo === 'individual') {
+    const { data, error: tipoError } = await supabaseClient
+      .from('sesiones')
+      .update({ tipo: 'grupal' })
+      .eq('id', destSession.id)
+      .select('id, tipo, numero, session_token')
+      .single();
+
+    if (tipoError) throw tipoError;
+    finalSession = data;
+  }
+
   saveStoredSession(mesaId, {
-    sesionId: destSession.id,
-    sessionToken: destSession.session_token,
-    tipo: destSession.tipo,
+    sesionId: finalSession.id,
+    sessionToken: finalSession.session_token,
+    tipo: finalSession.tipo,
   });
 
-  return destSession;
+  return finalSession;
 }
 
 function setSessionGateLoading(isLoading) {
