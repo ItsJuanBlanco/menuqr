@@ -26,12 +26,7 @@ function formatSessionCode(numero) {
 }
 
 function generateSessionToken() {
-  if (crypto?.randomUUID) return crypto.randomUUID();
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-    const r = (Math.random() * 16) | 0;
-    const v = c === 'x' ? r : (r & 0x3) | 0x8;
-    return v.toString(16);
-  });
+  return crypto.randomUUID();
 }
 
 async function getNextSessionNumero(mesaId) {
@@ -131,10 +126,15 @@ async function joinOrCreateGroupSession(mesaId) {
   if (findError) throw findError;
 
   if (existing) {
-    saveStoredSession(mesaId, { sesionId: existing.id, tipo: existing.tipo });
+    saveStoredSession(mesaId, {
+      sesionId: existing.id,
+      sessionToken: existing.session_token,
+      tipo: existing.tipo,
+    });
     return existing;
   }
 
+  const sessionToken = generateSessionToken();
   const numero = await getNextSessionNumero(mesaId);
 
   const { data, error } = await supabaseClient
@@ -142,7 +142,7 @@ async function joinOrCreateGroupSession(mesaId) {
     .insert({
       mesa_id: mesaId,
       restaurante_id: RESTAURANTE_ID,
-      session_token: null,
+      session_token: sessionToken,
       tipo: 'grupal',
       numero,
       activa: true,
@@ -152,7 +152,11 @@ async function joinOrCreateGroupSession(mesaId) {
 
   if (error) throw error;
 
-  saveStoredSession(mesaId, { sesionId: data.id, tipo: data.tipo });
+  saveStoredSession(mesaId, {
+    sesionId: data.id,
+    sessionToken: data.session_token,
+    tipo: data.tipo,
+  });
   return data;
 }
 
