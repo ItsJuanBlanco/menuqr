@@ -633,6 +633,177 @@ ul {
   color: var(--accent);
 }
 
+/* ── Propina y servicio ── */
+.account__extras {
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px dashed var(--border);
+}
+
+.account__service-toggle {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  margin-bottom: 18px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.account__service-toggle-input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.account__service-toggle-ui {
+  width: 44px;
+  height: 26px;
+  border-radius: 999px;
+  background: var(--bg-hover);
+  border: 1px solid var(--border);
+  position: relative;
+  flex-shrink: 0;
+  transition: background 0.2s ease;
+}
+
+.account__service-toggle-ui::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform 0.2s ease;
+}
+
+.account__service-toggle-input:checked + .account__service-toggle-ui {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.account__service-toggle-input:checked + .account__service-toggle-ui::after {
+  transform: translateX(18px);
+}
+
+.account__service-toggle-text {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1.35;
+}
+
+.account__tip {
+  margin-bottom: 18px;
+}
+
+.account__tip-label {
+  font-size: 0.8125rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  margin-bottom: 10px;
+}
+
+.account__tip-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.account__tip-btn {
+  min-width: 52px;
+  padding: 10px 12px;
+  border-radius: 999px;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--text);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.account__tip-btn--active {
+  color: #fff;
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.account__tip-custom {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+}
+
+.account__tip-custom-input {
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text);
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.account__tip-custom-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.account__payment-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.account__payment-summary-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 0.9375rem;
+}
+
+.account__payment-summary-row dt {
+  color: var(--text-muted);
+}
+
+.account__payment-summary-row dd {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+
+.account__payment-summary-row--total {
+  margin-top: 4px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--border);
+}
+
+.account__payment-summary-row--total dt,
+.account__payment-summary-row--total dd {
+  font-size: 1rem;
+  color: var(--text);
+}
+
+.account__payment-summary-row--total dd {
+  font-size: 1.25rem;
+  color: var(--accent);
+}
+
 .account__switch {
   margin-top: 8px;
   padding-top: 24px;

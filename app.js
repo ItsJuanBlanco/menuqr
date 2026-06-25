@@ -136,6 +136,11 @@ const state = {
   splitCount: 2,
   groupPayments: [],
   lastSplitQrUrl: '',
+  serviceChargeEnabled: true,
+  serviceChargePercent: 10,
+  tipPercent: null,
+  tipCustomMode: false,
+  tipCustomAmount: 0,
 };
 
 /* ── Utilidades ── */
@@ -391,6 +396,47 @@ function getAccountDeliveredTotal() {
   return groupDeliveredItems(delivered).reduce((sum, group) => sum + group.subtotal, 0);
 }
 
+function getPaymentBreakdown(subtotal = getAccountDeliveredTotal()) {
+  const cargoServicio = state.serviceChargeEnabled
+    ? Math.round(subtotal * (state.serviceChargePercent / 100))
+    : 0;
+
+  let propina = 0;
+  let propinaLabel = null;
+
+  if (state.tipCustomMode && state.tipCustomAmount > 0) {
+    propina = Math.round(state.tipCustomAmount);
+    propinaLabel = 'Otra';
+  } else if (state.tipPercent) {
+    propina = Math.round(subtotal * (state.tipPercent / 100));
+    propinaLabel = `${state.tipPercent}%`;
+  }
+
+  return {
+    subtotal,
+    cargoServicio,
+    propina,
+    propinaLabel,
+    total: subtotal + cargoServicio + propina,
+  };
+}
+
+function getPerPersonPaymentAmount(subtotal = getAccountDeliveredTotal()) {
+  const breakdown = getPaymentBreakdown(subtotal);
+  const count = state.splitCount;
+
+  if (!count || count < 1) {
+    return { subtotal: 0, cargoServicio: 0, propina: 0, total: 0 };
+  }
+
+  return {
+    subtotal: Math.ceil(breakdown.subtotal / count),
+    cargoServicio: Math.ceil(breakdown.cargoServicio / count),
+    propina: Math.ceil(breakdown.propina / count),
+    total: Math.ceil(breakdown.total / count),
+  };
+}
+
 function getSplitShareAmount(total, count) {
   if (!count || count < 1) return 0;
   return Math.ceil(total / count);
@@ -452,6 +498,78 @@ function clearSplitQrCanvas() {
   state.lastSplitQrUrl = '';
 }
 
+function updatePaymentExtrasUI(deliveredTotal) {
+  const section = document.getElementById('paymentExtrasSection');
+  const serviceToggle = document.getElementById('serviceChargeToggle');
+  const serviceLabel = document.getElementById('serviceChargeLabel');
+  const tipCustomField = document.getElementById('tipCustomField');
+  const tipCustomInput = document.getElementById('tipCustomInput');
+
+  if (!section) return;
+
+  const showExtras = deliveredTotal > 0 && !state.paymentPendingConfirmation;
+  section.hidden = !showExtras;
+
+  const accountTotal = document.getElementById('accountTotal');
+  if (accountTotal) accountTotal.hidden = showExtras || deliveredTotal <= 0;
+
+  if (!showExtras) return;
+
+  const breakdown = getPaymentBreakdown(deliveredTotal);
+
+  if (serviceToggle) serviceToggle.checked = state.serviceChargeEnabled;
+  if (serviceLabel) {
+    serviceLabel.textContent = `Cargo por servicio ${state.serviceChargePercent}% — ${formatCOP(breakdown.cargoServicio)}`;
+  }
+
+  document.querySelectorAll('[data-tip-percent]').forEach((btn) => {
+    const percent = Number(btn.dataset.tipPercent);
+    btn.classList.toggle(
+      'account__tip-btn--active',
+      !state.tipCustomMode && state.tipPercent === percent
+    );
+  });
+
+  const customBtn = document.querySelector('[data-tip-action="custom"]');
+  if (customBtn) {
+    customBtn.classList.toggle(
+      'account__tip-btn--active',
+      state.tipCustomMode || (state.tipCustomAmount > 0 && !state.tipPercent)
+    );
+  }
+
+  if (tipCustomField) tipCustomField.hidden = !state.tipCustomMode;
+  if (tipCustomInput && document.activeElement !== tipCustomInput) {
+    tipCustomInput.value = state.tipCustomAmount > 0 ? String(state.tipCustomAmount) : '';
+  }
+
+  document.getElementById('summarySubtotal').textContent = formatCOP(breakdown.subtotal);
+
+  const serviceRow = document.getElementById('summaryServiceRow');
+  if (serviceRow) serviceRow.hidden = !state.serviceChargeEnabled;
+  document.getElementById('summaryServiceLabel').textContent =
+    `Cargo por servicio (${state.serviceChargePercent}%)`;
+  document.getElementById('summaryServiceAmount').textContent = formatCOP(breakdown.cargoServicio);
+
+  const tipRow = document.getElementById('summaryTipRow');
+  if (tipRow) tipRow.hidden = breakdown.propina <= 0;
+  if (breakdown.propina > 0) {
+    const tipLabel = breakdown.propinaLabel === 'Otra'
+      ? 'Propina (otra)'
+      : `Propina (${breakdown.propinaLabel})`;
+    document.getElementById('summaryTipLabel').textContent = tipLabel;
+    document.getElementById('summaryTipAmount').textContent = formatCOP(breakdown.propina);
+  }
+
+  document.getElementById('summaryTotal').textContent = formatCOP(breakdown.total);
+}
+
+function refreshPaymentUi() {
+  const deliveredTotal = getAccountDeliveredTotal();
+  updatePaymentExtrasUI(deliveredTotal);
+  updateSplitBillUI(deliveredTotal);
+}
+
 function renderSplitQr(shareAmount) {
   const canvas = document.getElementById('splitQrCanvas');
   const box = document.getElementById('splitQrBox');
@@ -511,23 +629,24 @@ function updateSplitBillUI(deliveredTotal) {
   if (minusBtn) minusBtn.disabled = state.splitCount <= 2 || state.paymentSubmitting;
   if (plusBtn) plusBtn.disabled = state.splitCount >= 20 || state.paymentSubmitting;
 
-  const shareAmount = getSplitShareAmount(deliveredTotal, state.splitCount);
+  const shareAmount = getPerPersonPaymentAmount(deliveredTotal).total;
   if (splitShareEl) {
     splitShareEl.textContent = `Cada uno paga: ${formatCOP(shareAmount)}`;
   }
 
   const paidTotal = getGroupPaidTotal();
+  const breakdown = getPaymentBreakdown(deliveredTotal);
   if (splitProgressEl) {
     if (paidTotal > 0) {
       splitProgressEl.hidden = false;
-      splitProgressEl.textContent = `Pagado: ${formatCOP(paidTotal)} de ${formatCOP(deliveredTotal)}`;
+      splitProgressEl.textContent = `Pagado: ${formatCOP(paidTotal)} de ${formatCOP(breakdown.total)}`;
     } else {
       splitProgressEl.hidden = true;
       splitProgressEl.textContent = '';
     }
   }
 
-  if (paidTotal >= deliveredTotal) {
+  if (paidTotal >= breakdown.total) {
     const box = document.getElementById('splitQrBox');
     if (box) box.hidden = true;
     clearSplitQrCanvas();
@@ -888,6 +1007,7 @@ function renderAccount() {
     badge.hidden = true;
     if (wompiPayBtn) wompiPayBtn.hidden = true;
     if (paymentWaiting) paymentWaiting.hidden = true;
+    updatePaymentExtrasUI(0);
     updateSplitBillUI(0);
     return;
   }
@@ -934,11 +1054,13 @@ function renderAccount() {
     const showPayButton = deliveredTotal > 0 && !state.paymentPendingConfirmation && !isGrupal;
     if (wompiPayBtn) wompiPayBtn.hidden = !showPayButton;
     if (paymentWaiting) paymentWaiting.hidden = !state.paymentPendingConfirmation;
+    updatePaymentExtrasUI(deliveredTotal);
     updateSplitBillUI(deliveredTotal);
   } else {
     deliveredSection.hidden = true;
     if (wompiPayBtn) wompiPayBtn.hidden = true;
     if (paymentWaiting) paymentWaiting.hidden = !state.paymentPendingConfirmation;
+    updatePaymentExtrasUI(0);
     updateSplitBillUI(0);
   }
 
@@ -994,10 +1116,35 @@ async function getSessionApprovedPaymentsTotal(sesionId) {
   return (data || []).reduce((sum, row) => sum + Number(row.monto), 0);
 }
 
-async function handleApprovedWompiPayment(monto, referenciaWompi) {
+async function saveSessionPaymentExtras(cargoServicio, propina) {
+  if (!state.sesionId) return;
+
+  const { data, error: readError } = await supabaseClient
+    .from('sesiones')
+    .select('cargo_servicio, propina')
+    .eq('id', state.sesionId)
+    .maybeSingle();
+
+  if (readError) throw readError;
+
+  const { error } = await supabaseClient
+    .from('sesiones')
+    .update({
+      cargo_servicio: (Number(data?.cargo_servicio) || 0) + cargoServicio,
+      propina: (Number(data?.propina) || 0) + propina,
+    })
+    .eq('id', state.sesionId);
+
+  if (error) throw error;
+}
+
+async function handleApprovedWompiPayment(monto, referenciaWompi, extras = {}) {
   if (!state.sesionId || state.paymentSubmitting) return;
 
   state.paymentSubmitting = true;
+
+  const cargoServicio = Number(extras.cargoServicio) || 0;
+  const propina = Number(extras.propina) || 0;
 
   try {
     const { error: insertError } = await supabaseClient.from('pagos_grupo').insert({
@@ -1009,12 +1156,14 @@ async function handleApprovedWompiPayment(monto, referenciaWompi) {
 
     if (insertError) throw insertError;
 
-    const sessionTotal = getAccountDeliveredTotal();
+    await saveSessionPaymentExtras(cargoServicio, propina);
+
+    const breakdown = getPaymentBreakdown();
     const paidTotal = await getSessionApprovedPaymentsTotal(state.sesionId);
 
     await loadGroupPayments();
 
-    if (sessionTotal > 0 && paidTotal >= sessionTotal) {
+    if (breakdown.total > 0 && paidTotal >= breakdown.total) {
       await markPaymentPendingConfirmation(
         'Cuenta completa. El mesero confirmará el pago.',
         { skipSubmittingGuard: true }
@@ -1090,16 +1239,80 @@ async function openWompiCheckout(amount, options = {}) {
     const transaction = result?.transaction;
     if (transaction?.status === 'APPROVED') {
       const referencia = transaction.id || transaction.reference || reference;
-      handleApprovedWompiPayment(amount, referencia);
+      handleApprovedWompiPayment(amount, referencia, {
+        cargoServicio: options.cargoServicio || 0,
+        propina: options.propina || 0,
+      });
     } else {
       clearPaymentInProgress();
     }
   });
 }
 
+function initPaymentExtras() {
+  const serviceToggle = document.getElementById('serviceChargeToggle');
+  if (serviceToggle && !serviceToggle.dataset.bound) {
+    serviceToggle.dataset.bound = 'true';
+    serviceToggle.addEventListener('change', () => {
+      state.serviceChargeEnabled = serviceToggle.checked;
+      state.lastSplitQrUrl = '';
+      refreshPaymentUi();
+    });
+  }
+
+  const tipOptions = document.getElementById('tipPercentOptions');
+  if (tipOptions && !tipOptions.dataset.bound) {
+    tipOptions.dataset.bound = 'true';
+    tipOptions.addEventListener('click', (event) => {
+      const percentBtn = event.target.closest('[data-tip-percent]');
+      const customBtn = event.target.closest('[data-tip-action="custom"]');
+
+      if (percentBtn) {
+        const percent = Number(percentBtn.dataset.tipPercent);
+        if (state.tipPercent === percent && !state.tipCustomMode) {
+          state.tipPercent = null;
+        } else {
+          state.tipPercent = percent;
+          state.tipCustomMode = false;
+          state.tipCustomAmount = 0;
+        }
+      } else if (customBtn) {
+        if (state.tipCustomMode) {
+          state.tipCustomMode = false;
+          state.tipCustomAmount = 0;
+        } else {
+          state.tipCustomMode = true;
+          state.tipPercent = null;
+        }
+      } else {
+        return;
+      }
+
+      state.lastSplitQrUrl = '';
+      refreshPaymentUi();
+    });
+  }
+
+  const tipCustomInput = document.getElementById('tipCustomInput');
+  if (tipCustomInput && !tipCustomInput.dataset.bound) {
+    tipCustomInput.dataset.bound = 'true';
+    tipCustomInput.addEventListener('input', () => {
+      state.tipCustomMode = true;
+      state.tipPercent = null;
+      state.tipCustomAmount = Math.max(0, Number(tipCustomInput.value) || 0);
+      state.lastSplitQrUrl = '';
+      refreshPaymentUi();
+    });
+  }
+}
+
 function initWompiPayment() {
   document.getElementById('wompiPayBtn')?.addEventListener('click', () => {
-    openWompiCheckout(getAccountDeliveredTotal());
+    const breakdown = getPaymentBreakdown();
+    openWompiCheckout(breakdown.total, {
+      cargoServicio: breakdown.cargoServicio,
+      propina: breakdown.propina,
+    });
   });
 }
 
@@ -1114,7 +1327,8 @@ function initSplitBill() {
     minusBtn.addEventListener('click', () => {
       if (state.splitCount <= 2) return;
       state.splitCount -= 1;
-      updateSplitBillUI(getAccountDeliveredTotal());
+      state.lastSplitQrUrl = '';
+      refreshPaymentUi();
     });
   }
 
@@ -1123,7 +1337,8 @@ function initSplitBill() {
     plusBtn.addEventListener('click', () => {
       if (state.splitCount >= 20) return;
       state.splitCount += 1;
-      updateSplitBillUI(getAccountDeliveredTotal());
+      state.lastSplitQrUrl = '';
+      refreshPaymentUi();
     });
   }
 
@@ -1131,17 +1346,19 @@ function initSplitBill() {
   if (splitPayBtn && !splitPayBtn.dataset.bound) {
     splitPayBtn.dataset.bound = 'true';
     splitPayBtn.addEventListener('click', () => {
-      const deliveredTotal = getAccountDeliveredTotal();
-      const shareAmount = getSplitShareAmount(deliveredTotal, state.splitCount);
+      const breakdown = getPaymentBreakdown();
+      const share = getPerPersonPaymentAmount();
       const paidTotal = getGroupPaidTotal();
 
-      if (paidTotal >= deliveredTotal) {
+      if (paidTotal >= breakdown.total) {
         showToast('La cuenta ya está cubierta.', 'success');
         return;
       }
 
-      openWompiCheckout(shareAmount, {
+      openWompiCheckout(share.total, {
         reference: `sesion-${state.sesionId}-grupo-${Date.now()}`,
+        cargoServicio: share.cargoServicio,
+        propina: share.propina,
       });
     });
   }
@@ -1281,6 +1498,7 @@ async function init() {
     updateCartBar();
     initWaiterButtons();
     initAccountSwitch();
+    initPaymentExtras();
     initWompiPayment();
     initSplitBill();
     handleInitialRoute();

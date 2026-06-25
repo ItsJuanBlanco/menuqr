@@ -122,10 +122,62 @@
           <section class="account__section account__invoice" id="deliveredSection" hidden>
             <h3 class="account__section-title">Entregado</h3>
             <ul class="account__invoice-list" id="deliveredList"></ul>
-            <div class="account__total" id="accountTotal">
+            <div class="account__total" id="accountTotal" hidden>
               <span>Total acumulado</span>
               <strong id="totalAmount">$0</strong>
             </div>
+
+            <section class="account__extras" id="paymentExtrasSection" hidden>
+              <h3 class="account__section-title">Propina y servicio</h3>
+
+              <label class="account__service-toggle">
+                <input type="checkbox" class="account__service-toggle-input" id="serviceChargeToggle" checked>
+                <span class="account__service-toggle-ui" aria-hidden="true"></span>
+                <span class="account__service-toggle-text" id="serviceChargeLabel">Cargo por servicio 10% — $0</span>
+              </label>
+
+              <div class="account__tip">
+                <p class="account__tip-label">Propina adicional</p>
+                <div class="account__tip-options" id="tipPercentOptions">
+                  <button type="button" class="account__tip-btn" data-tip-percent="5">5%</button>
+                  <button type="button" class="account__tip-btn" data-tip-percent="10">10%</button>
+                  <button type="button" class="account__tip-btn" data-tip-percent="15">15%</button>
+                  <button type="button" class="account__tip-btn" data-tip-percent="20">20%</button>
+                  <button type="button" class="account__tip-btn account__tip-btn--custom" data-tip-action="custom">Otra</button>
+                </div>
+                <label class="account__tip-custom" id="tipCustomField" hidden>
+                  <span>Monto de propina</span>
+                  <input
+                    type="number"
+                    class="account__tip-custom-input"
+                    id="tipCustomInput"
+                    min="0"
+                    step="100"
+                    inputmode="numeric"
+                    placeholder="0"
+                  >
+                </label>
+              </div>
+
+              <dl class="account__payment-summary" id="paymentSummary">
+                <div class="account__payment-summary-row">
+                  <dt>Subtotal</dt>
+                  <dd id="summarySubtotal">$0</dd>
+                </div>
+                <div class="account__payment-summary-row" id="summaryServiceRow">
+                  <dt id="summaryServiceLabel">Cargo por servicio (10%)</dt>
+                  <dd id="summaryServiceAmount">$0</dd>
+                </div>
+                <div class="account__payment-summary-row" id="summaryTipRow" hidden>
+                  <dt id="summaryTipLabel">Propina</dt>
+                  <dd id="summaryTipAmount">$0</dd>
+                </div>
+                <div class="account__payment-summary-row account__payment-summary-row--total">
+                  <dt>Total a pagar</dt>
+                  <dd id="summaryTotal">$0</dd>
+                </div>
+              </dl>
+            </section>
 
             <section class="account__split" id="splitBillSection" hidden>
               <h3 class="account__section-title">Dividir y pagar</h3>
