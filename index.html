@@ -173,8 +173,8 @@
                     min="0"
                     step="100"
                     inputmode="numeric"
-                    placeholder="Propina $"
-                    aria-label="Monto de propina"
+                    placeholder="Propina $ (máx. 100%)"
+                    aria-label="Monto de propina, máximo 100% del subtotal"
                   >
                 </label>
               </div>
@@ -257,7 +257,7 @@
     </main>
 
     <!-- Carrito flotante (pedido pendiente) -->
-    <aside class="cart-bar" id="cartBar">
+    <aside class="cart-bar" id="cartBar" aria-hidden="true">
       <div class="cart-bar__info">
         <span class="cart-bar__count" id="cartSummary">0 items - $0</span>
       </div>

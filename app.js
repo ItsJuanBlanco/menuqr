@@ -394,6 +394,16 @@ function getAccountDeliveredTotal() {
   return groupDeliveredItems(delivered).reduce((sum, group) => sum + group.subtotal, 0);
 }
 
+const MAX_TIP_PERCENT = 100;
+
+function getMaxCustomTipAmount(subtotal = getAccountDeliveredTotal()) {
+  return Math.round(subtotal * (MAX_TIP_PERCENT / 100));
+}
+
+function clampCustomTipAmount(amount, subtotal = getAccountDeliveredTotal()) {
+  return Math.min(Math.max(0, Math.round(Number(amount) || 0)), getMaxCustomTipAmount(subtotal));
+}
+
 function getPaymentBreakdown(subtotal = getAccountDeliveredTotal()) {
   const cargoServicio = state.serviceChargeEnabled
     ? Math.round(subtotal * (state.serviceChargePercent / 100))
@@ -403,7 +413,7 @@ function getPaymentBreakdown(subtotal = getAccountDeliveredTotal()) {
   let propinaLabel = null;
 
   if (state.tipCustomMode && state.tipCustomAmount > 0) {
-    propina = Math.round(state.tipCustomAmount);
+    propina = clampCustomTipAmount(state.tipCustomAmount, subtotal);
     propinaLabel = 'Otra';
   } else if (state.tipPercent) {
     propina = Math.round(subtotal * (state.tipPercent / 100));
@@ -515,6 +525,10 @@ function updatePaymentExtrasUI(deliveredTotal) {
     return;
   }
 
+  if (state.tipCustomMode && state.tipCustomAmount > 0) {
+    state.tipCustomAmount = clampCustomTipAmount(state.tipCustomAmount, deliveredTotal);
+  }
+
   const breakdown = getPaymentBreakdown(deliveredTotal);
 
   document.querySelectorAll('[data-tip-percent]').forEach((btn) => {
@@ -534,8 +548,11 @@ function updatePaymentExtrasUI(deliveredTotal) {
   }
 
   if (tipCustomField) tipCustomField.hidden = !state.tipCustomMode;
-  if (tipCustomInput && document.activeElement !== tipCustomInput) {
-    tipCustomInput.value = state.tipCustomAmount > 0 ? String(state.tipCustomAmount) : '';
+  if (tipCustomInput) {
+    tipCustomInput.max = getMaxCustomTipAmount(deliveredTotal);
+    if (document.activeElement !== tipCustomInput) {
+      tipCustomInput.value = state.tipCustomAmount > 0 ? String(state.tipCustomAmount) : '';
+    }
   }
 
   document.getElementById('summarySubtotal').textContent = formatCOP(breakdown.subtotal);
@@ -897,7 +914,12 @@ function getCartTotals() {
 function updateCartBarVisibility() {
   const cartBar = document.getElementById('cartBar');
   if (!cartBar) return;
-  cartBar.hidden = state.activeTab !== 'carta';
+
+  const { count } = getCartTotals();
+  const visible = state.activeTab === 'carta' && count > 0;
+
+  cartBar.classList.toggle('cart-bar--visible', visible);
+  cartBar.setAttribute('aria-hidden', visible ? 'false' : 'true');
 }
 
 function updateCartBar() {
@@ -907,6 +929,7 @@ function updateCartBar() {
 
   summary.textContent = `${count} item${count !== 1 ? 's' : ''} - ${formatCOP(total)}`;
   sendBtn.disabled = count === 0;
+  updateCartBarVisibility();
 }
 
 async function sendOrder() {
@@ -1329,7 +1352,11 @@ function initPaymentExtras() {
     tipCustomInput.addEventListener('input', () => {
       state.tipCustomMode = true;
       state.tipPercent = null;
-      state.tipCustomAmount = Math.max(0, Number(tipCustomInput.value) || 0);
+      const subtotal = getAccountDeliveredTotal();
+      state.tipCustomAmount = clampCustomTipAmount(tipCustomInput.value, subtotal);
+      if (Number(tipCustomInput.value) !== state.tipCustomAmount) {
+        tipCustomInput.value = state.tipCustomAmount > 0 ? String(state.tipCustomAmount) : '';
+      }
       state.lastSplitQrUrl = '';
       refreshPaymentUi();
     });
