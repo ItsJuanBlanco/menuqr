@@ -18,9 +18,12 @@ const STATIC_PAGE_NAMES = new Set([
   'sessions.js',
   'pagar.html',
   'pagar.js',
+  'admin.html',
+  'admin.js',
+  'admin.css',
 ]);
 
-const PAGE_ROUTE_NAMES = new Set(['panel', 'panel.html', 'home', 'home.html', 'index.html']);
+const PAGE_ROUTE_NAMES = new Set(['panel', 'panel.html', 'home', 'home.html', 'index.html', 'admin', 'admin.html']);
 
 function isStaticAssetName(name) {
   return STATIC_PAGE_NAMES.has(String(name).toLowerCase());

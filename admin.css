@@ -1,0 +1,298 @@
+/* ── Admin login ── */
+.admin-login {
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: var(--bg);
+}
+
+.admin-login__card {
+  width: 100%;
+  max-width: 420px;
+  padding: 32px 28px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+.admin-login__brand {
+  text-align: center;
+  margin-bottom: 28px;
+}
+
+.admin-login__logo {
+  font-size: 2rem;
+  line-height: 1;
+  display: block;
+  margin-bottom: 12px;
+}
+
+.admin-login__title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.admin-login__subtitle {
+  margin-top: 6px;
+  font-size: 0.9375rem;
+  color: var(--text-muted);
+}
+
+.admin-login__form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.admin-login__label {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.admin-login__input {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 1rem;
+  background: #fff;
+  color: var(--text);
+}
+
+.admin-login__input:focus {
+  outline: 2px solid rgba(234, 88, 12, 0.25);
+  border-color: var(--accent);
+}
+
+.admin-login__btn {
+  margin-top: 4px;
+  padding: 13px 18px;
+  border-radius: var(--radius-sm);
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: #fff;
+  background: var(--accent);
+}
+
+.admin-login__btn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.admin-login__error {
+  margin-top: 14px;
+  font-size: 0.875rem;
+  color: #dc2626;
+  text-align: center;
+}
+
+/* ── Admin app ── */
+.admin-app {
+  max-width: 1280px;
+}
+
+.admin-logout-btn {
+  padding: 8px 14px;
+  border-radius: 999px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  border: 1px solid var(--border);
+  background: #fff;
+  color: var(--text-muted);
+}
+
+.admin-main {
+  padding: 24px;
+}
+
+.admin-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.admin-toolbar__hint {
+  font-size: 0.9375rem;
+  color: var(--text-muted);
+}
+
+.admin-loading,
+.admin-empty {
+  padding: 48px 24px;
+  text-align: center;
+  color: var(--text-muted);
+}
+
+.admin-table-wrap {
+  overflow-x: auto;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.admin-table th,
+.admin-table td {
+  padding: 14px 16px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+
+.admin-table th {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  background: #fafafa;
+}
+
+.admin-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.admin-table tbody tr:hover {
+  background: #fafafa;
+}
+
+.admin-table__name {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.admin-table__slug {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+}
+
+.admin-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.admin-badge--active {
+  background: var(--ready-soft);
+  color: var(--ready);
+}
+
+.admin-badge--inactive {
+  background: #fef2f2;
+  color: #dc2626;
+}
+
+.admin-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.admin-action-btn {
+  padding: 7px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 0.75rem;
+  font-weight: 600;
+  border: 1px solid var(--border);
+  background: #fff;
+  color: var(--text);
+  white-space: nowrap;
+}
+
+.admin-action-btn--primary {
+  border-color: rgba(234, 88, 12, 0.25);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.admin-action-btn--danger {
+  border-color: rgba(220, 38, 38, 0.2);
+  color: #dc2626;
+}
+
+.admin-action-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* ── New restaurant modal ── */
+.admin-modal {
+  max-width: 480px;
+}
+
+.admin-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.admin-form__field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.admin-form__label {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.admin-form__input {
+  width: 100%;
+  padding: 11px 13px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 0.9375rem;
+  background: #fff;
+}
+
+.admin-form__input:focus {
+  outline: 2px solid rgba(234, 88, 12, 0.2);
+  border-color: var(--accent);
+}
+
+.admin-form__hint {
+  font-size: 0.75rem;
+  color: var(--text-dim);
+}
+
+.admin-form__note {
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+}
+
+.admin-form__error {
+  font-size: 0.875rem;
+  color: #dc2626;
+}
+
+@media (max-width: 720px) {
+  .admin-table th:nth-child(3),
+  .admin-table td:nth-child(3) {
+    display: none;
+  }
+
+  .admin-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}

@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#f4f4f5">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Admin · MenuQR</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/panel.css">
+  <link rel="stylesheet" href="/admin.css">
+</head>
+<body>
+  <div class="admin-login" id="adminLogin">
+    <div class="admin-login__card">
+      <div class="admin-login__brand">
+        <span class="admin-login__logo" aria-hidden="true">⚙️</span>
+        <h1 class="admin-login__title">MenuQR Admin</h1>
+        <p class="admin-login__subtitle">Panel de control de la plataforma</p>
+      </div>
+      <form class="admin-login__form" id="adminLoginForm">
+        <label class="admin-login__label" for="adminEmail">Email de administrador</label>
+        <input
+          type="email"
+          class="admin-login__input"
+          id="adminEmail"
+          name="email"
+          autocomplete="email"
+          placeholder="tu@email.com"
+          required
+        >
+        <button type="submit" class="admin-login__btn" id="adminLoginBtn">Ingresar</button>
+      </form>
+      <p class="admin-login__error" id="adminLoginError" hidden role="alert"></p>
+    </div>
+  </div>
+
+  <div class="panel-app admin-app" id="adminApp" hidden>
+    <header class="panel-header">
+      <div class="panel-header__left">
+        <h1 class="panel-header__title">MenuQR Admin</h1>
+        <p class="panel-header__subtitle" id="adminUserLabel">Plataforma</p>
+      </div>
+      <div class="panel-header__right">
+        <span class="panel-header__count" id="adminRestaurantCount">0 restaurantes</span>
+        <button type="button" class="admin-logout-btn" id="adminLogoutBtn">Salir</button>
+      </div>
+    </header>
+
+    <main class="panel-main admin-main">
+      <div class="admin-toolbar">
+        <p class="admin-toolbar__hint">Restaurantes registrados en la plataforma</p>
+        <button type="button" class="menu-toolbar__btn" id="newRestaurantBtn">+ Nuevo restaurante</button>
+      </div>
+
+      <div class="admin-loading" id="adminLoading" hidden>Cargando restaurantes…</div>
+      <div class="admin-empty" id="adminEmpty" hidden>
+        <p class="panel-empty__title">Sin restaurantes</p>
+        <p class="panel-empty__text">Creá el primero con el botón «Nuevo restaurante».</p>
+      </div>
+      <div class="admin-table-wrap" id="adminTableWrap" hidden>
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th>Nombre</th>
+              <th>Slug</th>
+              <th>Ciudad</th>
+              <th>Estado</th>
+              <th>Creado</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="adminRestaurantList"></tbody>
+        </table>
+      </div>
+    </main>
+  </div>
+
+  <div class="modal" id="newRestaurantModal" hidden aria-hidden="true">
+    <div class="modal__backdrop" data-close-modal></div>
+    <div class="modal__box admin-modal" role="dialog" aria-labelledby="newRestaurantTitle">
+      <header class="modal__head">
+        <h2 class="modal__title" id="newRestaurantTitle">Nuevo restaurante</h2>
+        <button type="button" class="modal__close" data-close-modal aria-label="Cerrar">×</button>
+      </header>
+      <form class="admin-form" id="newRestaurantForm">
+        <label class="admin-form__field">
+          <span class="admin-form__label">Nombre del restaurante</span>
+          <input type="text" class="admin-form__input" id="restaurantName" required maxlength="120">
+        </label>
+        <label class="admin-form__field">
+          <span class="admin-form__label">Slug (URL)</span>
+          <input type="text" class="admin-form__input" id="restaurantSlug" required maxlength="80" pattern="[a-z0-9]+(?:-[a-z0-9]+)*">
+          <span class="admin-form__hint">menuqr…vercel.app/<strong id="slugPreview">slug</strong></span>
+        </label>
+        <label class="admin-form__field">
+          <span class="admin-form__label">Ciudad</span>
+          <input type="text" class="admin-form__input" id="restaurantCity" required maxlength="80">
+        </label>
+        <label class="admin-form__field">
+          <span class="admin-form__label">Email de contacto</span>
+          <input type="email" class="admin-form__input" id="restaurantEmail" required maxlength="120">
+        </label>
+        <p class="admin-form__note">Se crearán automáticamente 5 mesas (Mesa 1–5).</p>
+        <p class="admin-form__error" id="newRestaurantError" hidden role="alert"></p>
+        <button type="submit" class="dataphone-modal__confirm" id="newRestaurantSubmit">Guardar restaurante</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="panel-toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="/config.js"></script>
+  <script src="/admin.js"></script>
+</body>
+</html>
