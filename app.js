@@ -124,6 +124,10 @@ const state = {
   activeTab: 'carta',
   mesaId: null,
   mesaNumero: DEFAULT_MESA_NUMERO,
+  sesionId: null,
+  sessionToken: null,
+  sessionTipo: null,
+  sessionNumero: null,
   accountItems: [],
   sendingOrder: false,
   waiterCooldown: false,
@@ -307,7 +311,7 @@ async function seedProductsIfEmpty() {
 }
 
 async function loadAccountItems() {
-  if (!state.mesaId) return;
+  if (!state.mesaId || !state.sesionId) return;
 
   const { data, error } = await supabaseClient
     .from('pedido_items')
@@ -321,9 +325,10 @@ async function loadAccountItems() {
       notas,
       confirmado_por_mesero,
       productos ( nombre ),
-      pedidos!inner ( mesa_id, created_at, archivado )
+      pedidos!inner ( mesa_id, sesion_id, created_at, archivado )
     `)
     .eq('pedidos.mesa_id', state.mesaId)
+    .eq('pedidos.sesion_id', state.sesionId)
     .eq('pedidos.restaurante_id', RESTAURANTE_ID)
     .eq('pedidos.archivado', false);
 
@@ -569,8 +574,8 @@ async function sendOrder() {
   const { count, total } = getCartTotals();
   if (count === 0 || state.sendingOrder) return;
 
-  if (!state.mesaId) {
-    showToast('No se pudo identificar la mesa. Recarga la página.', 'error');
+  if (!state.mesaId || !state.sesionId) {
+    showToast('No se pudo identificar la mesa o la sesión. Recarga la página.', 'error');
     return;
   }
 
@@ -595,6 +600,7 @@ async function sendOrder() {
       .from('pedidos')
       .insert({
         mesa_id: state.mesaId,
+        sesion_id: state.sesionId,
         restaurante_id: RESTAURANTE_ID,
         estado: 'pendiente',
         total,
@@ -779,26 +785,40 @@ function handleInitialRoute() {
   }
 }
 
+function applySession(session) {
+  state.sesionId = session.id;
+  state.sessionToken = session.session_token || null;
+  state.sessionTipo = session.tipo;
+  state.sessionNumero = session.numero;
+  updateSessionBadge(session);
+}
+
 /* ── Init ── */
 async function init() {
   const restaurant = await window.restaurantReady;
   if (!restaurant) return;
 
-  bindProductsInput();
-  renderCategories();
-  renderProducts();
-  updateCartBar();
-  initWaiterButtons();
-  handleInitialRoute();
-
-  document.querySelectorAll('.bottom-nav__item').forEach((btn) => {
-    btn.addEventListener('click', () => switchTab(btn.dataset.tab));
-  });
-
-  document.getElementById('sendOrderBtn').addEventListener('click', sendOrder);
-
   try {
     await loadMesa();
+
+    const session = await startSessionFlow(state.mesaId, state.mesaNumero);
+    if (!session) return;
+
+    applySession(session);
+
+    bindProductsInput();
+    renderCategories();
+    renderProducts();
+    updateCartBar();
+    initWaiterButtons();
+    handleInitialRoute();
+
+    document.querySelectorAll('.bottom-nav__item').forEach((btn) => {
+      btn.addEventListener('click', () => switchTab(btn.dataset.tab));
+    });
+
+    document.getElementById('sendOrderBtn').addEventListener('click', sendOrder);
+
     const seeded = await seedProductsIfEmpty();
     const loadedFromDb = await loadMenuFromSupabase();
 

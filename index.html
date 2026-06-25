@@ -12,7 +12,67 @@
   <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
-  <div class="app">
+  <!-- Pantalla de bienvenida / sesión -->
+  <div class="session-gate" id="sessionGate" hidden>
+    <div class="session-gate__shell">
+      <header class="session-gate__header">
+        <span class="session-gate__logo" aria-hidden="true">🔥</span>
+        <p class="session-gate__mesa" id="sessionGateMesa">Mesa 1</p>
+      </header>
+
+      <div class="session-gate__body">
+        <h1 class="session-gate__title">¿Cómo querés pedir?</h1>
+        <p class="session-gate__subtitle">Elegí cómo agrupar tu cuenta en esta mesa</p>
+
+        <p class="session-gate__loading" id="sessionGateLoading">Verificando sesión…</p>
+
+        <div class="session-gate__options" id="sessionGateOptions" hidden>
+          <button type="button" class="session-gate__option" data-session-mode="individual">
+            <span class="session-gate__option-icon" aria-hidden="true">👤</span>
+            <span class="session-gate__option-text">
+              <strong>Cuenta propia</strong>
+              <small>Pedís y pagás solo lo tuyo</small>
+            </span>
+          </button>
+          <button type="button" class="session-gate__option" data-session-mode="grupal">
+            <span class="session-gate__option-icon" aria-hidden="true">👥</span>
+            <span class="session-gate__option-text">
+              <strong>Cuenta grupal</strong>
+              <small>Una sola cuenta para toda la mesa</small>
+            </span>
+          </button>
+          <button type="button" class="session-gate__option" data-session-mode="join">
+            <span class="session-gate__option-icon" aria-hidden="true">🔗</span>
+            <span class="session-gate__option-text">
+              <strong>Unirme a una cuenta</strong>
+              <small>Usá el código de 4 dígitos</small>
+            </span>
+          </button>
+        </div>
+
+        <form class="session-gate__join" id="sessionJoinForm" hidden>
+          <label class="session-gate__join-label" for="sessionJoinCode">Código de cuenta</label>
+          <div class="session-gate__join-row">
+            <input
+              type="text"
+              class="session-gate__join-input"
+              id="sessionJoinCode"
+              inputmode="numeric"
+              pattern="[0-9]*"
+              maxlength="4"
+              placeholder="0000"
+              autocomplete="one-time-code"
+            >
+            <button type="submit" class="session-gate__join-btn" id="sessionJoinSubmit">Unirme</button>
+          </div>
+        </form>
+
+        <p class="session-gate__error" id="sessionGateError" hidden role="alert"></p>
+      </div>
+    </div>
+  </div>
+
+  <div class="app" id="mainApp" hidden>
     <header class="header">
       <div class="header__brand">
         <span class="header__logo" aria-hidden="true">🔥</span>
@@ -21,7 +81,10 @@
           <p class="header__subtitle">App · Medellín</p>
         </div>
       </div>
-      <div class="header__table" id="tableBadge">Mesa 1</div>
+      <div class="header__meta">
+        <span class="header__session" id="sessionBadge" hidden>Cuenta</span>
+        <div class="header__table" id="tableBadge">Mesa 1</div>
+      </div>
     </header>
 
     <main class="main">
@@ -119,6 +182,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="/config.js"></script>
   <script src="/restaurant.js"></script>
+  <script src="/sessions.js"></script>
   <script src="/app.js"></script>
 </body>
 </html>
