@@ -1097,3 +1097,42 @@ ul {
   text-align: center;
   padding: 4px 8px;
 }
+
+/* ── Wompi payment ── */
+.wompi-pay-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  margin-top: 12px;
+  padding: 14px 18px;
+  border-radius: var(--radius-sm);
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: #fff;
+  background: #00c853;
+  border: none;
+  box-shadow: 0 4px 14px rgba(0, 200, 83, 0.35);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.wompi-pay-btn:active {
+  transform: scale(0.98);
+}
+
+.wompi-pay-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.account__payment-waiting {
+  margin-top: 16px;
+  padding: 14px 16px;
+  border-radius: var(--radius-sm);
+  text-align: center;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: #92400e;
+  background: #fef3c7;
+  border: 1px solid #fcd34d;
+}

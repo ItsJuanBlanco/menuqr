@@ -140,7 +140,7 @@ async function initRestaurant() {
 
   const { data, error } = await supabaseClient
     .from('restaurantes')
-    .select('id, slug, nombre')
+    .select('id, slug, nombre, wompi_public_key')
     .eq('slug', slug)
     .maybeSingle();
 

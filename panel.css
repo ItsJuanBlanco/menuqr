@@ -540,6 +540,19 @@ button {
   padding: 4px 0 12px;
 }
 
+.mesa-card__session-block {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mesa-card__session-block--payment {
+  padding: 10px;
+  border-radius: var(--radius-sm);
+  background: #fff7ed;
+  border: 1px solid #fdba74;
+}
+
 .mesa-card__session-line {
   display: flex;
   align-items: center;
@@ -556,6 +569,34 @@ button {
   font-weight: 700;
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
+}
+
+.mesa-card__payment-alert {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.mesa-card__payment-badge {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #c2410c;
+  background: #ffedd5;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid #fdba74;
+}
+
+.mesa-card__payment-btn {
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #fff;
+  background: #16a34a;
+  white-space: nowrap;
 }
 
 .mesa-card__divider {

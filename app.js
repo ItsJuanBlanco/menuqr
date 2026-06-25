@@ -131,6 +131,8 @@ const state = {
   accountItems: [],
   sendingOrder: false,
   waiterCooldown: false,
+  paymentPendingConfirmation: false,
+  paymentSubmitting: false,
 };
 
 /* ── Utilidades ── */
@@ -352,7 +354,43 @@ async function loadAccountItems() {
     }))
     .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
+  await loadSessionPaymentStatus();
   renderAccount();
+}
+
+async function loadSessionPaymentStatus() {
+  if (!state.sesionId) {
+    state.paymentPendingConfirmation = false;
+    return;
+  }
+
+  const { data, error } = await supabaseClient
+    .from('sesiones')
+    .select('pago_pendiente_confirmacion, activa')
+    .eq('id', state.sesionId)
+    .maybeSingle();
+
+  if (error) {
+    console.error('Error cargando estado de pago:', error);
+    return;
+  }
+
+  state.paymentPendingConfirmation = data?.pago_pendiente_confirmacion === true;
+
+  if (data && data.activa === false) {
+    state.paymentPendingConfirmation = false;
+  }
+}
+
+function getAccountDeliveredTotal() {
+  const delivered = state.accountItems.filter((item) => item.confirmado);
+  return groupDeliveredItems(delivered).reduce((sum, group) => sum + group.subtotal, 0);
+}
+
+const WOMPI_PUBLIC_KEY = 'pub_test_sLvY32q8txNx6ygl0BrYaNo5w1aUkfMT';
+
+function getWompiPublicKey() {
+  return RESTAURANTE?.wompi_public_key || WOMPI_PUBLIC_KEY;
 }
 
 function groupDeliveredItems(items) {
@@ -409,8 +447,9 @@ async function callWaiter() {
 function subscribeToRealtime() {
   if (!state.mesaId) return;
 
-  supabaseClient
-    .channel(`mesa-${state.mesaId}`)
+  const channel = supabaseClient.channel(`mesa-${state.mesaId}`);
+
+  channel
     .on(
       'postgres_changes',
       { event: '*', schema: 'public', table: 'pedidos', filter: `mesa_id=eq.${state.mesaId}` },
@@ -420,8 +459,19 @@ function subscribeToRealtime() {
       'postgres_changes',
       { event: '*', schema: 'public', table: 'pedido_items' },
       () => loadAccountItems()
-    )
-    .subscribe();
+    );
+
+  if (state.sesionId) {
+    channel.on(
+      'postgres_changes',
+      { event: 'UPDATE', schema: 'public', table: 'sesiones', filter: `id=eq.${state.sesionId}` },
+      () => {
+        loadSessionPaymentStatus().then(() => renderAccount());
+      }
+    );
+  }
+
+  channel.subscribe();
 }
 
 /* ── Render: categorías ── */
@@ -659,12 +709,14 @@ function renderAccount() {
   const deliveredList = document.getElementById('deliveredList');
   const totalEl = document.getElementById('accountTotal');
   const badge = document.getElementById('accountBadge');
+  const wompiPayBtn = document.getElementById('wompiPayBtn');
+  const paymentWaiting = document.getElementById('accountPaymentWaiting');
 
   const items = state.accountItems;
   const inProgress = items.filter(isInProgress);
   const delivered = items.filter((item) => item.confirmado);
   const groupedDelivered = groupDeliveredItems(delivered);
-  const deliveredTotal = groupedDelivered.reduce((sum, g) => sum + g.subtotal, 0);
+  const deliveredTotal = getAccountDeliveredTotal();
   const inProgressCount = inProgress.reduce((sum, item) => sum + item.qty, 0);
 
   if (items.length === 0) {
@@ -672,6 +724,8 @@ function renderAccount() {
     inProgressSection.hidden = true;
     deliveredSection.hidden = true;
     badge.hidden = true;
+    if (wompiPayBtn) wompiPayBtn.hidden = true;
+    if (paymentWaiting) paymentWaiting.hidden = true;
     return;
   }
 
@@ -713,8 +767,14 @@ function renderAccount() {
       .join('');
     document.getElementById('totalAmount').textContent = formatCOP(deliveredTotal);
     totalEl.hidden = false;
+
+    const showPayButton = deliveredTotal > 0 && !state.paymentPendingConfirmation;
+    if (wompiPayBtn) wompiPayBtn.hidden = !showPayButton;
+    if (paymentWaiting) paymentWaiting.hidden = !state.paymentPendingConfirmation;
   } else {
     deliveredSection.hidden = true;
+    if (wompiPayBtn) wompiPayBtn.hidden = true;
+    if (paymentWaiting) paymentWaiting.hidden = !state.paymentPendingConfirmation;
   }
 
   badge.hidden = inProgressCount === 0;
@@ -727,6 +787,64 @@ function getSessionSwitchSuccessMessage(session) {
       ? 'Cuenta Grupal'
       : `Cuenta ${formatSessionCode(session.numero)} (Personal)`;
   return `Cambio exitoso — ahora estás en ${label}. Tus pedidos activos fueron transferidos.`;
+}
+
+async function markPaymentPendingConfirmation(successMessage) {
+  if (!state.sesionId || state.paymentSubmitting) return;
+
+  state.paymentSubmitting = true;
+
+  try {
+    const { error } = await supabaseClient
+      .from('sesiones')
+      .update({ pago_pendiente_confirmacion: true })
+      .eq('id', state.sesionId);
+
+    if (error) throw error;
+
+    state.paymentPendingConfirmation = true;
+    renderAccount();
+    showToast(successMessage || 'Pago recibido, el mesero lo confirmará', 'success', 5000);
+  } catch (error) {
+    console.error(error);
+    showToast(error.message || 'No se pudo registrar el pago.', 'error');
+  } finally {
+    state.paymentSubmitting = false;
+  }
+}
+
+function openWompiCheckout(totalSesion) {
+  if (typeof WidgetCheckout === 'undefined') {
+    showToast('No se pudo cargar Wompi. Recarga la página.', 'error');
+    return;
+  }
+
+  if (!state.sesionId) {
+    showToast('No se pudo identificar tu sesión.', 'error');
+    return;
+  }
+
+  if (totalSesion <= 0) return;
+
+  const checkout = new WidgetCheckout({
+    currency: 'COP',
+    amountInCents: Math.round(totalSesion * 100),
+    reference: `sesion-${state.sesionId}-${Date.now()}`,
+    publicKey: getWompiPublicKey(),
+  });
+
+  checkout.open((result) => {
+    const transaction = result?.transaction;
+    if (transaction?.status === 'APPROVED') {
+      markPaymentPendingConfirmation('Pago recibido, el mesero lo confirmará');
+    }
+  });
+}
+
+function initWompiPayment() {
+  document.getElementById('wompiPayBtn')?.addEventListener('click', () => {
+    openWompiCheckout(getAccountDeliveredTotal());
+  });
 }
 
 function initAccountSwitch() {
@@ -861,6 +979,7 @@ async function init() {
     updateCartBar();
     initWaiterButtons();
     initAccountSwitch();
+    initWompiPayment();
     handleInitialRoute();
 
     document.querySelectorAll('.bottom-nav__item').forEach((btn) => {

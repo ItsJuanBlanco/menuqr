@@ -114,6 +114,14 @@ function formatSessionLineLabel(session) {
   return code ? `#${code}` : 'Cuenta';
 }
 
+function sortMesaSessions(sessions) {
+  return [...sessions].sort((a, b) => {
+    if (a.tipo === 'grupal' && b.tipo !== 'grupal') return 1;
+    if (a.tipo !== 'grupal' && b.tipo === 'grupal') return -1;
+    return (a.numero ?? 0) - (b.numero ?? 0);
+  });
+}
+
 function buildMesaSessionBreakdown(items, sesionById) {
   const totals = new Map();
 
@@ -122,20 +130,20 @@ function buildMesaSessionBreakdown(items, sesionById) {
     totals.set(item.sesionId, (totals.get(item.sesionId) || 0) + item.subtotal);
   });
 
-  return [...totals.entries()]
-    .map(([sesionId, total]) => ({
-      id: sesionId,
-      sesionId,
-      label: formatSessionLineLabel(sesionById.get(sesionId)),
-      total,
-      numero: sesionById.get(sesionId)?.numero ?? null,
-      tipo: sesionById.get(sesionId)?.tipo ?? 'individual',
-    }))
-    .sort((a, b) => {
-      if (a.tipo === 'grupal' && b.tipo !== 'grupal') return 1;
-      if (a.tipo !== 'grupal' && b.tipo === 'grupal') return -1;
-      return (a.numero ?? 0) - (b.numero ?? 0);
-    });
+  return sortMesaSessions(
+    [...totals.entries()].map(([sesionId, total]) => {
+      const meta = sesionById.get(sesionId);
+      return {
+        id: sesionId,
+        sesionId,
+        label: formatSessionLineLabel(meta),
+        total,
+        numero: meta?.numero ?? null,
+        tipo: meta?.tipo ?? 'individual',
+        pago_pendiente_confirmacion: meta?.pago_pendiente_confirmacion === true,
+      };
+    })
+  );
 }
 
 function groupDeliveredItems(items) {
@@ -410,11 +418,30 @@ async function fetchMesas() {
   if (sesionIds.length > 0) {
     const { data: sesionesData, error: sesionesError } = await supabaseClient
       .from('sesiones')
-      .select('id, numero, tipo')
+      .select('id, numero, tipo, pago_pendiente_confirmacion')
       .in('id', sesionIds);
 
     if (sesionesError) throw sesionesError;
     sesionById = new Map((sesionesData || []).map((sesion) => [sesion.id, sesion]));
+  }
+
+  const mesaIds = mesas.map((mesa) => mesa.id);
+  let activeSesiones = [];
+
+  if (mesaIds.length > 0) {
+    const { data: activeSesionesData, error: activeSesionesError } = await supabaseClient
+      .from('sesiones')
+      .select('id, numero, tipo, mesa_id, pago_pendiente_confirmacion')
+      .eq('restaurante_id', RESTAURANTE_ID)
+      .eq('activa', true)
+      .in('mesa_id', mesaIds);
+
+    if (activeSesionesError) throw activeSesionesError;
+    activeSesiones = activeSesionesData || [];
+
+    activeSesiones.forEach((sesion) => {
+      sesionById.set(sesion.id, { ...sesionById.get(sesion.id), ...sesion });
+    });
   }
 
   (itemsData || []).forEach((item) => {
@@ -441,7 +468,31 @@ async function fetchMesas() {
 
   mesas.forEach((mesa) => {
     if (!mesaSessionItems[mesa.id]) mesaSessionItems[mesa.id] = {};
-    mesaSessionBreakdown[mesa.id] = buildMesaSessionBreakdown(mesaAccounts[mesa.id] || [], sesionById);
+
+    const breakdown = buildMesaSessionBreakdown(mesaAccounts[mesa.id] || [], sesionById);
+    const byId = new Map(breakdown.map((session) => [session.id, session]));
+
+    activeSesiones
+      .filter((sesion) => sesion.mesa_id === mesa.id)
+      .forEach((sesion) => {
+        const existing = byId.get(sesion.id);
+        if (existing) {
+          existing.pago_pendiente_confirmacion = sesion.pago_pendiente_confirmacion === true;
+          return;
+        }
+
+        byId.set(sesion.id, {
+          id: sesion.id,
+          sesionId: sesion.id,
+          label: formatSessionLineLabel(sesion),
+          total: 0,
+          numero: sesion.numero,
+          tipo: sesion.tipo || 'individual',
+          pago_pendiente_confirmacion: sesion.pago_pendiente_confirmacion === true,
+        });
+      });
+
+    mesaSessionBreakdown[mesa.id] = sortMesaSessions([...byId.values()]);
   });
 
   renderMesas();
@@ -490,14 +541,24 @@ function renderMesas() {
         sessions.length === 0
           ? '<p class="mesa-card__sessions-empty">Sin cuentas activas</p>'
           : `<ul class="mesa-card__session-lines">${sessions
-              .map(
-                (session) => `
-                  <li class="mesa-card__session-line">
-                    <span class="mesa-card__session-label">${escapeHtml(session.label)}</span>
-                    <span class="mesa-card__session-amount">${formatCOP(session.total)}</span>
+              .map((session) => {
+                const paymentAlert = session.pago_pendiente_confirmacion
+                  ? `<div class="mesa-card__payment-alert">
+                      <span class="mesa-card__payment-badge">💳 Pago pendiente</span>
+                      <button type="button" class="mesa-card__payment-btn" data-action="confirmar-pago" data-sesion-id="${session.id}" data-mesa-id="${mesa.id}" data-mesa-num="${mesa.numero}">Confirmar pago</button>
+                    </div>`
+                  : '';
+
+                return `
+                  <li class="mesa-card__session-block${session.pago_pendiente_confirmacion ? ' mesa-card__session-block--payment' : ''}">
+                    <div class="mesa-card__session-line">
+                      <span class="mesa-card__session-label">${escapeHtml(session.label)}</span>
+                      <span class="mesa-card__session-amount">${formatCOP(session.total)}</span>
+                    </div>
+                    ${paymentAlert}
                   </li>
-                `
-              )
+                `;
+              })
               .join('')}</ul>`;
       const waiterAlert = mesa.mesero_requerido
         ? `<div class="mesa-card__alert">
@@ -543,6 +604,9 @@ function bindMesasActions() {
     else if (action === 'nueva-orden') openNewOrderModal(mesaId, mesaNum);
     else if (action === 'cerrar-mesa') closeMesa(mesaId, mesaNum);
     else if (action === 'atender-mesero') markWaiterAttended(mesaId);
+    else if (action === 'confirmar-pago') {
+      confirmSessionPayment(btn.dataset.sesionId, mesaId, mesaNum);
+    }
   });
 
   mesasClickBound = true;
@@ -615,6 +679,29 @@ function initModal() {
   document.querySelectorAll('[data-close-modal]').forEach((el) => {
     el.addEventListener('click', closeAccountModal);
   });
+}
+
+async function confirmSessionPayment(sesionId, mesaId, mesaNum, sessionLabel) {
+  if (updating.has(`pay-${sesionId}`)) return;
+
+  updating.add(`pay-${sesionId}`);
+
+  try {
+    const { error } = await supabaseClient
+      .from('sesiones')
+      .update({ pago_pendiente_confirmacion: false })
+      .eq('id', sesionId);
+
+    if (error) throw error;
+
+    showToast('Pago confirmado', 'success');
+    await refreshPanelData();
+  } catch (error) {
+    console.error(error);
+    showToast(error.message || 'No se pudo confirmar el pago.', 'error');
+  } finally {
+    updating.delete(`pay-${sesionId}`);
+  }
 }
 
 async function markWaiterAttended(mesaId) {

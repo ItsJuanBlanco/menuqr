@@ -10,6 +10,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/styles.css">
+  <script src="https://checkout.wompi.co/widget.js"></script>
 </head>
 <body>
   <!-- Pantalla de bienvenida / sesión -->
@@ -124,6 +125,12 @@
               <span>Total acumulado</span>
               <strong id="totalAmount">$0</strong>
             </div>
+            <button type="button" class="wompi-pay-btn" id="wompiPayBtn" hidden>
+              Pagar con Wompi
+            </button>
+            <p class="account__payment-waiting" id="accountPaymentWaiting" hidden>
+              Pago recibido, el mesero lo confirmará
+            </p>
           </section>
 
           <section class="account__switch" id="accountSwitchSection">
