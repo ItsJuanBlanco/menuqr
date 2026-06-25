@@ -942,6 +942,10 @@ ul {
 }
 
 /* ── Cart bar ── */
+.cart-bar[hidden] {
+  display: none !important;
+}
+
 .cart-bar {
   position: fixed;
   bottom: calc(var(--nav-height) + var(--safe-bottom) + 8px);

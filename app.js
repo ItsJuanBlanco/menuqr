@@ -169,18 +169,16 @@ function slugifyCategory(name) {
     .replace(/(^-|-$)/g, '');
 }
 
-function showToast(message, type = '', duration = 3200) {
+const TOAST_DISMISS_MS = 10000;
+
+function showToast(message, type = '', duration = TOAST_DISMISS_MS) {
   const toast = document.getElementById('toast');
   if (!toast) return;
 
   clearTimeout(showToast._timer);
 
   toast.textContent = message;
-  toast.className = 'toast' + (type ? ` toast--${type}` : '');
-
-  requestAnimationFrame(() => {
-    toast.classList.add('toast--visible');
-  });
+  toast.className = 'toast toast--visible' + (type ? ` toast--${type}` : '');
 
   showToast._timer = setTimeout(() => {
     toast.classList.remove('toast--visible');
@@ -896,6 +894,12 @@ function getCartTotals() {
   return { count, total };
 }
 
+function updateCartBarVisibility() {
+  const cartBar = document.getElementById('cartBar');
+  if (!cartBar) return;
+  cartBar.hidden = state.activeTab !== 'carta';
+}
+
 function updateCartBar() {
   const { count, total } = getCartTotals();
   const summary = document.getElementById('cartSummary');
@@ -928,7 +932,7 @@ async function sendOrder() {
   const cartSnapshot = { ...state.cart };
   const successMsg = `Pedido enviado (${count} item${count !== 1 ? 's' : ''}). El mesero lo confirmará pronto.`;
 
-  showToast(successMsg, 'success', 15000);
+  showToast(successMsg, 'success');
 
   try {
     const { data: pedido, error: pedidoError } = await supabaseClient
@@ -1449,6 +1453,8 @@ function switchTab(tabId) {
   });
 
   if (tabId === 'cuenta') renderAccount();
+
+  updateCartBarVisibility();
 }
 
 /* ── Llamar mesero ── */
@@ -1522,6 +1528,7 @@ async function init() {
     renderCategories();
     renderProducts();
     updateCartBar();
+    updateCartBarVisibility();
     initWaiterButtons();
     initAccountSwitch();
     initPaymentExtras();
