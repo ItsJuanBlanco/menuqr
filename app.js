@@ -133,6 +133,10 @@ const state = {
   waiterCooldown: false,
   paymentPendingConfirmation: false,
   paymentSubmitting: false,
+  splitCount: 2,
+  groupPayments: [],
+  splitQrUrls: [],
+  splitQrIndex: 0,
 };
 
 /* ── Utilidades ── */
@@ -355,6 +359,7 @@ async function loadAccountItems() {
     .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
   await loadSessionPaymentStatus();
+  await loadGroupPayments();
   renderAccount();
 }
 
@@ -385,6 +390,157 @@ async function loadSessionPaymentStatus() {
 function getAccountDeliveredTotal() {
   const delivered = state.accountItems.filter((item) => item.confirmado);
   return groupDeliveredItems(delivered).reduce((sum, group) => sum + group.subtotal, 0);
+}
+
+function getSplitShareAmount(total, count) {
+  if (!count || count < 1) return 0;
+  return Math.ceil(total / count);
+}
+
+function getGroupPaidTotal() {
+  return state.groupPayments
+    .filter((payment) => payment.estado === 'aprobado')
+    .reduce((sum, payment) => sum + Number(payment.monto), 0);
+}
+
+async function loadGroupPayments() {
+  if (!state.sesionId) {
+    state.groupPayments = [];
+    return;
+  }
+
+  const { data, error } = await supabaseClient
+    .from('pagos_grupo')
+    .select('id, monto, referencia_wompi, estado, created_at')
+    .eq('sesion_id', state.sesionId)
+    .order('created_at', { ascending: true });
+
+  if (error) {
+    console.error('Error cargando pagos de grupo:', error);
+    state.groupPayments = [];
+    return;
+  }
+
+  state.groupPayments = data || [];
+}
+
+function getPagarBaseUrl() {
+  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+    return `${window.location.origin}/pagar`;
+  }
+  return 'https://menuqr-virid.vercel.app/pagar';
+}
+
+function buildSplitPaymentUrl(monto, parte) {
+  const params = new URLSearchParams({
+    monto: String(monto),
+    sesion: state.sesionId,
+    parte: String(parte),
+  });
+  if (RESTAURANTE_SLUG) params.set('slug', RESTAURANTE_SLUG);
+  return `${getPagarBaseUrl()}?${params.toString()}`;
+}
+
+function buildSplitQrUrls(deliveredTotal, count) {
+  const shareAmount = getSplitShareAmount(deliveredTotal, count);
+  return Array.from({ length: count }, (_, index) => {
+    const parte = index + 1;
+    return {
+      parte,
+      monto: shareAmount,
+      url: buildSplitPaymentUrl(shareAmount, parte),
+    };
+  });
+}
+
+function hideSplitQrViewer() {
+  const viewer = document.getElementById('splitQrViewer');
+  if (viewer) viewer.hidden = true;
+  state.splitQrUrls = [];
+  state.splitQrIndex = 0;
+}
+
+function renderSplitQrAt(index) {
+  const viewer = document.getElementById('splitQrViewer');
+  const indicator = document.getElementById('splitQrIndicator');
+  const canvas = document.getElementById('splitQrCanvas');
+  const prevBtn = document.getElementById('splitQrPrev');
+  const nextBtn = document.getElementById('splitQrNext');
+
+  if (!viewer || !canvas || !state.splitQrUrls.length) return;
+
+  const safeIndex = Math.max(0, Math.min(index, state.splitQrUrls.length - 1));
+  state.splitQrIndex = safeIndex;
+
+  const current = state.splitQrUrls[safeIndex];
+  if (indicator) {
+    indicator.textContent = `Persona ${current.parte} de ${state.splitQrUrls.length}`;
+  }
+
+  canvas.innerHTML = '';
+
+  if (typeof QRCode === 'undefined') {
+    canvas.textContent = 'No se pudo cargar el generador de QR.';
+    return;
+  }
+
+  new QRCode(canvas, {
+    text: current.url,
+    width: 220,
+    height: 220,
+    colorDark: '#0a0a0c',
+    colorLight: '#ffffff',
+    correctLevel: QRCode.CorrectLevel.M,
+  });
+
+  if (prevBtn) prevBtn.disabled = safeIndex === 0;
+  if (nextBtn) nextBtn.disabled = safeIndex === state.splitQrUrls.length - 1;
+  viewer.hidden = false;
+}
+
+function updateSplitBillUI(deliveredTotal) {
+  const splitSection = document.getElementById('splitBillSection');
+  const splitShareEl = document.getElementById('splitShareAmount');
+  const splitProgressEl = document.getElementById('splitPaymentProgress');
+  const splitInput = document.getElementById('splitCountInput');
+  const generateQrBtn = document.getElementById('generateQrBtn');
+  const minusBtn = document.getElementById('splitCountMinus');
+  const plusBtn = document.getElementById('splitCountPlus');
+
+  if (!splitSection) return;
+
+  const showSplit = deliveredTotal > 0 && !state.paymentPendingConfirmation;
+  splitSection.hidden = !showSplit;
+
+  if (!showSplit) {
+    hideSplitQrViewer();
+    return;
+  }
+
+  if (splitInput) splitInput.value = String(state.splitCount);
+  if (minusBtn) minusBtn.disabled = state.splitCount <= 2 || state.paymentSubmitting;
+  if (plusBtn) plusBtn.disabled = state.splitCount >= 20 || state.paymentSubmitting;
+
+  const shareAmount = getSplitShareAmount(deliveredTotal, state.splitCount);
+  if (splitShareEl) {
+    splitShareEl.textContent = `Cada uno paga: ${formatCOP(shareAmount)}`;
+  }
+
+  const paidTotal = getGroupPaidTotal();
+  if (splitProgressEl) {
+    if (paidTotal > 0) {
+      splitProgressEl.hidden = false;
+      splitProgressEl.textContent = `Pagado: ${formatCOP(paidTotal)} de ${formatCOP(deliveredTotal)}`;
+    } else {
+      splitProgressEl.hidden = true;
+      splitProgressEl.textContent = '';
+    }
+  }
+
+  if (generateQrBtn) {
+    generateQrBtn.disabled =
+      state.paymentSubmitting || shareAmount <= 0 || paidTotal >= deliveredTotal;
+  }
 }
 
 const WOMPI_PUBLIC_KEY = 'pub_test_sLvY32q8txNx6ygl0BrYaNo5w1aUkfMT';
@@ -467,6 +623,13 @@ function subscribeToRealtime() {
       { event: 'UPDATE', schema: 'public', table: 'sesiones', filter: `id=eq.${state.sesionId}` },
       () => {
         loadSessionPaymentStatus().then(() => renderAccount());
+      }
+    );
+    channel.on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'pagos_grupo', filter: `sesion_id=eq.${state.sesionId}` },
+      () => {
+        loadGroupPayments().then(() => renderAccount());
       }
     );
   }
@@ -711,6 +874,7 @@ function renderAccount() {
   const badge = document.getElementById('accountBadge');
   const wompiPayBtn = document.getElementById('wompiPayBtn');
   const paymentWaiting = document.getElementById('accountPaymentWaiting');
+  const isGrupal = state.sessionTipo === 'grupal';
 
   const items = state.accountItems;
   const inProgress = items.filter(isInProgress);
@@ -726,6 +890,7 @@ function renderAccount() {
     badge.hidden = true;
     if (wompiPayBtn) wompiPayBtn.hidden = true;
     if (paymentWaiting) paymentWaiting.hidden = true;
+    updateSplitBillUI(0);
     return;
   }
 
@@ -768,13 +933,15 @@ function renderAccount() {
     document.getElementById('totalAmount').textContent = formatCOP(deliveredTotal);
     totalEl.hidden = false;
 
-    const showPayButton = deliveredTotal > 0 && !state.paymentPendingConfirmation;
+    const showPayButton = deliveredTotal > 0 && !state.paymentPendingConfirmation && !isGrupal;
     if (wompiPayBtn) wompiPayBtn.hidden = !showPayButton;
     if (paymentWaiting) paymentWaiting.hidden = !state.paymentPendingConfirmation;
+    updateSplitBillUI(deliveredTotal);
   } else {
     deliveredSection.hidden = true;
     if (wompiPayBtn) wompiPayBtn.hidden = true;
     if (paymentWaiting) paymentWaiting.hidden = !state.paymentPendingConfirmation;
+    updateSplitBillUI(0);
   }
 
   badge.hidden = inProgressCount === 0;
@@ -789,15 +956,98 @@ function getSessionSwitchSuccessMessage(session) {
   return `Cambio exitoso — ahora estás en ${label}. Tus pedidos activos fueron transferidos.`;
 }
 
-async function markPaymentPendingConfirmation(successMessage) {
+async function clearPaymentInProgress() {
+  if (!state.sesionId) return;
+
+  const { error } = await supabaseClient
+    .from('sesiones')
+    .update({ pago_en_proceso: false })
+    .eq('id', state.sesionId);
+
+  if (error) console.error('Error limpiando pago en proceso:', error);
+}
+
+async function markPaymentInProgress() {
+  if (!state.sesionId) return false;
+
+  const { error } = await supabaseClient
+    .from('sesiones')
+    .update({ pago_en_proceso: true })
+    .eq('id', state.sesionId);
+
+  if (error) {
+    console.error(error);
+    showToast(error.message || 'No se pudo iniciar el pago.', 'error');
+    return false;
+  }
+
+  return true;
+}
+
+async function getSessionApprovedPaymentsTotal(sesionId) {
+  const { data, error } = await supabaseClient
+    .from('pagos_grupo')
+    .select('monto')
+    .eq('sesion_id', sesionId)
+    .eq('estado', 'aprobado');
+
+  if (error) throw error;
+
+  return (data || []).reduce((sum, row) => sum + Number(row.monto), 0);
+}
+
+async function handleApprovedWompiPayment(monto, referenciaWompi) {
   if (!state.sesionId || state.paymentSubmitting) return;
 
   state.paymentSubmitting = true;
 
   try {
+    const { error: insertError } = await supabaseClient.from('pagos_grupo').insert({
+      sesion_id: state.sesionId,
+      monto,
+      referencia_wompi: referenciaWompi,
+      estado: 'aprobado',
+    });
+
+    if (insertError) throw insertError;
+
+    const sessionTotal = getAccountDeliveredTotal();
+    const paidTotal = await getSessionApprovedPaymentsTotal(state.sesionId);
+
+    await loadGroupPayments();
+
+    if (sessionTotal > 0 && paidTotal >= sessionTotal) {
+      await markPaymentPendingConfirmation(
+        'Cuenta completa. El mesero confirmará el pago.',
+        { skipSubmittingGuard: true }
+      );
+    } else {
+      await clearPaymentInProgress();
+      showToast('Tu parte fue registrada.', 'success', 4000);
+      renderAccount();
+    }
+  } catch (error) {
+    console.error(error);
+    showToast(error.message || 'No se pudo registrar tu pago.', 'error');
+    await clearPaymentInProgress();
+  } finally {
+    state.paymentSubmitting = false;
+    renderAccount();
+  }
+}
+
+async function markPaymentPendingConfirmation(successMessage, options = {}) {
+  const { skipSubmittingGuard = false } = options;
+
+  if (!state.sesionId) return;
+  if (!skipSubmittingGuard && state.paymentSubmitting) return;
+
+  if (!skipSubmittingGuard) state.paymentSubmitting = true;
+
+  try {
     const { error } = await supabaseClient
       .from('sesiones')
-      .update({ pago_pendiente_confirmacion: true })
+      .update({ pago_pendiente_confirmacion: true, pago_en_proceso: false })
       .eq('id', state.sesionId);
 
     if (error) throw error;
@@ -809,11 +1059,11 @@ async function markPaymentPendingConfirmation(successMessage) {
     console.error(error);
     showToast(error.message || 'No se pudo registrar el pago.', 'error');
   } finally {
-    state.paymentSubmitting = false;
+    if (!skipSubmittingGuard) state.paymentSubmitting = false;
   }
 }
 
-function openWompiCheckout(totalSesion) {
+async function openWompiCheckout(amount, options = {}) {
   if (typeof WidgetCheckout === 'undefined') {
     showToast('No se pudo cargar Wompi. Recarga la página.', 'error');
     return;
@@ -824,19 +1074,27 @@ function openWompiCheckout(totalSesion) {
     return;
   }
 
-  if (totalSesion <= 0) return;
+  if (amount <= 0) return;
+
+  const started = await markPaymentInProgress();
+  if (!started) return;
+
+  const reference = options.reference || `sesion-${state.sesionId}-${Date.now()}`;
 
   const checkout = new WidgetCheckout({
     currency: 'COP',
-    amountInCents: Math.round(totalSesion * 100),
-    reference: `sesion-${state.sesionId}-${Date.now()}`,
+    amountInCents: Math.round(amount * 100),
+    reference,
     publicKey: getWompiPublicKey(),
   });
 
   checkout.open((result) => {
     const transaction = result?.transaction;
     if (transaction?.status === 'APPROVED') {
-      markPaymentPendingConfirmation('Pago recibido, el mesero lo confirmará');
+      const referencia = transaction.id || transaction.reference || reference;
+      handleApprovedWompiPayment(amount, referencia);
+    } else {
+      clearPaymentInProgress();
     }
   });
 }
@@ -845,6 +1103,77 @@ function initWompiPayment() {
   document.getElementById('wompiPayBtn')?.addEventListener('click', () => {
     openWompiCheckout(getAccountDeliveredTotal());
   });
+}
+
+function initSplitBill() {
+  const minusBtn = document.getElementById('splitCountMinus');
+  const plusBtn = document.getElementById('splitCountPlus');
+  const generateQrBtn = document.getElementById('generateQrBtn');
+  const prevBtn = document.getElementById('splitQrPrev');
+  const nextBtn = document.getElementById('splitQrNext');
+
+  if (minusBtn && !minusBtn.dataset.bound) {
+    minusBtn.dataset.bound = 'true';
+    minusBtn.addEventListener('click', () => {
+      if (state.splitCount <= 2) return;
+      state.splitCount -= 1;
+      hideSplitQrViewer();
+      updateSplitBillUI(getAccountDeliveredTotal());
+    });
+  }
+
+  if (plusBtn && !plusBtn.dataset.bound) {
+    plusBtn.dataset.bound = 'true';
+    plusBtn.addEventListener('click', () => {
+      if (state.splitCount >= 20) return;
+      state.splitCount += 1;
+      hideSplitQrViewer();
+      updateSplitBillUI(getAccountDeliveredTotal());
+    });
+  }
+
+  if (generateQrBtn && !generateQrBtn.dataset.bound) {
+    generateQrBtn.dataset.bound = 'true';
+    generateQrBtn.addEventListener('click', () => {
+      if (!state.sesionId) {
+        showToast('No se pudo identificar tu sesión.', 'error');
+        return;
+      }
+
+      if (typeof QRCode === 'undefined') {
+        showToast('No se pudo cargar el generador de QR. Recarga la página.', 'error');
+        return;
+      }
+
+      const deliveredTotal = getAccountDeliveredTotal();
+      const paidTotal = getGroupPaidTotal();
+
+      if (paidTotal >= deliveredTotal) {
+        showToast('La cuenta ya está cubierta.', 'success');
+        return;
+      }
+
+      state.splitQrUrls = buildSplitQrUrls(deliveredTotal, state.splitCount);
+      state.splitQrIndex = 0;
+      renderSplitQrAt(0);
+    });
+  }
+
+  if (prevBtn && !prevBtn.dataset.bound) {
+    prevBtn.dataset.bound = 'true';
+    prevBtn.addEventListener('click', () => {
+      if (state.splitQrIndex <= 0) return;
+      renderSplitQrAt(state.splitQrIndex - 1);
+    });
+  }
+
+  if (nextBtn && !nextBtn.dataset.bound) {
+    nextBtn.dataset.bound = 'true';
+    nextBtn.addEventListener('click', () => {
+      if (state.splitQrIndex >= state.splitQrUrls.length - 1) return;
+      renderSplitQrAt(state.splitQrIndex + 1);
+    });
+  }
 }
 
 function initAccountSwitch() {
@@ -957,6 +1286,8 @@ function applySession(session) {
   state.sessionToken = session.session_token || null;
   state.sessionTipo = session.tipo;
   state.sessionNumero = session.numero;
+  state.splitCount = 2;
+  hideSplitQrViewer();
   updateSessionBadge(session);
 }
 
@@ -980,6 +1311,7 @@ async function init() {
     initWaiterButtons();
     initAccountSwitch();
     initWompiPayment();
+    initSplitBill();
     handleInitialRoute();
 
     document.querySelectorAll('.bottom-nav__item').forEach((btn) => {

@@ -1136,3 +1136,218 @@ ul {
   background: #fef3c7;
   border: 1px solid #fcd34d;
 }
+
+/* ── Dividir cuenta (sesión grupal) ── */
+.account__split {
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px dashed var(--border);
+}
+
+.account__split-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.account__split-label {
+  font-size: 0.9375rem;
+  color: var(--text);
+  flex: 1;
+  min-width: 0;
+}
+
+.account__split-stepper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.account__split-stepper-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.25rem;
+  font-weight: 600;
+  line-height: 1;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  color: var(--text);
+  transition: background 0.15s ease;
+}
+
+.account__split-stepper-btn:active:not(:disabled) {
+  background: var(--accent-soft);
+}
+
+.account__split-stepper-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.account__split-input {
+  width: 44px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  font-size: 1rem;
+  font-weight: 700;
+  text-align: center;
+  color: var(--text);
+  -moz-appearance: textfield;
+}
+
+.account__split-input::-webkit-outer-spin-button,
+.account__split-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.account__split-share {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 8px;
+}
+
+.account__split-progress {
+  font-size: 0.875rem;
+  color: var(--text-muted);
+  margin-bottom: 12px;
+}
+
+.account__split-pay-btn {
+  margin-top: 4px;
+}
+
+.account__split-qr {
+  margin-top: 20px;
+  padding: 20px 16px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  text-align: center;
+}
+
+.account__split-qr-indicator {
+  font-size: 1rem;
+  font-weight: 700;
+  margin-bottom: 16px;
+  color: var(--text);
+}
+
+.account__split-qr-canvas {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 240px;
+  margin-bottom: 12px;
+}
+
+.account__split-qr-canvas img,
+.account__split-qr-canvas canvas {
+  border-radius: 12px;
+  padding: 12px;
+  background: #fff;
+}
+
+.account__split-qr-hint {
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+  margin-bottom: 16px;
+  line-height: 1.45;
+}
+
+.account__split-qr-nav {
+  display: flex;
+  gap: 10px;
+}
+
+.account__split-qr-nav-btn {
+  flex: 1;
+  padding: 12px 14px;
+  border-radius: var(--radius-sm);
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text);
+  background: var(--bg-hover);
+  border: 1px solid var(--border);
+  transition: background 0.15s ease;
+}
+
+.account__split-qr-nav-btn:active:not(:disabled) {
+  background: var(--accent-soft);
+}
+
+.account__split-qr-nav-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ── Página pagar ── */
+.pagar-page {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 20px;
+  text-align: center;
+}
+
+.pagar-page__logo {
+  font-size: 2rem;
+  margin-bottom: 12px;
+}
+
+.pagar-page__title {
+  font-size: 1.375rem;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.pagar-page__amount {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--accent);
+  margin-bottom: 8px;
+  font-variant-numeric: tabular-nums;
+}
+
+.pagar-page__hint {
+  font-size: 0.9375rem;
+  color: var(--text-muted);
+  max-width: 20rem;
+  margin-bottom: 24px;
+}
+
+.pagar-page__status {
+  font-size: 0.9375rem;
+  color: var(--text-muted);
+}
+
+.pagar-page__success {
+  padding: 16px 20px;
+  border-radius: var(--radius-sm);
+  background: var(--success-soft);
+  border: 1px solid rgba(34, 197, 94, 0.35);
+  color: #86efac;
+  font-weight: 600;
+  max-width: 22rem;
+}
+
+.pagar-page__error {
+  padding: 16px 20px;
+  border-radius: var(--radius-sm);
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  color: #fca5a5;
+  font-weight: 600;
+  max-width: 22rem;
+}

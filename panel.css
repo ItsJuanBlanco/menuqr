@@ -589,6 +589,25 @@ button {
   border: 1px solid #fdba74;
 }
 
+.mesa-card__payment-badge--complete {
+  color: #166534;
+  background: #dcfce7;
+  border-color: #86efac;
+}
+
+.mesa-card__payment-badge--paying {
+  color: #92400e;
+  background: #fef3c7;
+  border-color: #fcd34d;
+}
+
+.mesa-card__payment-progress {
+  margin-top: 6px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #c2410c;
+}
+
 .mesa-card__payment-btn {
   padding: 6px 12px;
   border-radius: var(--radius-sm);

@@ -16,6 +16,8 @@ const STATIC_PAGE_NAMES = new Set([
   'panel-menu.js',
   'restaurant.js',
   'sessions.js',
+  'pagar.html',
+  'pagar.js',
 ]);
 
 const PAGE_ROUTE_NAMES = new Set(['panel', 'panel.html', 'home', 'home.html', 'index.html']);

@@ -122,7 +122,7 @@ function sortMesaSessions(sessions) {
   });
 }
 
-function buildMesaSessionBreakdown(items, sesionById) {
+function buildMesaSessionBreakdown(items, sesionById, pagosBySesion = new Map()) {
   const totals = new Map();
 
   items.forEach((item) => {
@@ -141,6 +141,8 @@ function buildMesaSessionBreakdown(items, sesionById) {
         numero: meta?.numero ?? null,
         tipo: meta?.tipo ?? 'individual',
         pago_pendiente_confirmacion: meta?.pago_pendiente_confirmacion === true,
+        pago_en_proceso: meta?.pago_en_proceso === true,
+        paidTotal: pagosBySesion.get(sesionId) || 0,
       };
     })
   );
@@ -412,18 +414,9 @@ async function fetchMesas() {
   mesaSessionBreakdown = {};
   mesaSessionItems = {};
 
-  const sesionIds = [...new Set((itemsData || []).map((item) => item.sesion_id).filter(Boolean))];
+  const sesionIdsFromItems = [...new Set((itemsData || []).map((item) => item.sesion_id).filter(Boolean))];
   let sesionById = new Map();
-
-  if (sesionIds.length > 0) {
-    const { data: sesionesData, error: sesionesError } = await supabaseClient
-      .from('sesiones')
-      .select('id, numero, tipo, pago_pendiente_confirmacion')
-      .in('id', sesionIds);
-
-    if (sesionesError) throw sesionesError;
-    sesionById = new Map((sesionesData || []).map((sesion) => [sesion.id, sesion]));
-  }
+  let pagosBySesion = new Map();
 
   const mesaIds = mesas.map((mesa) => mesa.id);
   let activeSesiones = [];
@@ -431,13 +424,44 @@ async function fetchMesas() {
   if (mesaIds.length > 0) {
     const { data: activeSesionesData, error: activeSesionesError } = await supabaseClient
       .from('sesiones')
-      .select('id, numero, tipo, mesa_id, pago_pendiente_confirmacion')
+      .select('id, numero, tipo, mesa_id, pago_pendiente_confirmacion, pago_en_proceso')
       .eq('restaurante_id', RESTAURANTE_ID)
       .eq('activa', true)
       .in('mesa_id', mesaIds);
 
     if (activeSesionesError) throw activeSesionesError;
     activeSesiones = activeSesionesData || [];
+  }
+
+  const allSesionIds = [
+    ...new Set([...sesionIdsFromItems, ...activeSesiones.map((sesion) => sesion.id)]),
+  ];
+
+  if (allSesionIds.length > 0) {
+    const [{ data: sesionesData, error: sesionesError }, { data: pagosData, error: pagosError }] =
+      await Promise.all([
+        supabaseClient
+          .from('sesiones')
+          .select('id, numero, tipo, pago_pendiente_confirmacion, pago_en_proceso')
+          .in('id', allSesionIds),
+        supabaseClient
+          .from('pagos_grupo')
+          .select('sesion_id, monto')
+          .in('sesion_id', allSesionIds)
+          .eq('estado', 'aprobado'),
+      ]);
+
+    if (sesionesError) throw sesionesError;
+    if (pagosError) throw pagosError;
+
+    sesionById = new Map((sesionesData || []).map((sesion) => [sesion.id, sesion]));
+
+    (pagosData || []).forEach((pago) => {
+      pagosBySesion.set(
+        pago.sesion_id,
+        (pagosBySesion.get(pago.sesion_id) || 0) + Number(pago.monto)
+      );
+    });
 
     activeSesiones.forEach((sesion) => {
       sesionById.set(sesion.id, { ...sesionById.get(sesion.id), ...sesion });
@@ -469,7 +493,7 @@ async function fetchMesas() {
   mesas.forEach((mesa) => {
     if (!mesaSessionItems[mesa.id]) mesaSessionItems[mesa.id] = {};
 
-    const breakdown = buildMesaSessionBreakdown(mesaAccounts[mesa.id] || [], sesionById);
+    const breakdown = buildMesaSessionBreakdown(mesaAccounts[mesa.id] || [], sesionById, pagosBySesion);
     const byId = new Map(breakdown.map((session) => [session.id, session]));
 
     activeSesiones
@@ -478,6 +502,8 @@ async function fetchMesas() {
         const existing = byId.get(sesion.id);
         if (existing) {
           existing.pago_pendiente_confirmacion = sesion.pago_pendiente_confirmacion === true;
+          existing.pago_en_proceso = sesion.pago_en_proceso === true;
+          existing.paidTotal = pagosBySesion.get(sesion.id) || existing.paidTotal || 0;
           return;
         }
 
@@ -489,6 +515,8 @@ async function fetchMesas() {
           numero: sesion.numero,
           tipo: sesion.tipo || 'individual',
           pago_pendiente_confirmacion: sesion.pago_pendiente_confirmacion === true,
+          pago_en_proceso: sesion.pago_en_proceso === true,
+          paidTotal: pagosBySesion.get(sesion.id) || 0,
         });
       });
 
@@ -542,20 +570,30 @@ function renderMesas() {
           ? '<p class="mesa-card__sessions-empty">Sin cuentas activas</p>'
           : `<ul class="mesa-card__session-lines">${sessions
               .map((session) => {
-                const paymentAlert = session.pago_pendiente_confirmacion
-                  ? `<div class="mesa-card__payment-alert">
-                      <span class="mesa-card__payment-badge">💳 Pago pendiente</span>
-                      <button type="button" class="mesa-card__payment-btn" data-action="confirmar-pago" data-sesion-id="${session.id}" data-mesa-id="${mesa.id}" data-mesa-num="${mesa.numero}">Confirmar pago</button>
-                    </div>`
-                  : '';
+                const paidTotal = session.paidTotal || 0;
+                const sessionTotal = session.total || 0;
+                const isComplete = session.pago_pendiente_confirmacion === true;
+                const isPaying = session.pago_en_proceso === true && !isComplete;
+
+                let paymentInfo = '';
+                if (isComplete) {
+                  paymentInfo = `<div class="mesa-card__payment-alert">
+                      <span class="mesa-card__payment-badge mesa-card__payment-badge--complete">✅ Pago completado</span>
+                      <button type="button" class="mesa-card__payment-btn" data-action="confirmar-pago" data-sesion-id="${session.id}" data-mesa-id="${mesa.id}" data-mesa-num="${mesa.numero}">Confirmar</button>
+                    </div>`;
+                } else if (isPaying) {
+                  paymentInfo = `<span class="mesa-card__payment-badge mesa-card__payment-badge--paying">💳 Pagando...</span>`;
+                } else if (paidTotal > 0 && sessionTotal > 0) {
+                  paymentInfo = `<p class="mesa-card__payment-progress">💳 ${formatCOP(paidTotal)} pagados de ${formatCOP(sessionTotal)}</p>`;
+                }
 
                 return `
-                  <li class="mesa-card__session-block${session.pago_pendiente_confirmacion ? ' mesa-card__session-block--payment' : ''}">
+                  <li class="mesa-card__session-block${isComplete || isPaying ? ' mesa-card__session-block--payment' : ''}">
                     <div class="mesa-card__session-line">
                       <span class="mesa-card__session-label">${escapeHtml(session.label)}</span>
                       <span class="mesa-card__session-amount">${formatCOP(session.total)}</span>
                     </div>
-                    ${paymentAlert}
+                    ${paymentInfo}
                   </li>
                 `;
               })
@@ -681,20 +719,48 @@ function initModal() {
   });
 }
 
-async function confirmSessionPayment(sesionId, mesaId, mesaNum, sessionLabel) {
+async function confirmSessionPayment(sesionId, mesaId, mesaNum) {
   if (updating.has(`pay-${sesionId}`)) return;
 
   updating.add(`pay-${sesionId}`);
 
   try {
-    const { error } = await supabaseClient
+    const { error: pedidosError } = await supabaseClient
+      .from('pedidos')
+      .update({ archivado: true })
+      .eq('sesion_id', sesionId)
+      .eq('restaurante_id', RESTAURANTE_ID)
+      .eq('archivado', false);
+
+    if (pedidosError) throw pedidosError;
+
+    const { error: sesionError } = await supabaseClient
       .from('sesiones')
-      .update({ pago_pendiente_confirmacion: false })
+      .update({ activa: false, pago_pendiente_confirmacion: false, pago_en_proceso: false })
       .eq('id', sesionId);
 
-    if (error) throw error;
+    if (sesionError) throw sesionError;
 
-    showToast('Pago confirmado', 'success');
+    const { data: activeSessions, error: activeError } = await supabaseClient
+      .from('sesiones')
+      .select('id')
+      .eq('mesa_id', mesaId)
+      .eq('restaurante_id', RESTAURANTE_ID)
+      .eq('activa', true)
+      .limit(1);
+
+    if (activeError) throw activeError;
+
+    if (!activeSessions?.length) {
+      const { error: mesaError } = await supabaseClient
+        .from('mesas')
+        .update({ estado: 'libre', mesero_requerido: false })
+        .eq('id', mesaId);
+
+      if (mesaError) throw mesaError;
+    }
+
+    showToast('Sesión cerrada', 'success');
     await refreshPanelData();
   } catch (error) {
     console.error(error);
@@ -1472,7 +1538,7 @@ function subscribeToRealtime() {
     realtimeChannel = null;
   }
 
-  const tables = ['pedidos', 'pedido_items', 'mesas', 'productos', 'sesiones'];
+  const tables = ['pedidos', 'pedido_items', 'mesas', 'productos', 'sesiones', 'pagos_grupo'];
   realtimeChannel = supabaseClient.channel('panel-live-sync');
 
   tables.forEach((table) => {
