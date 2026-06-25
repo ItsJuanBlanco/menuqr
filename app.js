@@ -404,15 +404,35 @@ function clampCustomTipAmount(amount, subtotal = getAccountDeliveredTotal()) {
   return Math.min(Math.max(0, Math.round(Number(amount) || 0)), getMaxCustomTipAmount(subtotal));
 }
 
-function getPaymentBreakdown(subtotal = getAccountDeliveredTotal()) {
-  const cargoServicio = state.serviceChargeEnabled
-    ? Math.round(subtotal * (state.serviceChargePercent / 100))
-    : 0;
+function getActiveServicePercent() {
+  if (!state.serviceChargeEnabled || state.tipCustomMode) return null;
+  return state.tipPercent ?? state.serviceChargePercent;
+}
 
+function getActiveTipPercent() {
+  if (state.tipCustomMode) return null;
+  if (state.tipPercent) return state.tipPercent;
+  if (state.serviceChargeEnabled) return state.serviceChargePercent;
+  return null;
+}
+
+function getPaymentBreakdown(subtotal = getAccountDeliveredTotal()) {
+  let cargoServicio = 0;
   let propina = 0;
   let propinaLabel = null;
+  let serviceLabel = null;
 
-  if (state.tipCustomMode && state.tipCustomAmount > 0) {
+  if (state.serviceChargeEnabled) {
+    if (state.tipCustomMode && state.tipCustomAmount > 0) {
+      propina = clampCustomTipAmount(state.tipCustomAmount, subtotal);
+      serviceLabel = 'Propina';
+      propinaLabel = 'Otra';
+    } else {
+      const percent = getActiveServicePercent() ?? state.serviceChargePercent;
+      cargoServicio = Math.round(subtotal * (percent / 100));
+      serviceLabel = `Servicio (${percent}%)`;
+    }
+  } else if (state.tipCustomMode && state.tipCustomAmount > 0) {
     propina = clampCustomTipAmount(state.tipCustomAmount, subtotal);
     propinaLabel = 'Otra';
   } else if (state.tipPercent) {
@@ -425,6 +445,7 @@ function getPaymentBreakdown(subtotal = getAccountDeliveredTotal()) {
     cargoServicio,
     propina,
     propinaLabel,
+    serviceLabel,
     total: subtotal + cargoServicio + propina,
   };
 }
@@ -535,7 +556,7 @@ function updatePaymentExtrasUI(deliveredTotal) {
     const percent = Number(btn.dataset.tipPercent);
     btn.classList.toggle(
       'account__tip-btn--active',
-      !state.tipCustomMode && state.tipPercent === percent
+      !state.tipCustomMode && getActiveTipPercent() === percent
     );
   });
 
@@ -559,16 +580,22 @@ function updatePaymentExtrasUI(deliveredTotal) {
 
   const serviceRow = document.getElementById('summaryServiceRow');
   const optionalLink = document.getElementById('serviceOptionalLink');
-  if (serviceRow) serviceRow.hidden = !state.serviceChargeEnabled;
-  document.getElementById('summaryServiceLabel').textContent =
-    `Servicio (${state.serviceChargePercent}%)`;
-  document.getElementById('summaryServiceAmount').textContent = formatCOP(breakdown.cargoServicio);
+  const serviceAmount = breakdown.cargoServicio + (state.serviceChargeEnabled ? breakdown.propina : 0);
+  const showServiceRow = state.serviceChargeEnabled && serviceAmount > 0;
+
+  if (serviceRow) serviceRow.hidden = !showServiceRow;
+  if (showServiceRow) {
+    document.getElementById('summaryServiceLabel').textContent =
+      breakdown.serviceLabel || `Servicio (${state.serviceChargePercent}%)`;
+    document.getElementById('summaryServiceAmount').textContent = formatCOP(serviceAmount);
+  }
   if (optionalLink) optionalLink.hidden = !state.serviceChargeEnabled;
   if (serviceRemoveConfirm && !state.serviceChargeEnabled) serviceRemoveConfirm.hidden = true;
 
   const tipRow = document.getElementById('summaryTipRow');
-  if (tipRow) tipRow.hidden = breakdown.propina <= 0;
-  if (breakdown.propina > 0) {
+  const showTipRow = !state.serviceChargeEnabled && breakdown.propina > 0;
+  if (tipRow) tipRow.hidden = !showTipRow;
+  if (showTipRow) {
     const tipLabel = breakdown.propinaLabel === 'Otra'
       ? 'Propina'
       : `Propina (${breakdown.propinaLabel})`;
@@ -1322,8 +1349,12 @@ function initPaymentExtras() {
 
       if (percentBtn) {
         const percent = Number(percentBtn.dataset.tipPercent);
-        if (state.tipPercent === percent && !state.tipCustomMode) {
+        const activePercent = getActiveTipPercent();
+
+        if (activePercent === percent && !state.tipCustomMode) {
           state.tipPercent = null;
+          state.tipCustomMode = false;
+          state.tipCustomAmount = 0;
         } else {
           state.tipPercent = percent;
           state.tipCustomMode = false;
