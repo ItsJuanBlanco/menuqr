@@ -509,7 +509,8 @@ function updateSplitBillUI(deliveredTotal) {
 
   if (!splitSection) return;
 
-  const showSplit = deliveredTotal > 0 && !state.paymentPendingConfirmation;
+  const showSplit =
+    state.sessionTipo === 'grupal' && deliveredTotal > 0 && !state.paymentPendingConfirmation;
   splitSection.hidden = !showSplit;
 
   if (!showSplit) {
