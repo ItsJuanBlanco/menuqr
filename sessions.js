@@ -42,48 +42,46 @@ async function getNextSessionNumero(mesaId) {
   return (data?.numero ?? 0) + 1;
 }
 
-async function fetchActiveSessionByToken(mesaId, sessionToken) {
-  const { data, error } = await supabaseClient
-    .from('sesiones')
-    .select('id, tipo, numero, session_token, activa')
-    .eq('mesa_id', mesaId)
-    .eq('session_token', sessionToken)
-    .eq('activa', true)
-    .maybeSingle();
+async function fetchStoredSessionFromDb(mesaId, stored) {
+  if (stored.sessionToken) {
+    const { data, error } = await supabaseClient
+      .from('sesiones')
+      .select('id, tipo, numero, session_token, activa')
+      .eq('mesa_id', mesaId)
+      .eq('session_token', stored.sessionToken)
+      .maybeSingle();
 
-  if (error) throw error;
-  return data;
-}
+    if (error) throw error;
+    return data;
+  }
 
-async function fetchActiveSessionById(mesaId, sesionId) {
-  const { data, error } = await supabaseClient
-    .from('sesiones')
-    .select('id, tipo, numero, session_token, activa')
-    .eq('id', sesionId)
-    .eq('mesa_id', mesaId)
-    .eq('activa', true)
-    .maybeSingle();
+  if (stored.sesionId) {
+    const { data, error } = await supabaseClient
+      .from('sesiones')
+      .select('id, tipo, numero, session_token, activa')
+      .eq('id', stored.sesionId)
+      .eq('mesa_id', mesaId)
+      .maybeSingle();
 
-  if (error) throw error;
-  return data;
+    if (error) throw error;
+    return data;
+  }
+
+  return null;
 }
 
 async function tryResumeStoredSession(mesaId) {
   const stored = loadStoredSession(mesaId);
-  if (!stored) return null;
+  if (!stored?.sessionToken && !stored?.sesionId) return null;
 
-  if (stored.sessionToken) {
-    const session = await fetchActiveSessionByToken(mesaId, stored.sessionToken);
-    if (session) return session;
+  const session = await fetchStoredSessionFromDb(mesaId, stored);
+
+  if (!session || session.activa !== true) {
+    clearStoredSession(mesaId);
+    return null;
   }
 
-  if (stored.sesionId) {
-    const session = await fetchActiveSessionById(mesaId, stored.sesionId);
-    if (session) return session;
-  }
-
-  clearStoredSession(mesaId);
-  return null;
+  return session;
 }
 
 async function createIndividualSession(mesaId) {

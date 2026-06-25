@@ -522,6 +522,15 @@ async function closeMesa(mesaId, mesaNum) {
 
     if (pedidosError) throw pedidosError;
 
+    const { error: sesionesError } = await supabaseClient
+      .from('sesiones')
+      .update({ activa: false })
+      .eq('mesa_id', mesaId)
+      .eq('restaurante_id', RESTAURANTE_ID)
+      .eq('activa', true);
+
+    if (sesionesError) throw sesionesError;
+
     const { data: mesaUpdated, error: mesaError } = await supabaseClient
       .from('mesas')
       .update({ estado: 'libre', mesero_requerido: false })
