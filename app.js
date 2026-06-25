@@ -220,6 +220,7 @@ async function loadMesa() {
   const { data, error } = await supabaseClient
     .from('mesas')
     .select('id, numero')
+    .eq('restaurante_id', RESTAURANTE_ID)
     .eq('numero', state.mesaNumero)
     .maybeSingle();
 
@@ -323,6 +324,7 @@ async function loadAccountItems() {
       pedidos!inner ( mesa_id, created_at, archivado )
     `)
     .eq('pedidos.mesa_id', state.mesaId)
+    .eq('pedidos.restaurante_id', RESTAURANTE_ID)
     .eq('pedidos.archivado', false);
 
   if (error) {
@@ -381,7 +383,8 @@ async function callWaiter() {
   const { error } = await supabaseClient
     .from('mesas')
     .update({ mesero_requerido: true })
-    .eq('id', state.mesaId);
+    .eq('id', state.mesaId)
+    .eq('restaurante_id', RESTAURANTE_ID);
 
   if (error) {
     showToast(error.message || 'No se pudo llamar al mesero.', 'error');
@@ -592,6 +595,7 @@ async function sendOrder() {
       .from('pedidos')
       .insert({
         mesa_id: state.mesaId,
+        restaurante_id: RESTAURANTE_ID,
         estado: 'pendiente',
         total,
         archivado: false,
@@ -777,6 +781,9 @@ function handleInitialRoute() {
 
 /* ── Init ── */
 async function init() {
+  const restaurant = await window.restaurantReady;
+  if (!restaurant) return;
+
   bindProductsInput();
   renderCategories();
   renderProducts();

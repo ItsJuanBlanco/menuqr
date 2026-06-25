@@ -8,13 +8,6 @@ function showToast(message, type = '', duration = 3200) {
   }, duration);
 }
 
-function buildIndexUrl(hash = '') {
-  const params = new URLSearchParams(window.location.search);
-  const query = params.toString();
-  const base = query ? `index.html?${query}` : 'index.html';
-  return hash ? `${base}${hash}` : base;
-}
-
 async function loadMesa() {
   const params = new URLSearchParams(window.location.search);
   const mesaParam = params.get('mesa');
@@ -25,6 +18,7 @@ async function loadMesa() {
   const { data, error } = await supabaseClient
     .from('mesas')
     .select('id, numero')
+    .eq('restaurante_id', RESTAURANTE_ID)
     .eq('numero', mesaNumero)
     .maybeSingle();
 
@@ -38,14 +32,18 @@ async function callWaiter(mesaId) {
   const { error } = await supabaseClient
     .from('mesas')
     .update({ mesero_requerido: true })
-    .eq('id', mesaId);
+    .eq('id', mesaId)
+    .eq('restaurante_id', RESTAURANTE_ID);
 
   if (error) throw error;
 }
 
 async function init() {
-  document.getElementById('linkCarta').href = buildIndexUrl();
-  document.getElementById('linkCuenta').href = buildIndexUrl('#cuenta');
+  const restaurant = await window.restaurantReady;
+  if (!restaurant) return;
+
+  document.getElementById('linkCarta').href = buildAppUrl();
+  document.getElementById('linkCuenta').href = buildAppUrl('#cuenta');
 
   const btn = document.getElementById('homeCallWaiter');
   const status = document.getElementById('homeStatus');

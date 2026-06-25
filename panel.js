@@ -147,6 +147,7 @@ async function fetchOrders() {
         productos ( nombre )
       )
     `)
+    .eq('restaurante_id', RESTAURANTE_ID)
     .eq('archivado', false)
     .in('estado', PEDIDO_ESTADOS_ACTIVOS)
     .order('created_at', { ascending: true });
@@ -317,6 +318,7 @@ async function fetchMesas() {
       supabaseClient
         .from('mesas')
         .select('id, numero, estado, mesero_requerido')
+        .eq('restaurante_id', RESTAURANTE_ID)
         .order('numero'),
       supabaseClient
         .from('pedido_items')
@@ -327,10 +329,11 @@ async function fetchMesas() {
           confirmado_por_mesero,
           producto_id,
           productos ( nombre ),
-          pedidos!inner ( mesa_id, archivado )
+          pedidos!inner ( mesa_id, archivado, restaurante_id )
         `)
         .eq('confirmado_por_mesero', true)
-        .eq('pedidos.archivado', false),
+        .eq('pedidos.archivado', false)
+        .eq('pedidos.restaurante_id', RESTAURANTE_ID),
     ]);
 
   if (mesasError) throw mesasError;
@@ -514,6 +517,7 @@ async function closeMesa(mesaId, mesaNum) {
       .from('pedidos')
       .update({ archivado: true })
       .eq('mesa_id', mesaId)
+      .eq('restaurante_id', RESTAURANTE_ID)
       .eq('archivado', false);
 
     if (pedidosError) throw pedidosError;
@@ -756,6 +760,9 @@ function subscribeToRealtime() {
 }
 
 async function init() {
+  const restaurant = await window.restaurantReady;
+  if (!restaurant) return;
+
   initTabs();
   initModal();
   bindListActions();
