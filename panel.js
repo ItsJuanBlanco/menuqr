@@ -12,6 +12,42 @@ let mesasClickBound = false;
 let realtimeChannel = null;
 let realtimeRefreshTimer = null;
 let dataphoneModalState = null;
+let paymentQrModalState = null;
+
+const PANEL_SERVICE_PERCENT = 10;
+
+function getPanelPaymentBreakdown(subtotal, serviceEnabled = true) {
+  const cargoServicio = serviceEnabled
+    ? Math.round(Number(subtotal) * (PANEL_SERVICE_PERCENT / 100))
+    : 0;
+
+  return {
+    subtotal: Number(subtotal) || 0,
+    cargoServicio,
+    total: (Number(subtotal) || 0) + cargoServicio,
+  };
+}
+
+async function saveSessionCargoServicio(sesionId, cargoServicio) {
+  if (!sesionId || cargoServicio <= 0) return;
+
+  const { data, error: readError } = await supabaseClient
+    .from('sesiones')
+    .select('cargo_servicio')
+    .eq('id', sesionId)
+    .maybeSingle();
+
+  if (readError) throw readError;
+
+  const { error } = await supabaseClient
+    .from('sesiones')
+    .update({
+      cargo_servicio: (Number(data?.cargo_servicio) || 0) + cargoServicio,
+    })
+    .eq('id', sesionId);
+
+  if (error) throw error;
+}
 
 function getPagarBaseUrl() {
   if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
@@ -20,11 +56,12 @@ function getPagarBaseUrl() {
   return 'https://menuqr-virid.vercel.app/pagar';
 }
 
-function buildPagarUrl(monto, sesionId) {
+function buildPagarUrl(monto, sesionId, cargoServicio = 0) {
   const params = new URLSearchParams({
     monto: String(monto),
     sesion: sesionId,
   });
+  if (cargoServicio > 0) params.set('servicio', String(cargoServicio));
   if (RESTAURANTE_SLUG) params.set('slug', RESTAURANTE_SLUG);
   return `${getPagarBaseUrl()}?${params.toString()}`;
 }
@@ -758,15 +795,34 @@ function openDataphoneModal({ sesionId, sessionLabel, sessionTotal, mesaId, mesa
     mesaId,
     mesaNum,
     sessionLabel,
-    sessionTotal: Number(sessionTotal),
+    subtotal: Number(sessionTotal),
+    serviceChargeEnabled: true,
   };
 
   document.getElementById('dataphoneLabel').textContent = sessionLabel;
-  document.getElementById('dataphoneAmount').textContent = formatCOP(Number(sessionTotal));
+  const toggle = document.getElementById('dataphoneServiceToggle');
+  if (toggle) toggle.checked = true;
+  updateDataphoneModalUI();
 
   const modal = document.getElementById('dataphoneModal');
   modal.hidden = false;
   modal.setAttribute('aria-hidden', 'false');
+}
+
+function updateDataphoneModalUI() {
+  if (!dataphoneModalState) return;
+
+  const toggle = document.getElementById('dataphoneServiceToggle');
+  if (toggle) dataphoneModalState.serviceChargeEnabled = toggle.checked;
+
+  const breakdown = getPanelPaymentBreakdown(
+    dataphoneModalState.subtotal,
+    dataphoneModalState.serviceChargeEnabled
+  );
+
+  document.getElementById('dataphoneSubtotal').textContent = formatCOP(breakdown.subtotal);
+  document.getElementById('dataphoneServiceAmount').textContent = formatCOP(breakdown.cargoServicio);
+  document.getElementById('dataphoneAmount').textContent = formatCOP(breakdown.total);
 }
 
 function closeDataphoneModal() {
@@ -774,6 +830,35 @@ function closeDataphoneModal() {
   modal.hidden = true;
   modal.setAttribute('aria-hidden', 'true');
   dataphoneModalState = null;
+}
+
+function renderPaymentQrModal() {
+  if (!paymentQrModalState) return;
+
+  const toggle = document.getElementById('paymentQrServiceToggle');
+  if (toggle) paymentQrModalState.serviceChargeEnabled = toggle.checked;
+
+  const breakdown = getPanelPaymentBreakdown(
+    paymentQrModalState.subtotal,
+    paymentQrModalState.serviceChargeEnabled
+  );
+
+  document.getElementById('paymentQrSubtotal').textContent = formatCOP(breakdown.subtotal);
+  document.getElementById('paymentQrServiceAmount').textContent = formatCOP(breakdown.cargoServicio);
+  document.getElementById('paymentQrTotal').textContent = formatCOP(breakdown.total);
+
+  const canvas = document.getElementById('paymentQrCanvas');
+  if (!canvas || typeof QRCode === 'undefined') return;
+
+  canvas.innerHTML = '';
+  new QRCode(canvas, {
+    text: buildPagarUrl(breakdown.total, paymentQrModalState.sesionId, breakdown.cargoServicio),
+    width: 240,
+    height: 240,
+    colorDark: '#0f172a',
+    colorLight: '#ffffff',
+    correctLevel: QRCode.CorrectLevel.M,
+  });
 }
 
 function openPaymentQrModal({ sesionId, sessionLabel, sessionTotal }) {
@@ -788,20 +873,17 @@ function openPaymentQrModal({ sesionId, sessionLabel, sessionTotal }) {
     return;
   }
 
+  paymentQrModalState = {
+    sesionId,
+    sessionLabel,
+    subtotal: total,
+    serviceChargeEnabled: true,
+  };
+
   document.getElementById('paymentQrTitle').textContent = `QR · ${sessionLabel}`;
-  document.getElementById('paymentQrAmount').textContent = formatCOP(total);
-
-  const canvas = document.getElementById('paymentQrCanvas');
-  canvas.innerHTML = '';
-
-  new QRCode(canvas, {
-    text: buildPagarUrl(total, sesionId),
-    width: 240,
-    height: 240,
-    colorDark: '#0f172a',
-    colorLight: '#ffffff',
-    correctLevel: QRCode.CorrectLevel.M,
-  });
+  const toggle = document.getElementById('paymentQrServiceToggle');
+  if (toggle) toggle.checked = true;
+  renderPaymentQrModal();
 
   const modal = document.getElementById('paymentQrModal');
   modal.hidden = false;
@@ -812,6 +894,7 @@ function closePaymentQrModal() {
   const modal = document.getElementById('paymentQrModal');
   modal.hidden = true;
   modal.setAttribute('aria-hidden', 'true');
+  paymentQrModalState = null;
   const canvas = document.getElementById('paymentQrCanvas');
   if (canvas) canvas.innerHTML = '';
 }
@@ -848,12 +931,18 @@ function initModal() {
     if (!dataphoneModalState) return;
 
     const { sesionId, mesaId, mesaNum } = dataphoneModalState;
+    const breakdown = getPanelPaymentBreakdown(
+      dataphoneModalState.subtotal,
+      dataphoneModalState.serviceChargeEnabled
+    );
     const btn = document.getElementById('dataphoneConfirmBtn');
     btn.disabled = true;
     btn.textContent = 'Confirmando…';
 
     try {
-      await confirmSessionPayment(sesionId, mesaId, mesaNum, 'Cobro confirmado');
+      await confirmSessionPayment(sesionId, mesaId, mesaNum, 'Cobro confirmado', {
+        cargoServicio: breakdown.cargoServicio,
+      });
       closeDataphoneModal();
       closeAccountModal();
     } finally {
@@ -861,9 +950,14 @@ function initModal() {
       btn.textContent = 'Confirmar cobro';
     }
   });
+
+  document.getElementById('dataphoneServiceToggle')?.addEventListener('change', updateDataphoneModalUI);
+  document.getElementById('paymentQrServiceToggle')?.addEventListener('change', renderPaymentQrModal);
 }
 
-async function confirmSessionPayment(sesionId, mesaId, mesaNum, successMessage = 'Sesión cerrada') {
+async function confirmSessionPayment(sesionId, mesaId, mesaNum, successMessage = 'Sesión cerrada', options = {}) {
+  const { cargoServicio = 0 } = options;
+
   if (updating.has(`pay-${sesionId}`)) return;
 
   updating.add(`pay-${sesionId}`);
@@ -877,6 +971,10 @@ async function confirmSessionPayment(sesionId, mesaId, mesaNum, successMessage =
       .eq('archivado', false);
 
     if (pedidosError) throw pedidosError;
+
+    if (cargoServicio > 0) {
+      await saveSessionCargoServicio(sesionId, cargoServicio);
+    }
 
     const { error: sesionError } = await supabaseClient
       .from('sesiones')

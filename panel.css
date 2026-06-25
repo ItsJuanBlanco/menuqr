@@ -1115,6 +1115,65 @@ button {
   margin-bottom: 12px;
 }
 
+.panel-pay-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0 0 16px;
+  text-align: left;
+}
+
+.panel-pay-summary__row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 0.875rem;
+}
+
+.panel-pay-summary__row--service {
+  font-size: 0.8125rem;
+}
+
+.panel-pay-summary__row dt {
+  color: var(--text-muted);
+}
+
+.panel-pay-summary__row dd {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.panel-pay-summary__service-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  color: var(--text-muted);
+}
+
+.panel-pay-summary__service-label input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent, #f97316);
+}
+
+.panel-pay-summary__divider {
+  height: 1px;
+  background: var(--border);
+  margin: 2px 0;
+}
+
+.panel-pay-summary__row--total dt,
+.panel-pay-summary__row--total dd {
+  font-weight: 700;
+  color: var(--text);
+}
+
+.dataphone-modal__summary {
+  margin-bottom: 12px;
+}
+
 .dataphone-modal__amount {
   font-size: clamp(2.5rem, 12vw, 3.5rem);
   font-weight: 800;
@@ -1139,11 +1198,7 @@ button {
   max-width: 380px;
 }
 
-.payment-qr-modal__amount {
-  text-align: center;
-  font-size: 1.5rem;
-  font-weight: 800;
-  font-variant-numeric: tabular-nums;
+.payment-qr-modal__summary {
   margin-bottom: 16px;
 }
 

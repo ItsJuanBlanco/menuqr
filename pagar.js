@@ -74,7 +74,32 @@ async function markPaymentInProgress(sesionId) {
   if (error) throw error;
 }
 
-async function handleApprovedPayment(monto, sesionId, referenciaWompi, restauranteId) {
+async function saveSessionPaymentExtras(sesionId, { cargoServicio = 0, propina = 0 } = {}) {
+  if (!sesionId || (cargoServicio <= 0 && propina <= 0)) return;
+
+  const { data, error: readError } = await supabaseClient
+    .from('sesiones')
+    .select('cargo_servicio, propina')
+    .eq('id', sesionId)
+    .maybeSingle();
+
+  if (readError) throw readError;
+
+  const { error } = await supabaseClient
+    .from('sesiones')
+    .update({
+      cargo_servicio: (Number(data?.cargo_servicio) || 0) + cargoServicio,
+      propina: (Number(data?.propina) || 0) + propina,
+    })
+    .eq('id', sesionId);
+
+  if (error) throw error;
+}
+
+async function handleApprovedPayment(monto, sesionId, referenciaWompi, restauranteId, extras = {}) {
+  const cargoServicio = Number(extras.cargoServicio) || 0;
+  const propina = Number(extras.propina) || 0;
+
   const { error: insertError } = await supabaseClient.from('pagos_grupo').insert({
     sesion_id: sesionId,
     monto,
@@ -83,6 +108,8 @@ async function handleApprovedPayment(monto, sesionId, referenciaWompi, restauran
   });
 
   if (insertError) throw insertError;
+
+  await saveSessionPaymentExtras(sesionId, { cargoServicio, propina });
 
   const paidTotal = await getSessionApprovedPaymentsTotal(sesionId);
   const sessionTotal = await getSessionDeliveredTotal(sesionId, restauranteId);
@@ -106,7 +133,7 @@ async function handleApprovedPayment(monto, sesionId, referenciaWompi, restauran
   setPagarMessage('success', 'Pago registrado. Tu parte fue acreditada a la cuenta.');
 }
 
-async function openWompiCheckout({ monto, sesionId, parte, publicKey, restauranteId }) {
+async function openWompiCheckout({ monto, sesionId, parte, publicKey, restauranteId, cargoServicio = 0 }) {
   if (typeof WidgetCheckout === 'undefined') {
     setPagarMessage('error', 'No se pudo cargar Wompi. Recarga la página.');
     return;
@@ -130,7 +157,7 @@ async function openWompiCheckout({ monto, sesionId, parte, publicKey, restaurant
     if (transaction?.status === 'APPROVED') {
       try {
         const referencia = transaction.id || transaction.reference || reference;
-        await handleApprovedPayment(monto, sesionId, referencia, restauranteId);
+        await handleApprovedPayment(monto, sesionId, referencia, restauranteId, { cargoServicio });
       } catch (error) {
         console.error(error);
         await clearPaymentInProgress(sesionId);
@@ -195,12 +222,15 @@ async function initPagar() {
 
     const publicKey = restaurante?.wompi_public_key || WOMPI_PUBLIC_KEY;
 
+    const cargoServicio = Number(params.get('servicio')) || 0;
+
     await openWompiCheckout({
       monto,
       sesionId,
       parte,
       publicKey,
       restauranteId: sesion.restaurante_id,
+      cargoServicio,
     });
   } catch (error) {
     console.error(error);

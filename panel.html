@@ -83,6 +83,22 @@
       <div class="modal__box modal__box--dataphone" role="dialog" aria-labelledby="dataphoneLabel">
         <button type="button" class="modal__close dataphone-modal__close" data-close-dataphone aria-label="Cerrar">×</button>
         <p class="dataphone-modal__label" id="dataphoneLabel">Cuenta #0000</p>
+        <dl class="panel-pay-summary dataphone-modal__summary">
+          <div class="panel-pay-summary__row">
+            <dt>Subtotal</dt>
+            <dd id="dataphoneSubtotal">$0</dd>
+          </div>
+          <div class="panel-pay-summary__row panel-pay-summary__row--service" id="dataphoneServiceRow">
+            <dt>
+              <label class="panel-pay-summary__service-label">
+                <input type="checkbox" id="dataphoneServiceToggle" checked>
+                <span>Servicio (10%)</span>
+              </label>
+            </dt>
+            <dd id="dataphoneServiceAmount">$0</dd>
+          </div>
+          <div class="panel-pay-summary__divider" aria-hidden="true"></div>
+        </dl>
         <p class="dataphone-modal__amount" id="dataphoneAmount">$0</p>
         <button type="button" class="dataphone-modal__confirm" id="dataphoneConfirmBtn">Confirmar cobro</button>
       </div>
@@ -96,7 +112,26 @@
           <h2 class="modal__title" id="paymentQrTitle">QR de pago</h2>
           <button type="button" class="modal__close" data-close-payment-qr aria-label="Cerrar">×</button>
         </header>
-        <p class="payment-qr-modal__amount" id="paymentQrAmount">$0</p>
+        <dl class="panel-pay-summary payment-qr-modal__summary">
+          <div class="panel-pay-summary__row">
+            <dt>Subtotal</dt>
+            <dd id="paymentQrSubtotal">$0</dd>
+          </div>
+          <div class="panel-pay-summary__row panel-pay-summary__row--service" id="paymentQrServiceRow">
+            <dt>
+              <label class="panel-pay-summary__service-label">
+                <input type="checkbox" id="paymentQrServiceToggle" checked>
+                <span>Servicio (10%)</span>
+              </label>
+            </dt>
+            <dd id="paymentQrServiceAmount">$0</dd>
+          </div>
+          <div class="panel-pay-summary__divider" aria-hidden="true"></div>
+          <div class="panel-pay-summary__row panel-pay-summary__row--total">
+            <dt>Total</dt>
+            <dd id="paymentQrTotal">$0</dd>
+          </div>
+        </dl>
         <div class="payment-qr-modal__canvas" id="paymentQrCanvas"></div>
         <p class="payment-qr-modal__hint">El cliente escanea este QR y paga con Wompi desde su celular.</p>
       </div>
