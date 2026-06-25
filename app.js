@@ -124,8 +124,9 @@ const state = {
   activeTab: 'carta',
   mesaId: null,
   mesaNumero: DEFAULT_MESA_NUMERO,
-  confirmedItems: [],
+  accountItems: [],
   sendingOrder: false,
+  waiterCooldown: false,
 };
 
 /* ── Utilidades ── */
@@ -154,14 +155,54 @@ function slugifyCategory(name) {
     .replace(/(^-|-$)/g, '');
 }
 
-function showToast(message, type = '') {
+function showToast(message, type = '', duration = 3200) {
   const toast = document.getElementById('toast');
-  toast.textContent = message;
-  toast.className = 'toast toast--visible' + (type ? ` toast--${type}` : '');
+  if (!toast) return;
+
   clearTimeout(showToast._timer);
+
+  toast.textContent = message;
+  toast.className = 'toast' + (type ? ` toast--${type}` : '');
+
+  requestAnimationFrame(() => {
+    toast.classList.add('toast--visible');
+  });
+
   showToast._timer = setTimeout(() => {
     toast.classList.remove('toast--visible');
-  }, 3200);
+  }, duration);
+}
+
+function hideToast() {
+  const toast = document.getElementById('toast');
+  if (!toast) return;
+  clearTimeout(showToast._timer);
+  toast.classList.remove('toast--visible');
+}
+
+function escapeHtml(text) {
+  return String(text)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function formatItemEstado(estado) {
+  const labels = {
+    pendiente: 'Pendiente',
+    en_preparacion: 'En preparación',
+    listo: 'Listo',
+  };
+  return labels[estado] || labels.pendiente;
+}
+
+function getCartEntry(productId) {
+  return state.cart[productId] || null;
+}
+
+function getCartQty(productId) {
+  return state.cart[productId]?.qty || 0;
 }
 
 function isUuid(value) {
@@ -259,37 +300,97 @@ async function seedProductsIfEmpty() {
   return true;
 }
 
-async function loadConfirmedItems() {
+async function loadAccountItems() {
   if (!state.mesaId) return;
 
   const { data, error } = await supabaseClient
     .from('pedido_items')
     .select(`
       id,
+      producto_id,
       cantidad,
       precio_unitario,
       subtotal,
+      estado,
+      notas,
       confirmado_por_mesero,
       productos ( nombre ),
-      pedidos!inner ( mesa_id )
+      pedidos!inner ( mesa_id, created_at, archivado )
     `)
-    .eq('confirmado_por_mesero', true)
-    .eq('pedidos.mesa_id', state.mesaId);
+    .eq('pedidos.mesa_id', state.mesaId)
+    .eq('pedidos.archivado', false);
 
   if (error) {
-    console.error('Error cargando cuenta confirmada:', error);
+    console.error('Error cargando cuenta:', error);
     return;
   }
 
-  state.confirmedItems = (data || []).map((item) => ({
-    id: item.id,
-    name: item.productos?.nombre || 'Producto',
-    qty: item.cantidad,
-    unitPrice: Number(item.precio_unitario),
-    subtotal: Number(item.subtotal ?? item.precio_unitario * item.cantidad),
-  }));
+  state.accountItems = (data || [])
+    .map((item) => ({
+      id: item.id,
+      productoId: item.producto_id,
+      name: item.productos?.nombre || 'Producto',
+      qty: item.cantidad,
+      unitPrice: Number(item.precio_unitario),
+      subtotal: Number(item.subtotal ?? item.precio_unitario * item.cantidad),
+      estado: item.estado || 'pendiente',
+      notas: item.notas || '',
+      confirmado: item.confirmado_por_mesero === true,
+      createdAt: item.pedidos?.created_at || '',
+    }))
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
   renderAccount();
+}
+
+function groupDeliveredItems(items) {
+  const groups = new Map();
+
+  items.forEach((item) => {
+    const key = item.productoId || item.name;
+    if (!groups.has(key)) {
+      groups.set(key, { name: item.name, qty: 0, subtotal: 0 });
+    }
+    const group = groups.get(key);
+    group.qty += item.qty;
+    group.subtotal += item.subtotal;
+  });
+
+  return [...groups.values()].sort((a, b) => a.name.localeCompare(b.name, 'es'));
+}
+
+function isInProgress(item) {
+  if (item.confirmado) return false;
+  const estado = item.estado || 'pendiente';
+  return estado === 'pendiente' || estado === 'en_preparacion';
+}
+
+async function callWaiter() {
+  if (!state.mesaId) {
+    showToast('No se pudo identificar la mesa. Recarga la página.', 'error');
+    return false;
+  }
+
+  if (state.waiterCooldown) return false;
+
+  const { error } = await supabaseClient
+    .from('mesas')
+    .update({ mesero_requerido: true })
+    .eq('id', state.mesaId);
+
+  if (error) {
+    showToast(error.message || 'No se pudo llamar al mesero.', 'error');
+    return false;
+  }
+
+  state.waiterCooldown = true;
+  showToast('Mesero notificado — llegará en unos momentos', 'success');
+
+  setTimeout(() => {
+    state.waiterCooldown = false;
+  }, 8000);
+
+  return true;
 }
 
 function subscribeToRealtime() {
@@ -300,12 +401,12 @@ function subscribeToRealtime() {
     .on(
       'postgres_changes',
       { event: '*', schema: 'public', table: 'pedidos', filter: `mesa_id=eq.${state.mesaId}` },
-      () => loadConfirmedItems()
+      () => loadAccountItems()
     )
     .on(
       'postgres_changes',
       { event: '*', schema: 'public', table: 'pedido_items' },
-      () => loadConfirmedItems()
+      () => loadAccountItems()
     )
     .subscribe();
 }
@@ -337,13 +438,32 @@ function renderCategories() {
 }
 
 /* ── Render: productos ── */
+let productsInputBound = false;
+
+function bindProductsInput() {
+  if (productsInputBound) return;
+
+  document.getElementById('products').addEventListener('input', (event) => {
+    const input = event.target.closest('[data-notas]');
+    if (!input) return;
+
+    const productId = input.dataset.notas;
+    if (state.cart[productId]) {
+      state.cart[productId].notas = input.value;
+    }
+  });
+
+  productsInputBound = true;
+}
+
 function renderProducts() {
   const container = document.getElementById('products');
   const filtered = MENU.products.filter((p) => p.category === state.activeCategory);
 
   container.innerHTML = filtered
     .map((product) => {
-      const qty = state.cart[product.id] || 0;
+      const qty = getCartQty(product.id);
+      const cartEntry = getCartEntry(product.id);
       const addSection =
         qty === 0
           ? `<button type="button" class="product-card__add" data-add="${product.id}">+ Agregar</button>`
@@ -353,6 +473,20 @@ function renderProducts() {
               <button type="button" class="product-card__qty-btn" data-plus="${product.id}" aria-label="Agregar uno">+</button>
             </div>`;
 
+      const notesSection =
+        qty > 0
+          ? `<label class="product-card__notes">
+              <span class="product-card__notes-label">Especificaciones (opcional)</span>
+              <input
+                type="text"
+                class="product-card__notes-input"
+                data-notas="${product.id}"
+                value="${escapeHtml(cartEntry?.notas || '')}"
+                placeholder="Ej: sin cebolla, término medio…"
+              >
+            </label>`
+          : '';
+
       return `
         <article class="product-card">
           <div class="product-card__image-wrap">
@@ -361,6 +495,7 @@ function renderProducts() {
           <div class="product-card__body">
             <h3 class="product-card__name">${product.name}</h3>
             <p class="product-card__desc">${product.description}</p>
+            ${notesSection}
             <div class="product-card__footer">
               <span class="product-card__price">${formatCOP(product.price)}</span>
               ${addSection}
@@ -384,15 +519,18 @@ function renderProducts() {
 
 /* ── Carrito ── */
 function addToCart(productId) {
-  state.cart[productId] = (state.cart[productId] || 0) + 1;
+  if (!state.cart[productId]) {
+    state.cart[productId] = { qty: 0, notas: '' };
+  }
+  state.cart[productId].qty += 1;
   renderProducts();
   updateCartBar();
 }
 
 function removeFromCart(productId) {
   if (!state.cart[productId]) return;
-  state.cart[productId]--;
-  if (state.cart[productId] <= 0) delete state.cart[productId];
+  state.cart[productId].qty -= 1;
+  if (state.cart[productId].qty <= 0) delete state.cart[productId];
   renderProducts();
   updateCartBar();
 }
@@ -400,28 +538,23 @@ function removeFromCart(productId) {
 function getCartTotals() {
   let count = 0;
   let total = 0;
-  for (const [id, qty] of Object.entries(state.cart)) {
+  for (const [id, entry] of Object.entries(state.cart)) {
     const product = getProduct(id);
-    if (product) {
-      count += qty;
-      total += product.price * qty;
+    if (product && entry.qty > 0) {
+      count += entry.qty;
+      total += product.price * entry.qty;
     }
   }
   return { count, total };
 }
 
 function updateCartBar() {
-  const bar = document.getElementById('cartBar');
   const { count, total } = getCartTotals();
+  const summary = document.getElementById('cartSummary');
+  const sendBtn = document.getElementById('sendOrderBtn');
 
-  if (count === 0) {
-    bar.hidden = true;
-    return;
-  }
-
-  bar.hidden = false;
-  document.getElementById('cartCount').textContent = `${count} item${count !== 1 ? 's' : ''}`;
-  document.getElementById('cartTotal').textContent = formatCOP(total);
+  summary.textContent = `${count} item${count !== 1 ? 's' : ''} - ${formatCOP(total)}`;
+  sendBtn.disabled = count === 0;
 }
 
 async function sendOrder() {
@@ -445,6 +578,9 @@ async function sendOrder() {
   btn.textContent = 'Enviando…';
 
   const cartSnapshot = { ...state.cart };
+  const successMsg = `Pedido enviado (${count} item${count !== 1 ? 's' : ''}). El mesero lo confirmará pronto.`;
+
+  showToast(successMsg, 'success', 15000);
 
   try {
     const { data: pedido, error: pedidoError } = await supabaseClient
@@ -453,89 +589,121 @@ async function sendOrder() {
         mesa_id: state.mesaId,
         estado: 'pendiente',
         total,
+        archivado: false,
       })
       .select('id')
       .single();
 
     if (pedidoError) throw pedidoError;
 
-    const items = Object.entries(cartSnapshot).map(([productId, qty]) => {
+    const items = Object.entries(cartSnapshot).map(([productId, entry]) => {
       const product = getProduct(productId);
+      const notas = entry.notas?.trim();
       return {
         pedido_id: pedido.id,
         producto_id: productId,
-        cantidad: qty,
+        cantidad: entry.qty,
         precio_unitario: product.price,
-        subtotal: product.price * qty,
+        subtotal: product.price * entry.qty,
         estado: 'pendiente',
         confirmado_por_mesero: false,
+        notas: notas || null,
       };
     });
 
     const { error: itemsError } = await supabaseClient.from('pedido_items').insert(items);
     if (itemsError) throw itemsError;
 
-    showToast(
-      `Pedido enviado (${count} item${count !== 1 ? 's' : ''}). El mesero lo confirmará pronto.`,
-      'success'
-    );
+    await supabaseClient
+      .from('mesas')
+      .update({ estado: 'ocupada' })
+      .eq('id', state.mesaId);
 
     state.cart = {};
     renderProducts();
     updateCartBar();
+    await loadAccountItems();
   } catch (error) {
     console.error('Error al enviar pedido:', error);
+    hideToast();
     showToast(error.message || 'No se pudo enviar el pedido. Intenta de nuevo.', 'error');
   } finally {
     state.sendingOrder = false;
-    btn.disabled = false;
     btn.textContent = 'Enviar pedido';
+    updateCartBar();
   }
 }
 
 /* ── Mi cuenta ── */
 function renderAccount() {
-  const list = document.getElementById('confirmedList');
   const empty = document.getElementById('accountEmpty');
+  const inProgressSection = document.getElementById('inProgressSection');
+  const inProgressList = document.getElementById('inProgressList');
+  const inProgressEmpty = document.getElementById('inProgressEmpty');
+  const deliveredSection = document.getElementById('deliveredSection');
+  const deliveredList = document.getElementById('deliveredList');
   const totalEl = document.getElementById('accountTotal');
   const badge = document.getElementById('accountBadge');
 
-  const items = state.confirmedItems;
-  let grandTotal = 0;
-  let itemCount = 0;
-
-  items.forEach((item) => {
-    grandTotal += item.subtotal;
-    itemCount += item.qty;
-  });
+  const items = state.accountItems;
+  const inProgress = items.filter(isInProgress);
+  const delivered = items.filter((item) => item.confirmado);
+  const groupedDelivered = groupDeliveredItems(delivered);
+  const deliveredTotal = groupedDelivered.reduce((sum, g) => sum + g.subtotal, 0);
+  const inProgressCount = inProgress.reduce((sum, item) => sum + item.qty, 0);
 
   if (items.length === 0) {
-    list.innerHTML = '';
     empty.style.display = 'block';
-    totalEl.hidden = true;
+    inProgressSection.hidden = true;
+    deliveredSection.hidden = true;
     badge.hidden = true;
     return;
   }
 
   empty.style.display = 'none';
-  totalEl.hidden = false;
-  badge.hidden = false;
-  badge.textContent = itemCount;
-  document.getElementById('totalAmount').textContent = formatCOP(grandTotal);
 
-  list.innerHTML = items
-    .map(
-      (item) => `
+  inProgressSection.hidden = false;
+  inProgressEmpty.hidden = inProgress.length > 0;
+  inProgressList.innerHTML = inProgress
+    .map((item) => {
+      const estado = item.estado || 'pendiente';
+      const notasHtml = item.notas
+        ? `<span class="account__item-notas">${escapeHtml(item.notas)}</span>`
+        : '';
+
+      return `
         <li class="account__item">
           <div class="account__item-info">
-            <span class="account__item-name">${item.name}</span>
-            <span class="account__item-qty">${item.qty} × ${formatCOP(item.unitPrice)}</span>
+            <span class="account__item-name">${escapeHtml(item.name)}</span>
+            <span class="account__item-qty">× ${item.qty}</span>
+            ${notasHtml}
+            <span class="account__item-status account__item-status--${estado}">${formatItemEstado(estado)}</span>
           </div>
-          <span class="account__item-price">${formatCOP(item.subtotal)}</span>
         </li>
-      `
-    )
+      `;
+    })
     .join('');
+
+  if (groupedDelivered.length > 0) {
+    deliveredSection.hidden = false;
+    deliveredList.innerHTML = groupedDelivered
+      .map(
+        (group) => `
+          <li class="account__invoice-line">
+            <span>x${group.qty} ${escapeHtml(group.name)}</span>
+            <span>— ${formatCOP(group.subtotal)}</span>
+          </li>
+        `
+      )
+      .join('');
+    document.getElementById('totalAmount').textContent = formatCOP(deliveredTotal);
+    totalEl.hidden = false;
+  } else {
+    deliveredSection.hidden = true;
+  }
+
+  badge.hidden = inProgressCount === 0;
+  badge.textContent = inProgressCount;
 }
 
 /* ── Tabs ── */
@@ -559,36 +727,57 @@ function switchTab(tabId) {
 }
 
 /* ── Llamar mesero ── */
-function initWaiterButton() {
-  const btn = document.getElementById('callWaiterBtn');
+function initWaiterButtons() {
+  const tabBtn = document.getElementById('callWaiterBtn');
+  const fabBtn = document.getElementById('callWaiterFab');
   const status = document.getElementById('waiterStatus');
-  let cooldown = false;
 
-  btn.addEventListener('click', () => {
-    if (cooldown) return;
+  async function handleCall(button) {
+    const sent = await callWaiter();
+    if (!sent) return;
 
-    cooldown = true;
-    btn.classList.add('waiter__btn--sent');
-    btn.innerHTML = '<span class="waiter__btn-icon" aria-hidden="true">✓</span> Notificación enviada';
-    status.textContent = 'Un mesero está en camino a tu mesa.';
+    if (button) {
+      const isFab = button.classList.contains('call-waiter-fab');
+      const originalHtml = isFab
+        ? '<span aria-hidden="true">🛎️</span> Llamar mesero'
+        : '<span class="waiter__btn-icon" aria-hidden="true">🔔</span> Llamar mesero';
 
-    showToast('Mesero notificado — llegará en unos momentos', 'success');
+      button.classList.add('waiter__btn--sent');
+      button.innerHTML = isFab
+        ? '<span aria-hidden="true">✓</span> Mesero avisado'
+        : '<span class="waiter__btn-icon" aria-hidden="true">✓</span> Notificación enviada';
 
+      setTimeout(() => {
+        button.classList.remove('waiter__btn--sent');
+        button.innerHTML = originalHtml;
+      }, 8000);
+    }
+
+    if (status) status.textContent = 'Un mesero está en camino a tu mesa.';
     setTimeout(() => {
-      btn.classList.remove('waiter__btn--sent');
-      btn.innerHTML = '<span class="waiter__btn-icon" aria-hidden="true">🔔</span> Llamar mesero';
-      status.textContent = '';
-      cooldown = false;
+      if (status) status.textContent = '';
     }, 8000);
-  });
+  }
+
+  tabBtn.addEventListener('click', () => handleCall(tabBtn));
+  fabBtn.addEventListener('click', () => handleCall(fabBtn));
+}
+
+function handleInitialRoute() {
+  const hash = window.location.hash.replace('#', '');
+  if (hash === 'cuenta' || hash === 'mesero' || hash === 'carta') {
+    switchTab(hash);
+  }
 }
 
 /* ── Init ── */
 async function init() {
+  bindProductsInput();
   renderCategories();
   renderProducts();
   updateCartBar();
-  initWaiterButton();
+  initWaiterButtons();
+  handleInitialRoute();
 
   document.querySelectorAll('.bottom-nav__item').forEach((btn) => {
     btn.addEventListener('click', () => switchTab(btn.dataset.tab));
@@ -609,9 +798,8 @@ async function init() {
       showToast('No se pudo cargar el menú desde Supabase.', 'error');
     }
 
-    await loadConfirmedItems();
+    await loadAccountItems();
     subscribeToRealtime();
-    renderAccount();
   } catch (error) {
     console.error('Error inicializando Supabase:', error);
     showToast(error.message || 'Error conectando con Supabase.', 'error');

@@ -29,6 +29,9 @@
       <section class="panel panel--active" id="panel-carta" role="tabpanel" aria-labelledby="tab-carta">
         <div class="categories" id="categories" role="tablist" aria-label="Categorías"></div>
         <div class="products" id="products"></div>
+        <button type="button" class="call-waiter-fab" id="callWaiterFab">
+          <span aria-hidden="true">🛎️</span> Llamar mesero
+        </button>
       </section>
 
       <!-- Tab: Mi cuenta -->
@@ -36,18 +39,29 @@
         <div class="account">
           <div class="account__header">
             <h2 class="account__title">Tu cuenta</h2>
-            <p class="account__hint">Productos confirmados por el mesero</p>
+            <p class="account__hint">Seguimiento de tus pedidos</p>
           </div>
-          <ul class="account__list" id="confirmedList"></ul>
+
           <div class="account__empty" id="accountEmpty">
             <span class="account__empty-icon" aria-hidden="true">🍽️</span>
-            <p>Aún no hay productos confirmados.</p>
-            <p class="account__empty-sub">Agrega items desde la carta y espera la confirmación del mesero.</p>
+            <p>Aún no tienes pedidos.</p>
+            <p class="account__empty-sub">Agrega productos desde la carta para verlos aquí.</p>
           </div>
-          <div class="account__total" id="accountTotal" hidden>
-            <span>Total acumulado</span>
-            <strong id="totalAmount">$0</strong>
-          </div>
+
+          <section class="account__section" id="inProgressSection" hidden>
+            <h3 class="account__section-title">En progreso</h3>
+            <ul class="account__list" id="inProgressList"></ul>
+            <p class="account__section-empty" id="inProgressEmpty" hidden>Nada en preparación por ahora.</p>
+          </section>
+
+          <section class="account__section account__invoice" id="deliveredSection" hidden>
+            <h3 class="account__section-title">Entregado</h3>
+            <ul class="account__invoice-list" id="deliveredList"></ul>
+            <div class="account__total" id="accountTotal">
+              <span>Total acumulado</span>
+              <strong id="totalAmount">$0</strong>
+            </div>
+          </section>
         </div>
       </section>
 
@@ -67,10 +81,9 @@
     </main>
 
     <!-- Carrito flotante (pedido pendiente) -->
-    <aside class="cart-bar" id="cartBar" hidden>
+    <aside class="cart-bar" id="cartBar">
       <div class="cart-bar__info">
-        <span class="cart-bar__count" id="cartCount">0 items</span>
-        <span class="cart-bar__total" id="cartTotal">$0</span>
+        <span class="cart-bar__count" id="cartSummary">0 items - $0</span>
       </div>
       <button type="button" class="cart-bar__btn" id="sendOrderBtn">Enviar pedido</button>
     </aside>

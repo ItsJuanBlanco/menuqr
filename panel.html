@@ -14,7 +14,7 @@
   <div class="panel-app">
     <header class="panel-header">
       <div class="panel-header__left">
-        <h1 class="panel-header__title">Panel de pedidos</h1>
+        <h1 class="panel-header__title">Panel del negocio</h1>
         <p class="panel-header__subtitle">Mesero · Cocina</p>
       </div>
       <div class="panel-header__right">
@@ -22,18 +22,47 @@
           <span class="panel-header__dot" aria-hidden="true"></span>
           En vivo
         </span>
-        <span class="panel-header__count" id="orderCount">0 pedidos</span>
+        <span class="panel-header__count" id="headerCount">0 pedidos</span>
       </div>
     </header>
 
+    <nav class="panel-tabs" role="tablist" aria-label="Secciones del panel">
+      <button type="button" class="panel-tabs__btn panel-tabs__btn--active" id="tabPedidos" role="tab" aria-selected="true" data-panel="pedidos">Pedidos</button>
+      <button type="button" class="panel-tabs__btn" id="tabMesas" role="tab" aria-selected="false" data-panel="mesas">Mesas</button>
+    </nav>
+
     <main class="panel-main">
-      <div class="panel-empty" id="emptyState" hidden>
-        <span class="panel-empty__icon" aria-hidden="true">✓</span>
-        <p class="panel-empty__title">Sin pedidos activos</p>
-        <p class="panel-empty__text">Los nuevos pedidos aparecerán aquí automáticamente.</p>
-      </div>
-      <div class="panel-orders" id="ordersList"></div>
+      <!-- Pedidos -->
+      <section class="panel-view panel-view--active" id="viewPedidos" role="tabpanel" aria-labelledby="tabPedidos">
+        <div class="panel-empty" id="emptyState" hidden>
+          <span class="panel-empty__icon" aria-hidden="true">✓</span>
+          <p class="panel-empty__title">Sin pedidos activos</p>
+          <p class="panel-empty__text">Los nuevos pedidos aparecerán aquí automáticamente.</p>
+        </div>
+        <div class="panel-orders" id="ordersList"></div>
+      </section>
+
+      <!-- Mesas -->
+      <section class="panel-view" id="viewMesas" role="tabpanel" aria-labelledby="tabMesas" hidden>
+        <div class="panel-mesas" id="mesasList"></div>
+      </section>
     </main>
+
+    <!-- Modal cuenta mesa -->
+    <div class="modal" id="accountModal" hidden aria-hidden="true">
+      <div class="modal__backdrop" data-close-modal></div>
+      <div class="modal__box" role="dialog" aria-labelledby="modalTitle">
+        <header class="modal__head">
+          <h2 class="modal__title" id="modalTitle">Cuenta Mesa 1</h2>
+          <button type="button" class="modal__close" data-close-modal aria-label="Cerrar">×</button>
+        </header>
+        <ul class="modal__invoice" id="modalInvoice"></ul>
+        <div class="modal__total">
+          <span>Total</span>
+          <strong id="modalTotal">$0</strong>
+        </div>
+      </div>
+    </div>
 
     <div class="panel-toast" id="toast" role="status" aria-live="polite"></div>
   </div>
