@@ -1,8 +1,7 @@
-const ADMIN_SESSION_KEY = 'menuqr:adminEmail';
+const ADMIN_SESSION_KEY = 'menuqr:adminSession';
+const ADMIN_USER = 'admin';
+const ADMIN_PASS = 'admin123';
 const DEFAULT_MESAS_COUNT = 5;
-
-/** Mismo cliente global que define config.js */
-const supabaseClient = window.supabaseClient;
 
 let restaurants = [];
 let slugManuallyEdited = false;
@@ -48,15 +47,15 @@ function formatDate(isoString) {
   }).format(new Date(isoString));
 }
 
-function getStoredAdminEmail() {
-  return normalizeEmail(localStorage.getItem(ADMIN_SESSION_KEY));
+function isAdminLoggedIn() {
+  return localStorage.getItem(ADMIN_SESSION_KEY) === 'true';
 }
 
-function setStoredAdminEmail(email) {
-  localStorage.setItem(ADMIN_SESSION_KEY, normalizeEmail(email));
+function setAdminLoggedIn() {
+  localStorage.setItem(ADMIN_SESSION_KEY, 'true');
 }
 
-function clearStoredAdminEmail() {
+function clearAdminSession() {
   localStorage.removeItem(ADMIN_SESSION_KEY);
 }
 
@@ -65,11 +64,11 @@ function showLogin() {
   document.getElementById('adminApp')?.setAttribute('hidden', '');
 }
 
-function showAdminApp(email) {
+function showAdminApp(username) {
   document.getElementById('adminLogin')?.setAttribute('hidden', '');
   document.getElementById('adminApp')?.removeAttribute('hidden');
   const label = document.getElementById('adminUserLabel');
-  if (label) label.textContent = email;
+  if (label) label.textContent = username;
 }
 
 function setLoginError(message) {
@@ -88,62 +87,41 @@ function assertSupabaseClient() {
   if (typeof supabase === 'undefined') {
     throw new Error('No se cargó la librería de Supabase. Verificá el CDN en admin.html.');
   }
-  if (!window.supabaseClient) {
+  if (!supabaseClient) {
     throw new Error('No se inicializó supabaseClient. Verificá que config.js cargue antes de admin.js.');
   }
-  return window.supabaseClient;
+  return supabaseClient;
 }
 
-async function verifyAdminEmail(email) {
-  const normalized = normalizeEmail(email);
-  if (!normalized) return null;
-
-  const client = assertSupabaseClient();
-
-  const { data, error } = await client
-    .from('admins')
-    .select('id, email')
-    .ilike('email', normalized)
-    .maybeSingle();
-
-  if (error) {
-    console.error('Error consultando admins:', error);
-    throw error;
-  }
-
-  return data;
+function checkAdminCredentials(username, password) {
+  return String(username || '').trim() === ADMIN_USER && password === ADMIN_PASS;
 }
 
-async function loginAdmin(email) {
-  const admin = await verifyAdminEmail(email);
-  if (!admin) {
-    setLoginError('Email no autorizado. Contactá al administrador de la plataforma.');
+async function loginAdmin(username, password) {
+  if (!checkAdminCredentials(username, password)) {
+    setLoginError('Usuario o contraseña incorrectos.');
     return false;
   }
 
-  setStoredAdminEmail(admin.email);
+  setAdminLoggedIn();
   setLoginError('');
-  showAdminApp(admin.email);
+  showAdminApp(ADMIN_USER);
   await loadRestaurants();
   return true;
 }
 
 async function restoreSession() {
-  const email = getStoredAdminEmail();
-  if (!email) return false;
+  if (!isAdminLoggedIn()) return false;
 
+  showAdminApp(ADMIN_USER);
   try {
-    const admin = await verifyAdminEmail(email);
-    if (!admin) {
-      clearStoredAdminEmail();
-      return false;
-    }
-
-    showAdminApp(admin.email);
     await loadRestaurants();
     return true;
   } catch (error) {
     console.error(error);
+    clearAdminSession();
+    showLogin();
+    setLoginError(error.message || 'No se pudo conectar con Supabase.');
     return false;
   }
 }
@@ -242,10 +220,17 @@ function renderRestaurants() {
     .join('');
 }
 
+function buildRestaurantPanelUrl(slug) {
+  const safeSlug = encodeURIComponent(slug);
+  if (window.location.hostname === 'localhost') {
+    return `http://localhost:8080/panel.html?slug=${safeSlug}`;
+  }
+  return `https://menuqr-virid.vercel.app/${safeSlug}/panel`;
+}
+
 function openRestaurantPanel(slug) {
   if (!slug) return;
-  const url = `${window.location.origin}/${encodeURIComponent(slug)}/panel`;
-  window.open(url, '_blank', 'noopener,noreferrer');
+  window.open(buildRestaurantPanelUrl(slug), '_blank', 'noopener,noreferrer');
 }
 
 async function toggleRestaurantActive(restaurantId, currentlyActive) {
@@ -435,16 +420,17 @@ function bindLogin() {
 
   form?.addEventListener('submit', async (event) => {
     event.preventDefault();
-    const email = document.getElementById('adminEmail')?.value;
+    const username = document.getElementById('adminUsername')?.value;
+    const password = document.getElementById('adminPassword')?.value;
     btn.disabled = true;
-    btn.textContent = 'Verificando…';
+    btn.textContent = 'Ingresando…';
     setLoginError('');
 
     try {
-      await loginAdmin(email);
+      await loginAdmin(username, password);
     } catch (error) {
       console.error(error);
-      setLoginError(error.message || 'Error al verificar el email.');
+      setLoginError(error.message || 'No se pudo cargar el panel.');
     } finally {
       btn.disabled = false;
       btn.textContent = 'Ingresar';
@@ -454,7 +440,7 @@ function bindLogin() {
 
 function bindLogout() {
   document.getElementById('adminLogoutBtn')?.addEventListener('click', () => {
-    clearStoredAdminEmail();
+    clearAdminSession();
     restaurants = [];
     showLogin();
     showToast('Sesión cerrada', 'success');
@@ -462,14 +448,6 @@ function bindLogout() {
 }
 
 async function init() {
-  try {
-    assertSupabaseClient();
-  } catch (error) {
-    console.error(error);
-    setLoginError(error.message);
-    return;
-  }
-
   bindLogin();
   bindLogout();
   bindRestaurantListActions();

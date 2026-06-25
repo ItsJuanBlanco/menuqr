@@ -21,14 +21,24 @@
         <p class="admin-login__subtitle">Panel de control de la plataforma</p>
       </div>
       <form class="admin-login__form" id="adminLoginForm">
-        <label class="admin-login__label" for="adminEmail">Email de administrador</label>
+        <label class="admin-login__label" for="adminUsername">Usuario</label>
         <input
-          type="email"
+          type="text"
           class="admin-login__input"
-          id="adminEmail"
-          name="email"
-          autocomplete="email"
-          placeholder="tu@email.com"
+          id="adminUsername"
+          name="username"
+          autocomplete="username"
+          placeholder="admin"
+          required
+        >
+        <label class="admin-login__label" for="adminPassword">Contraseña</label>
+        <input
+          type="password"
+          class="admin-login__input"
+          id="adminPassword"
+          name="password"
+          autocomplete="current-password"
+          placeholder="••••••••"
           required
         >
         <button type="submit" class="admin-login__btn" id="adminLoginBtn">Ingresar</button>
