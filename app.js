@@ -430,6 +430,13 @@ function getPagarBaseUrl() {
   return 'https://menuqr-virid.vercel.app/pagar';
 }
 
+function cleanupLegacySplitUi() {
+  ['splitQrIndicator', 'splitQrPrev', 'splitQrNext', 'generateQrBtn', 'splitQrViewer'].forEach((id) => {
+    document.getElementById(id)?.remove();
+  });
+  document.querySelectorAll('.account__split-qr-nav').forEach((el) => el.remove());
+}
+
 function buildSplitPaymentUrl(monto) {
   const params = new URLSearchParams({
     monto: String(monto),
@@ -439,36 +446,32 @@ function buildSplitPaymentUrl(monto) {
   return `${getPagarBaseUrl()}?${params.toString()}`;
 }
 
-function hideSplitQrViewer() {
-  const viewer = document.getElementById('splitQrViewer');
+function clearSplitQrCanvas() {
   const canvas = document.getElementById('splitQrCanvas');
-  if (viewer) viewer.hidden = true;
   if (canvas) canvas.innerHTML = '';
   state.lastSplitQrUrl = '';
 }
 
 function renderSplitQr(shareAmount) {
-  const viewer = document.getElementById('splitQrViewer');
   const canvas = document.getElementById('splitQrCanvas');
+  const box = document.getElementById('splitQrBox');
 
-  if (!viewer || !canvas || !state.sesionId || shareAmount <= 0) {
-    hideSplitQrViewer();
+  if (!canvas || !box || !state.sesionId || shareAmount <= 0) {
+    if (box) box.hidden = true;
+    clearSplitQrCanvas();
     return;
   }
 
+  box.hidden = false;
   const url = buildSplitPaymentUrl(shareAmount);
 
-  if (url === state.lastSplitQrUrl && canvas.childNodes.length > 0) {
-    viewer.hidden = false;
-    return;
-  }
+  if (url === state.lastSplitQrUrl && canvas.childNodes.length > 0) return;
 
   state.lastSplitQrUrl = url;
   canvas.innerHTML = '';
 
   if (typeof QRCode === 'undefined') {
     canvas.textContent = 'No se pudo cargar el generador de QR.';
-    viewer.hidden = false;
     return;
   }
 
@@ -480,8 +483,6 @@ function renderSplitQr(shareAmount) {
     colorLight: '#ffffff',
     correctLevel: QRCode.CorrectLevel.M,
   });
-
-  viewer.hidden = false;
 }
 
 function updateSplitBillUI(deliveredTotal) {
@@ -499,7 +500,9 @@ function updateSplitBillUI(deliveredTotal) {
   splitSection.hidden = !showSplit;
 
   if (!showSplit) {
-    hideSplitQrViewer();
+    const box = document.getElementById('splitQrBox');
+    if (box) box.hidden = true;
+    clearSplitQrCanvas();
     return;
   }
 
@@ -524,7 +527,9 @@ function updateSplitBillUI(deliveredTotal) {
   }
 
   if (paidTotal >= deliveredTotal) {
-    hideSplitQrViewer();
+    const box = document.getElementById('splitQrBox');
+    if (box) box.hidden = true;
+    clearSplitQrCanvas();
     return;
   }
 
@@ -1094,6 +1099,8 @@ function initWompiPayment() {
 }
 
 function initSplitBill() {
+  cleanupLegacySplitUi();
+
   const minusBtn = document.getElementById('splitCountMinus');
   const plusBtn = document.getElementById('splitCountPlus');
 
@@ -1227,7 +1234,7 @@ function applySession(session) {
   state.sessionTipo = session.tipo;
   state.sessionNumero = session.numero;
   state.splitCount = 2;
-  hideSplitQrViewer();
+  clearSplitQrCanvas();
   updateSessionBadge(session);
 }
 
