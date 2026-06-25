@@ -77,6 +77,31 @@
       </div>
     </div>
 
+    <!-- Modal cobrar con datáfono -->
+    <div class="modal" id="dataphoneModal" hidden aria-hidden="true">
+      <div class="modal__backdrop" data-close-dataphone></div>
+      <div class="modal__box modal__box--dataphone" role="dialog" aria-labelledby="dataphoneLabel">
+        <button type="button" class="modal__close dataphone-modal__close" data-close-dataphone aria-label="Cerrar">×</button>
+        <p class="dataphone-modal__label" id="dataphoneLabel">Cuenta #0000</p>
+        <p class="dataphone-modal__amount" id="dataphoneAmount">$0</p>
+        <button type="button" class="dataphone-modal__confirm" id="dataphoneConfirmBtn">Confirmar cobro</button>
+      </div>
+    </div>
+
+    <!-- Modal QR de pago Wompi -->
+    <div class="modal" id="paymentQrModal" hidden aria-hidden="true">
+      <div class="modal__backdrop" data-close-payment-qr></div>
+      <div class="modal__box modal__box--payment-qr" role="dialog" aria-labelledby="paymentQrTitle">
+        <header class="modal__head">
+          <h2 class="modal__title" id="paymentQrTitle">QR de pago</h2>
+          <button type="button" class="modal__close" data-close-payment-qr aria-label="Cerrar">×</button>
+        </header>
+        <p class="payment-qr-modal__amount" id="paymentQrAmount">$0</p>
+        <div class="payment-qr-modal__canvas" id="paymentQrCanvas"></div>
+        <p class="payment-qr-modal__hint">El cliente escanea este QR y paga con Wompi desde su celular.</p>
+      </div>
+    </div>
+
     <!-- Modal producto -->
     <div class="modal" id="productModal" hidden aria-hidden="true">
       <div class="modal__backdrop" data-close-product-modal></div>
@@ -160,6 +185,7 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <script src="/config.js"></script>
   <script src="/restaurant.js"></script>
   <script src="/panel.js"></script>

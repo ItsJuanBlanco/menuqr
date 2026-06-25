@@ -1057,6 +1057,119 @@ button {
   line-height: 1.2;
 }
 
+.modal__session-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.modal__session-btn {
+  width: 100%;
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  text-align: center;
+  border: 1px solid var(--border);
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+
+.modal__session-btn:active {
+  transform: scale(0.98);
+}
+
+.modal__session-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.modal__session-btn--dataphone {
+  color: var(--text);
+  background: var(--bg-card);
+}
+
+.modal__session-btn--qr {
+  color: #fff;
+  background: #16a34a;
+  border-color: #16a34a;
+}
+
+.modal__box--dataphone {
+  max-width: 360px;
+  text-align: center;
+  padding: 28px 24px 24px;
+}
+
+.dataphone-modal__close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+}
+
+.dataphone-modal__label {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  margin-bottom: 12px;
+}
+
+.dataphone-modal__amount {
+  font-size: clamp(2.5rem, 12vw, 3.5rem);
+  font-weight: 800;
+  line-height: 1.05;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  margin-bottom: 28px;
+}
+
+.dataphone-modal__confirm {
+  width: 100%;
+  padding: 14px 18px;
+  border-radius: var(--radius-sm);
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: #fff;
+  background: var(--accent, #f97316);
+}
+
+.modal__box--payment-qr {
+  max-width: 380px;
+}
+
+.payment-qr-modal__amount {
+  text-align: center;
+  font-size: 1.5rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  margin-bottom: 16px;
+}
+
+.payment-qr-modal__canvas {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 260px;
+  margin-bottom: 14px;
+}
+
+.payment-qr-modal__canvas img,
+.payment-qr-modal__canvas canvas {
+  border-radius: 12px;
+  padding: 12px;
+  background: #fff;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+.payment-qr-modal__hint {
+  text-align: center;
+  font-size: 0.875rem;
+  color: var(--text-muted);
+  line-height: 1.45;
+}
+
 /* Menú admin */
 .menu-toolbar {
   display: flex;

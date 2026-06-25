@@ -492,6 +492,7 @@ function updateSplitBillUI(deliveredTotal) {
   const splitInput = document.getElementById('splitCountInput');
   const minusBtn = document.getElementById('splitCountMinus');
   const plusBtn = document.getElementById('splitCountPlus');
+  const splitPayBtn = document.getElementById('splitPayBtn');
 
   if (!splitSection) return;
 
@@ -534,6 +535,10 @@ function updateSplitBillUI(deliveredTotal) {
   }
 
   renderSplitQr(shareAmount);
+
+  if (splitPayBtn) {
+    splitPayBtn.disabled = state.paymentSubmitting || shareAmount <= 0;
+  }
 }
 
 const WOMPI_PUBLIC_KEY = 'pub_test_sLvY32q8txNx6ygl0BrYaNo5w1aUkfMT';
@@ -1119,6 +1124,25 @@ function initSplitBill() {
       if (state.splitCount >= 20) return;
       state.splitCount += 1;
       updateSplitBillUI(getAccountDeliveredTotal());
+    });
+  }
+
+  const splitPayBtn = document.getElementById('splitPayBtn');
+  if (splitPayBtn && !splitPayBtn.dataset.bound) {
+    splitPayBtn.dataset.bound = 'true';
+    splitPayBtn.addEventListener('click', () => {
+      const deliveredTotal = getAccountDeliveredTotal();
+      const shareAmount = getSplitShareAmount(deliveredTotal, state.splitCount);
+      const paidTotal = getGroupPaidTotal();
+
+      if (paidTotal >= deliveredTotal) {
+        showToast('La cuenta ya está cubierta.', 'success');
+        return;
+      }
+
+      openWompiCheckout(shareAmount, {
+        reference: `sesion-${state.sesionId}-grupo-${Date.now()}`,
+      });
     });
   }
 }

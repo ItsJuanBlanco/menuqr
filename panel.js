@@ -11,6 +11,23 @@ let listClickBound = false;
 let mesasClickBound = false;
 let realtimeChannel = null;
 let realtimeRefreshTimer = null;
+let dataphoneModalState = null;
+
+function getPagarBaseUrl() {
+  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+    return `${window.location.origin}/pagar`;
+  }
+  return 'https://menuqr-virid.vercel.app/pagar';
+}
+
+function buildPagarUrl(monto, sesionId) {
+  const params = new URLSearchParams({
+    monto: String(monto),
+    sesion: sesionId,
+  });
+  if (RESTAURANTE_SLUG) params.set('slug', RESTAURANTE_SLUG);
+  return `${getPagarBaseUrl()}?${params.toString()}`;
+}
 
 function formatCOP(amount) {
   return new Intl.NumberFormat('es-CO', {
@@ -697,6 +714,28 @@ function openAccountModal(mesaId, mesaNum) {
                   <span>Subtotal</span>
                   <span>— ${formatCOP(session.total)}</span>
                 </div>
+                <div class="modal__session-actions">
+                  <button
+                    type="button"
+                    class="modal__session-btn modal__session-btn--dataphone"
+                    data-action="cobrar-dataphone"
+                    data-sesion-id="${session.id}"
+                    data-session-label="${escapeHtml(heading)}"
+                    data-session-total="${session.total}"
+                    data-mesa-id="${mesaId}"
+                    data-mesa-num="${mesaNum}"
+                    ${session.total <= 0 ? 'disabled' : ''}
+                  >Cobrar con datáfono</button>
+                  <button
+                    type="button"
+                    class="modal__session-btn modal__session-btn--qr"
+                    data-action="enviar-qr"
+                    data-sesion-id="${session.id}"
+                    data-session-label="${escapeHtml(heading)}"
+                    data-session-total="${session.total}"
+                    ${session.total <= 0 ? 'disabled' : ''}
+                  >Enviar QR de pago</button>
+                </div>
               </li>
             `;
           })
@@ -713,13 +752,118 @@ function closeAccountModal() {
   modal.setAttribute('aria-hidden', 'true');
 }
 
+function openDataphoneModal({ sesionId, sessionLabel, sessionTotal, mesaId, mesaNum }) {
+  dataphoneModalState = {
+    sesionId,
+    mesaId,
+    mesaNum,
+    sessionLabel,
+    sessionTotal: Number(sessionTotal),
+  };
+
+  document.getElementById('dataphoneLabel').textContent = sessionLabel;
+  document.getElementById('dataphoneAmount').textContent = formatCOP(Number(sessionTotal));
+
+  const modal = document.getElementById('dataphoneModal');
+  modal.hidden = false;
+  modal.setAttribute('aria-hidden', 'false');
+}
+
+function closeDataphoneModal() {
+  const modal = document.getElementById('dataphoneModal');
+  modal.hidden = true;
+  modal.setAttribute('aria-hidden', 'true');
+  dataphoneModalState = null;
+}
+
+function openPaymentQrModal({ sesionId, sessionLabel, sessionTotal }) {
+  const total = Number(sessionTotal);
+  if (!sesionId || total <= 0) {
+    showToast('No hay monto para generar el QR.', 'error');
+    return;
+  }
+
+  if (typeof QRCode === 'undefined') {
+    showToast('No se pudo cargar el generador de QR.', 'error');
+    return;
+  }
+
+  document.getElementById('paymentQrTitle').textContent = `QR · ${sessionLabel}`;
+  document.getElementById('paymentQrAmount').textContent = formatCOP(total);
+
+  const canvas = document.getElementById('paymentQrCanvas');
+  canvas.innerHTML = '';
+
+  new QRCode(canvas, {
+    text: buildPagarUrl(total, sesionId),
+    width: 240,
+    height: 240,
+    colorDark: '#0f172a',
+    colorLight: '#ffffff',
+    correctLevel: QRCode.CorrectLevel.M,
+  });
+
+  const modal = document.getElementById('paymentQrModal');
+  modal.hidden = false;
+  modal.setAttribute('aria-hidden', 'false');
+}
+
+function closePaymentQrModal() {
+  const modal = document.getElementById('paymentQrModal');
+  modal.hidden = true;
+  modal.setAttribute('aria-hidden', 'true');
+  const canvas = document.getElementById('paymentQrCanvas');
+  if (canvas) canvas.innerHTML = '';
+}
+
+function handleAccountModalAction(event) {
+  const btn = event.target.closest('[data-action]');
+  if (!btn) return;
+
+  const { action, sesionId, sessionLabel, sessionTotal, mesaId, mesaNum } = btn.dataset;
+
+  if (action === 'cobrar-dataphone') {
+    openDataphoneModal({ sesionId, sessionLabel, sessionTotal, mesaId, mesaNum });
+  } else if (action === 'enviar-qr') {
+    openPaymentQrModal({ sesionId, sessionLabel, sessionTotal });
+  }
+}
+
 function initModal() {
   document.querySelectorAll('[data-close-modal]').forEach((el) => {
     el.addEventListener('click', closeAccountModal);
   });
+
+  document.querySelectorAll('[data-close-dataphone]').forEach((el) => {
+    el.addEventListener('click', closeDataphoneModal);
+  });
+
+  document.querySelectorAll('[data-close-payment-qr]').forEach((el) => {
+    el.addEventListener('click', closePaymentQrModal);
+  });
+
+  document.getElementById('modalInvoice')?.addEventListener('click', handleAccountModalAction);
+
+  document.getElementById('dataphoneConfirmBtn')?.addEventListener('click', async () => {
+    if (!dataphoneModalState) return;
+
+    const { sesionId, mesaId, mesaNum } = dataphoneModalState;
+    const btn = document.getElementById('dataphoneConfirmBtn');
+    btn.disabled = true;
+    btn.textContent = 'Confirmando…';
+
+    try {
+      await confirmSessionPayment(sesionId, mesaId, mesaNum, 'Cobro confirmado');
+      closeDataphoneModal();
+      closeAccountModal();
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Confirmar cobro';
+    }
+  });
 }
 
-async function confirmSessionPayment(sesionId, mesaId, mesaNum) {
+async function confirmSessionPayment(sesionId, mesaId, mesaNum, successMessage = 'Sesión cerrada') {
   if (updating.has(`pay-${sesionId}`)) return;
 
   updating.add(`pay-${sesionId}`);
@@ -760,7 +904,7 @@ async function confirmSessionPayment(sesionId, mesaId, mesaNum) {
       if (mesaError) throw mesaError;
     }
 
-    showToast('Sesión cerrada', 'success');
+    showToast(successMessage, 'success');
     await refreshPanelData();
   } catch (error) {
     console.error(error);
