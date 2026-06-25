@@ -169,6 +169,20 @@ function slugifyCategory(name) {
     .replace(/(^-|-$)/g, '');
 }
 
+const VALID_TABS = new Set(['carta', 'cuenta', 'mesero']);
+const ACTIVE_TAB_KEY = 'activeTab';
+
+function saveActiveTab(tabId) {
+  if (VALID_TABS.has(tabId)) {
+    localStorage.setItem(ACTIVE_TAB_KEY, tabId);
+  }
+}
+
+function getStoredActiveTab() {
+  const stored = localStorage.getItem(ACTIVE_TAB_KEY);
+  return VALID_TABS.has(stored) ? stored : null;
+}
+
 const TOAST_DISMISS_MS = 5000;
 
 function showToast(message, type = '', duration = TOAST_DISMISS_MS) {
@@ -1495,7 +1509,10 @@ function initAccountSwitch() {
 
 /* ── Tabs ── */
 function switchTab(tabId) {
+  if (!VALID_TABS.has(tabId)) return;
+
   state.activeTab = tabId;
+  saveActiveTab(tabId);
 
   document.querySelectorAll('.bottom-nav__item').forEach((btn) => {
     const isActive = btn.dataset.tab === tabId;
@@ -1554,9 +1571,8 @@ function initWaiterButtons() {
 
 function handleInitialRoute() {
   const hash = window.location.hash.replace('#', '');
-  if (hash === 'cuenta' || hash === 'mesero' || hash === 'carta') {
-    switchTab(hash);
-  }
+  const tabFromHash = VALID_TABS.has(hash) ? hash : null;
+  switchTab(tabFromHash || getStoredActiveTab() || 'carta');
 }
 
 function applySession(session) {

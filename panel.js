@@ -16,6 +16,24 @@ let paymentQrModalState = null;
 
 const PANEL_SERVICE_PERCENT = 10;
 
+const VALID_PANEL_TABS = new Set(['pedidos', 'mesas', 'menu']);
+const ACTIVE_PANEL_TAB_KEY = 'activePanelTab';
+
+function saveActivePanelTab(panelId) {
+  if (VALID_PANEL_TABS.has(panelId)) {
+    localStorage.setItem(ACTIVE_PANEL_TAB_KEY, panelId);
+  }
+}
+
+function getStoredActivePanelTab() {
+  const stored = localStorage.getItem(ACTIVE_PANEL_TAB_KEY);
+  return VALID_PANEL_TABS.has(stored) ? stored : null;
+}
+
+function restoreActivePanelTab() {
+  switchPanel(getStoredActivePanelTab() || 'pedidos');
+}
+
 function getPanelPaymentBreakdown(subtotal, serviceEnabled = true) {
   const cargoServicio = serviceEnabled
     ? Math.round(Number(subtotal) * (PANEL_SERVICE_PERCENT / 100))
@@ -236,7 +254,10 @@ function updateHeaderCount() {
 
 /* ── Tabs ── */
 function switchPanel(panelId) {
+  if (!VALID_PANEL_TABS.has(panelId)) return;
+
   activePanel = panelId;
+  saveActivePanelTab(panelId);
 
   document.querySelectorAll('.panel-tabs__btn').forEach((btn) => {
     const isActive = btn.dataset.panel === panelId;
@@ -1819,8 +1840,7 @@ async function init() {
       fetchMesas(),
       typeof fetchMenuProducts === 'function' ? fetchMenuProducts() : Promise.resolve(),
     ]);
-    renderOrders();
-    renderMesas();
+    restoreActivePanelTab();
     subscribeToRealtime();
   } catch (error) {
     console.error('Error inicializando panel:', error);
