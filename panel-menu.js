@@ -219,14 +219,36 @@ function revokePendingProductImagePreview() {
   }
 }
 
-function setProductImagePreview(src, hint = '') {
+function updateProductImageUI({ src = '', hint = '', btnText = 'Elegir imagen', showClear = false } = {}) {
   const preview = document.getElementById('productImagePreview');
   const img = document.getElementById('productImagePreviewImg');
   const hintEl = document.getElementById('productImageHint');
+  const btnTextEl = document.getElementById('productImageBtnText');
+  const clearBtn = document.getElementById('productImageClearBtn');
 
-  if (img) img.src = src || '';
+  if (img) {
+    if (src) {
+      img.onerror = () => {
+        img.onerror = null;
+        updateProductImageUI({
+          hint: 'No se pudo cargar la imagen. Subí una nueva.',
+          btnText: 'Elegir imagen',
+          showClear: false,
+        });
+      };
+      img.src = src;
+      img.alt = 'Vista previa del producto';
+    } else {
+      img.onerror = null;
+      img.removeAttribute('src');
+      img.alt = '';
+    }
+  }
+
   if (preview) preview.hidden = !src;
-  if (hintEl && hint) hintEl.textContent = hint;
+  if (hintEl) hintEl.textContent = hint;
+  if (btnTextEl) btnTextEl.textContent = btnText;
+  if (clearBtn) clearBtn.hidden = !showClear;
 }
 
 function resetProductImageField(existingUrl = '') {
@@ -237,16 +259,20 @@ function resetProductImageField(existingUrl = '') {
   if (fileInput) fileInput.value = '';
 
   if (existingUrl) {
-    setProductImagePreview(
-      existingUrl,
-      'Imagen actual. Seleccioná otra para reemplazarla.'
-    );
+    updateProductImageUI({
+      src: existingUrl,
+      hint: 'Imagen actual. Elegí otra para reemplazarla.',
+      btnText: 'Cambiar imagen',
+      showClear: false,
+    });
     return;
   }
 
-  setProductImagePreview('', '');
-  const hintEl = document.getElementById('productImageHint');
-  if (hintEl) hintEl.textContent = 'JPG, PNG o WEBP';
+  updateProductImageUI({
+    hint: 'JPG, PNG o WEBP · opcional',
+    btnText: 'Elegir imagen',
+    showClear: false,
+  });
 }
 
 function validateProductImageFile(file) {
@@ -296,7 +322,12 @@ function bindProductImageField() {
     pendingProductImageFile = file;
     revokePendingProductImagePreview();
     pendingProductImagePreviewUrl = URL.createObjectURL(file);
-    setProductImagePreview(pendingProductImagePreviewUrl, 'Vista previa de la imagen seleccionada.');
+    updateProductImageUI({
+      src: pendingProductImagePreviewUrl,
+      hint: file.name,
+      btnText: 'Cambiar imagen',
+      showClear: true,
+    });
   });
 
   clearBtn?.addEventListener('click', () => {

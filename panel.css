@@ -1649,42 +1649,112 @@ body.mesa-qr-printing .mesa-qr-print {
   gap: 12px;
 }
 
+.product-form [hidden] {
+  display: none !important;
+}
+
 .product-form__image {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 6px;
 }
 
-.product-form__image-hint {
+.product-form__image-label {
   font-size: 0.8125rem;
+  font-weight: 600;
   color: var(--text-muted);
 }
 
-.product-form__image-preview {
+.product-form__image-body {
   display: flex;
-  flex-direction: column;
   align-items: flex-start;
-  gap: 10px;
+  gap: 14px;
+}
+
+.product-form__image-preview {
+  flex-shrink: 0;
+  width: 96px;
+  height: 96px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg);
+  overflow: hidden;
 }
 
 .product-form__image-preview img {
   width: 100%;
-  max-width: 220px;
-  aspect-ratio: 1;
+  height: 100%;
   object-fit: cover;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--border);
-  background: #fff;
+  display: block;
 }
 
-.product-form__image-clear {
-  padding: 8px 12px;
+.product-form__image-controls {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  min-width: 0;
+  flex: 1;
+}
+
+.product-form__file-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.product-form__file-label {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 9px 14px;
   border-radius: var(--radius-sm);
-  font-size: 0.8125rem;
+  font-size: 0.875rem;
   font-weight: 600;
   border: 1px solid var(--border);
   background: #fff;
+  color: var(--text);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.product-form__file-label:hover {
+  border-color: var(--accent);
+  background: var(--prep-soft);
+}
+
+.product-form__file-label:focus-within {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.product-form__image-hint {
+  margin: 0;
+  font-size: 0.8125rem;
   color: var(--text-muted);
+  line-height: 1.4;
+}
+
+.product-form__image-clear {
+  padding: 0;
+  border: 0;
+  background: none;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #dc2626;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.product-form__image-clear:hover {
+  color: #b91c1c;
 }
 
 .product-form__toggle {

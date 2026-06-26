@@ -200,20 +200,26 @@
             <input type="text" id="productCategoriaCustom" maxlength="60" placeholder="Ej: Postres">
           </label>
           <div class="product-form__image">
-            <label class="product-form__field">
-              <span>Imagen</span>
-              <input
-                type="file"
-                id="productImagen"
-                accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
-              >
-            </label>
-            <p class="product-form__image-hint" id="productImageHint">JPG, PNG o WEBP</p>
-            <div class="product-form__image-preview" id="productImagePreview" hidden>
-              <img id="productImagePreviewImg" alt="Vista previa del producto">
-              <button type="button" class="product-form__image-clear" id="productImageClearBtn">
-                Quitar selección
-              </button>
+            <span class="product-form__image-label">Imagen</span>
+            <div class="product-form__image-body">
+              <div class="product-form__image-preview" id="productImagePreview" hidden>
+                <img id="productImagePreviewImg" alt="">
+              </div>
+              <div class="product-form__image-controls">
+                <label class="product-form__file-label">
+                  <input
+                    type="file"
+                    id="productImagen"
+                    class="product-form__file-input"
+                    accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
+                  >
+                  <span id="productImageBtnText">Elegir imagen</span>
+                </label>
+                <p class="product-form__image-hint" id="productImageHint">JPG, PNG o WEBP · opcional</p>
+                <button type="button" class="product-form__image-clear" id="productImageClearBtn" hidden>
+                  Quitar selección
+                </button>
+              </div>
             </div>
           </div>
           <label class="product-form__toggle">
