@@ -19,7 +19,7 @@ let mesaQrAddOpen = false;
 
 const PANEL_SERVICE_PERCENT = 10;
 
-const VALID_PANEL_TABS = new Set(['pedidos', 'mesas', 'menu', 'resumen', 'qr']);
+const VALID_PANEL_TABS = new Set(['pedidos', 'mesas', 'menu', 'resumen', 'qr', 'ajustes']);
 const ACTIVE_PANEL_TAB_KEY = 'activePanelTab';
 
 function saveActivePanelTab(panelId) {
@@ -322,6 +322,8 @@ function updateHeaderCount() {
     el.textContent = `${total} producto${total !== 1 ? 's' : ''} · ${available} disponible${available !== 1 ? 's' : ''}`;
   } else if (activePanel === 'qr') {
     el.textContent = `${mesas.length} QR${mesas.length !== 1 ? 's' : ''} de mesa`;
+  } else if (activePanel === 'ajustes') {
+    el.textContent = 'Ajustes del restaurante';
   } else {
     el.textContent = `${orders.length} pedido${orders.length !== 1 ? 's' : ''}`;
   }
@@ -355,6 +357,7 @@ function switchPanel(panelId) {
   if (panelId === 'menu' && typeof fetchMenuProducts === 'function') fetchMenuProducts();
   if (panelId === 'resumen' && typeof fetchDailySummary === 'function') fetchDailySummary();
   if (panelId === 'qr') renderMesaQrs();
+  if (panelId === 'ajustes' && typeof loadRestaurantSettings === 'function') loadRestaurantSettings();
 }
 
 function buildMesaMenuUrl(mesaNumero) {

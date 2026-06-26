@@ -41,6 +41,7 @@
       <button type="button" class="panel-tabs__btn" id="tabMenu" role="tab" aria-selected="false" data-panel="menu">Menú</button>
       <button type="button" class="panel-tabs__btn" id="tabResumen" role="tab" aria-selected="false" data-panel="resumen">Resumen</button>
       <button type="button" class="panel-tabs__btn" id="tabQr" role="tab" aria-selected="false" data-panel="qr">QR</button>
+      <button type="button" class="panel-tabs__btn" id="tabAjustes" role="tab" aria-selected="false" data-panel="ajustes">Ajustes</button>
     </nav>
 
     <main class="panel-main">
@@ -112,6 +113,70 @@
               <button type="submit" class="mesa-qr-add__confirm" id="mesaQrAddSubmit">Confirmar</button>
               <button type="button" class="mesa-qr-add__cancel" id="mesaQrAddCancel">Cancelar</button>
             </div>
+          </form>
+        </div>
+      </section>
+
+      <!-- Ajustes -->
+      <section class="panel-view" id="viewAjustes" role="tabpanel" aria-labelledby="tabAjustes" hidden>
+        <div class="settings-panel">
+          <div class="settings-panel__head">
+            <h2 class="settings-panel__title">Ajustes del restaurante</h2>
+            <p class="settings-panel__hint">Personalizá colores, logo y portada de la carta del cliente.</p>
+          </div>
+          <form class="settings-form" id="settingsForm">
+            <div class="settings-form__row">
+              <label class="settings-form__field">
+                <span class="settings-form__label">Color primario</span>
+                <input type="color" class="settings-form__color" id="settingsColorPrimary" value="#FF6B00">
+              </label>
+              <label class="settings-form__field">
+                <span class="settings-form__label">Color de fondo</span>
+                <input type="color" class="settings-form__color" id="settingsColorBg" value="#0a0a0c">
+              </label>
+            </div>
+            <div class="product-form__image">
+              <span class="product-form__image-label">Logo del restaurante</span>
+              <div class="product-form__image-body">
+                <div class="product-form__image-preview" id="settingsLogoPreview" hidden>
+                  <img id="settingsLogoPreviewImg" alt="Vista previa del logo">
+                </div>
+                <div class="product-form__image-controls">
+                  <label class="product-form__file-label">
+                    <input
+                      type="file"
+                      id="settingsLogoInput"
+                      class="product-form__file-input"
+                      accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
+                    >
+                    <span id="settingsLogoBtnText">Subir logo</span>
+                  </label>
+                  <p class="product-form__image-hint" id="settingsLogoHint">JPG, PNG o WEBP</p>
+                </div>
+              </div>
+            </div>
+            <div class="product-form__image">
+              <span class="product-form__image-label">Foto de portada</span>
+              <div class="product-form__image-body">
+                <div class="product-form__image-preview product-form__image-preview--wide" id="settingsCoverPreview" hidden>
+                  <img id="settingsCoverPreviewImg" alt="Vista previa de la portada">
+                </div>
+                <div class="product-form__image-controls">
+                  <label class="product-form__file-label">
+                    <input
+                      type="file"
+                      id="settingsCoverInput"
+                      class="product-form__file-input"
+                      accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
+                    >
+                    <span id="settingsCoverBtnText">Subir portada</span>
+                  </label>
+                  <p class="product-form__image-hint" id="settingsCoverHint">JPG, PNG o WEBP · banner en la carta</p>
+                </div>
+              </div>
+            </div>
+            <p class="settings-form__error" id="settingsFormError" hidden role="alert"></p>
+            <button type="submit" class="menu-toolbar__btn settings-form__save" id="settingsSaveBtn">Guardar ajustes</button>
           </form>
         </div>
       </section>
@@ -455,5 +520,6 @@
   <script src="/category-order.js"></script>
   <script src="/panel-menu.js"></script>
   <script src="/panel-summary.js"></script>
+  <script src="/panel-settings.js"></script>
 </body>
 </html>
