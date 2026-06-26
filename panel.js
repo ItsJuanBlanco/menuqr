@@ -243,35 +243,36 @@ function resumePanelAudioContext() {
   return Promise.resolve();
 }
 
-function playTone({ frequency, type = 'sine', startAt = 0, duration = 0.18, volume = 0.22 }) {
-  const ctx = getPanelAudioContext();
-  const osc = ctx.createOscillator();
-  const gain = ctx.createGain();
-  const start = ctx.currentTime + startAt;
-
-  osc.type = type;
-  osc.frequency.setValueAtTime(frequency, start);
-  gain.gain.setValueAtTime(0.0001, start);
-  gain.gain.exponentialRampToValueAtTime(volume, start + 0.02);
-  gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
-
-  osc.connect(gain);
-  gain.connect(ctx.destination);
-  osc.start(start);
-  osc.stop(start + duration + 0.02);
-}
-
 function playNewOrderSound() {
   void resumePanelAudioContext().then(() => {
-    playTone({ frequency: 880, type: 'sine', startAt: 0, duration: 0.16, volume: 0.2 });
-    playTone({ frequency: 1175, type: 'sine', startAt: 0.12, duration: 0.2, volume: 0.24 });
+    const ctx = getPanelAudioContext();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.frequency.setValueAtTime(880, ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(1100, ctx.currentTime + 0.1);
+    gain.gain.setValueAtTime(0.3, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.8);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + 0.8);
   });
 }
 
 function playWaiterCallSound() {
   void resumePanelAudioContext().then(() => {
-    playTone({ frequency: 180, type: 'square', startAt: 0, duration: 0.12, volume: 0.12 });
-    playTone({ frequency: 160, type: 'square', startAt: 0.22, duration: 0.12, volume: 0.12 });
+    const ctx = getPanelAudioContext();
+    [0, 0.2, 0.4].forEach((delay) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.frequency.setValueAtTime(660, ctx.currentTime + delay);
+      gain.gain.setValueAtTime(0.3, ctx.currentTime + delay);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + delay + 0.15);
+      osc.start(ctx.currentTime + delay);
+      osc.stop(ctx.currentTime + delay + 0.15);
+    });
   });
 }
 
