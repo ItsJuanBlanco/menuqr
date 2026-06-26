@@ -16,6 +16,7 @@ const STATIC_PAGE_NAMES = new Set([
   'panel.js',
   'panel-menu.js',
   'panel-auth.js',
+  'panel-summary.js',
   'login.js',
   'restaurant.js',
   'sessions.js',

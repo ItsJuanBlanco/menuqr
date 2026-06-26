@@ -18,7 +18,7 @@ let mesaQrAddOpen = false;
 
 const PANEL_SERVICE_PERCENT = 10;
 
-const VALID_PANEL_TABS = new Set(['pedidos', 'mesas', 'menu', 'qr']);
+const VALID_PANEL_TABS = new Set(['pedidos', 'mesas', 'menu', 'resumen', 'qr']);
 const ACTIVE_PANEL_TAB_KEY = 'activePanelTab';
 
 function saveActivePanelTab(panelId) {
@@ -285,6 +285,7 @@ function switchPanel(panelId) {
   if (panelId === 'pedidos') renderOrders();
   if (panelId === 'mesas') renderMesas();
   if (panelId === 'menu' && typeof fetchMenuProducts === 'function') fetchMenuProducts();
+  if (panelId === 'resumen' && typeof fetchDailySummary === 'function') fetchDailySummary();
   if (panelId === 'qr') renderMesaQrs();
 }
 
@@ -888,6 +889,12 @@ function scheduleRealtimeRefresh() {
     if (typeof reloadMenuProducts === 'function') {
       reloadMenuProducts().catch((error) => {
         console.error('Error refrescando menú (realtime):', error);
+      });
+    }
+
+    if (activePanel === 'resumen' && typeof fetchDailySummary === 'function') {
+      fetchDailySummary(true).catch((error) => {
+        console.error('Error refrescando resumen (realtime):', error);
       });
     }
   }, 250);

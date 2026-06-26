@@ -36,6 +36,7 @@
       <button type="button" class="panel-tabs__btn panel-tabs__btn--active" id="tabPedidos" role="tab" aria-selected="true" data-panel="pedidos">Pedidos</button>
       <button type="button" class="panel-tabs__btn" id="tabMesas" role="tab" aria-selected="false" data-panel="mesas">Mesas</button>
       <button type="button" class="panel-tabs__btn" id="tabMenu" role="tab" aria-selected="false" data-panel="menu">Menú</button>
+      <button type="button" class="panel-tabs__btn" id="tabResumen" role="tab" aria-selected="false" data-panel="resumen">Resumen</button>
       <button type="button" class="panel-tabs__btn" id="tabQr" role="tab" aria-selected="false" data-panel="qr">QR</button>
     </nav>
 
@@ -65,6 +66,22 @@
           <button type="button" class="menu-toolbar__btn" id="addProductBtn">+ Agregar producto</button>
         </div>
         <div class="menu-sections" id="menuList"></div>
+      </section>
+
+      <!-- Resumen del día -->
+      <section class="panel-view" id="viewResumen" role="tabpanel" aria-labelledby="tabResumen" hidden>
+        <div class="daily-summary">
+          <div class="daily-summary__head">
+            <div>
+              <h2 class="daily-summary__title">Resumen del día</h2>
+              <p class="daily-summary__date" id="dailySummaryDate">Hoy</p>
+            </div>
+            <button type="button" class="daily-summary__refresh" id="dailySummaryRefresh">Actualizar</button>
+          </div>
+          <div class="daily-summary__loading" id="dailySummaryLoading" hidden>Cargando resumen…</div>
+          <p class="daily-summary__error" id="dailySummaryError" hidden role="alert"></p>
+          <div class="daily-summary__content" id="dailySummaryContent" hidden></div>
+        </div>
       </section>
 
       <!-- QR mesas -->
@@ -323,5 +340,6 @@
   <script src="/panel-auth.js"></script>
   <script src="/panel.js"></script>
   <script src="/panel-menu.js"></script>
+  <script src="/panel-summary.js"></script>
 </body>
 </html>

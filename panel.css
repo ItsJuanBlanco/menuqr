@@ -1846,7 +1846,198 @@ body.mesa-qr-printing .mesa-qr-print {
   background: var(--accent);
 }
 
+/* Daily summary (admin) */
+.daily-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  max-width: 960px;
+}
+
+.daily-summary__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.daily-summary__title {
+  margin: 0;
+  font-size: 1.375rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.daily-summary__date {
+  margin: 4px 0 0;
+  font-size: 0.875rem;
+  color: var(--text-muted);
+}
+
+.daily-summary__refresh {
+  padding: 8px 14px;
+  border-radius: 999px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  border: 1px solid var(--border);
+  background: #fff;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.daily-summary__refresh:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.daily-summary__loading,
+.daily-summary__error {
+  font-size: 0.9375rem;
+  color: var(--text-muted);
+}
+
+.daily-summary__error {
+  color: #dc2626;
+}
+
+.daily-summary__content {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+.daily-summary__section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.daily-summary__section-title {
+  margin: 0;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+
+.daily-summary__cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 14px;
+}
+
+.daily-summary__cards--hero {
+  grid-template-columns: minmax(220px, 360px);
+}
+
+.daily-summary__card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 18px 20px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: #fff;
+  box-shadow: var(--shadow);
+}
+
+.daily-summary__card--highlight {
+  border-color: #fed7aa;
+  background: linear-gradient(180deg, #fff7ed 0%, #fff 100%);
+}
+
+.daily-summary__card-label {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.daily-summary__card-value {
+  font-size: 1.75rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+}
+
+.daily-summary__card--highlight .daily-summary__card-value {
+  font-size: 2rem;
+  color: var(--accent);
+}
+
+.daily-summary__card-meta {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--ready);
+}
+
+.daily-summary__panel {
+  padding: 16px 18px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: #fff;
+  box-shadow: var(--shadow);
+}
+
+.daily-summary__empty {
+  margin: 0;
+  font-size: 0.9375rem;
+  color: var(--text-muted);
+}
+
+.daily-summary__ranking {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.daily-summary__ranking-item {
+  display: grid;
+  grid-template-columns: 28px 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.daily-summary__ranking-item:last-child {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+.daily-summary__ranking-pos {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  background: var(--bg);
+  color: var(--text-muted);
+}
+
+.daily-summary__ranking-name {
+  font-size: 0.9375rem;
+  font-weight: 600;
+}
+
+.daily-summary__ranking-qty {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--accent);
+}
+
 @media (max-width: 640px) {
+  .daily-summary__head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
   .panel-header {
     flex-direction: column;
     align-items: flex-start;

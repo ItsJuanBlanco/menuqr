@@ -51,7 +51,7 @@ function buildPanelUrl(slug) {
 }
 
 function getAllowedPanelTabs(role) {
-  if (role === 'admin') return new Set(['pedidos', 'mesas', 'menu', 'qr']);
+  if (role === 'admin') return new Set(['pedidos', 'mesas', 'menu', 'resumen', 'qr']);
   return new Set(['pedidos', 'mesas']);
 }
 
@@ -62,7 +62,7 @@ function redirectToLogin(slug) {
 function applyPanelRoleAccess(role) {
   const isAdmin = role === 'admin';
 
-  ['menu', 'qr'].forEach((panelId) => {
+  ['menu', 'resumen', 'qr'].forEach((panelId) => {
     const btn = document.querySelector(`.panel-tabs__btn[data-panel="${panelId}"]`);
     if (btn) btn.hidden = !isAdmin;
   });
