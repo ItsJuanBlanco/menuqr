@@ -757,7 +757,7 @@ function getPagarBaseUrl() {
   if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
     return `${window.location.origin}/pagar`;
   }
-  return 'https://menuqr-virid.vercel.app/pagar';
+  return 'https://listoapp.com.co/pagar';
 }
 
 function cleanupLegacySplitUi() {
