@@ -1,5 +1,6 @@
 const WOMPI_PUBLIC_KEY = 'pub_test_sLvY32q8txNx6ygl0BrYaNo5w1aUkfMT';
 const WOMPI_SIGNATURE_URL = `${SUPABASE_URL}/functions/v1/wompi-signature`;
+const PAGAR_PENDING_STORAGE_KEY = 'listo:pagar-pending';
 
 function formatCOP(amount) {
   return new Intl.NumberFormat('es-CO', {
@@ -8,6 +9,10 @@ function formatCOP(amount) {
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   }).format(amount);
+}
+
+function getPagarParams() {
+  return new URLSearchParams(window.location.search);
 }
 
 function setPagarMessage(type, message) {
@@ -25,6 +30,53 @@ function setPagarMessage(type, message) {
           : 'pagar-page__status';
     status.textContent = message;
   }
+}
+
+function parseSesionIdFromPagarReference(reference) {
+  const value = String(reference || '');
+  const parteMatch = value.match(/^sesion-(.+)-parte-\d+-\d+$/);
+  if (parteMatch) return parteMatch[1];
+
+  const match = value.match(/^sesion-(.+)-\d+$/);
+  return match ? match[1] : null;
+}
+
+function clearWompiRedirectParamsFromUrl() {
+  const url = new URL(window.location.href);
+  let changed = false;
+
+  ['id', 'status', 'reference'].forEach((key) => {
+    if (url.searchParams.has(key)) {
+      url.searchParams.delete(key);
+      changed = true;
+    }
+  });
+
+  if (changed) {
+    window.history.replaceState({}, '', url.pathname + url.search + url.hash);
+  }
+}
+
+function savePagarPendingPayment(data) {
+  sessionStorage.setItem(PAGAR_PENDING_STORAGE_KEY, JSON.stringify(data));
+}
+
+function loadPagarPendingPayment(reference) {
+  try {
+    const raw = sessionStorage.getItem(PAGAR_PENDING_STORAGE_KEY);
+    if (!raw) return null;
+
+    const data = JSON.parse(raw);
+    if (reference && data.reference !== reference) return null;
+
+    return data;
+  } catch {
+    return null;
+  }
+}
+
+function clearPagarPendingPayment() {
+  sessionStorage.removeItem(PAGAR_PENDING_STORAGE_KEY);
 }
 
 async function getSessionApprovedPaymentsTotal(sesionId) {
@@ -101,16 +153,26 @@ async function handleApprovedPayment(monto, sesionId, referenciaWompi, restauran
   const cargoServicio = Number(extras.cargoServicio) || 0;
   const propina = Number(extras.propina) || 0;
 
-  const { error: insertError } = await supabaseClient.from('pagos_grupo').insert({
-    sesion_id: sesionId,
-    monto,
-    referencia_wompi: referenciaWompi,
-    estado: 'aprobado',
-  });
+  const { data: existingPayment, error: existingError } = await supabaseClient
+    .from('pagos_grupo')
+    .select('id')
+    .eq('referencia_wompi', referenciaWompi)
+    .maybeSingle();
 
-  if (insertError) throw insertError;
+  if (existingError) throw existingError;
 
-  await saveSessionPaymentExtras(sesionId, { cargoServicio, propina });
+  if (!existingPayment) {
+    const { error: insertError } = await supabaseClient.from('pagos_grupo').insert({
+      sesion_id: sesionId,
+      monto,
+      referencia_wompi: referenciaWompi,
+      estado: 'aprobado',
+    });
+
+    if (insertError) throw insertError;
+
+    await saveSessionPaymentExtras(sesionId, { cargoServicio, propina });
+  }
 
   const paidTotal = await getSessionApprovedPaymentsTotal(sesionId);
   const sessionTotal = await getSessionDeliveredTotal(sesionId, restauranteId);
@@ -125,13 +187,13 @@ async function handleApprovedPayment(monto, sesionId, referenciaWompi, restauran
 
     setPagarMessage(
       'success',
-      'Pago registrado. La cuenta está completa y el mesero la confirmará.'
+      '¡Pago exitoso! ✓ La cuenta está completa y el mesero la confirmará.'
     );
     return;
   }
 
   await clearPaymentInProgress(sesionId);
-  setPagarMessage('success', 'Pago registrado. Tu parte fue acreditada a la cuenta.');
+  setPagarMessage('success', '¡Pago exitoso! ✓ Tu parte fue acreditada a la cuenta.');
 }
 
 async function fetchWompiSignature(amountInCents, reference) {
@@ -157,12 +219,60 @@ async function fetchWompiSignature(amountInCents, reference) {
   return data;
 }
 
-function buildPagarRedirectUrl() {
-  const url = new URL(window.location.href);
-  url.searchParams.delete('id');
-  url.searchParams.delete('status');
-  url.searchParams.delete('reference');
-  return url.toString();
+async function handleWompiRedirectReturn({ sesionId, monto, cargoServicio, restauranteId }) {
+  const params = getPagarParams();
+  const wompiId = params.get('id');
+  const status = params.get('status');
+  const reference = params.get('reference');
+
+  if (!wompiId || !status) return false;
+
+  clearWompiRedirectParamsFromUrl();
+
+  if (String(status).toUpperCase() !== 'APPROVED') {
+    clearPagarPendingPayment();
+    setPagarMessage('error', 'El pago no se completó. Podés intentar de nuevo.');
+    return true;
+  }
+
+  const pending = loadPagarPendingPayment(reference || undefined);
+  const resolvedSesionId =
+    sesionId || pending?.sesionId || parseSesionIdFromPagarReference(reference);
+  const resolvedMonto = monto > 0 ? monto : Number(pending?.monto) || 0;
+  const resolvedCargoServicio = cargoServicio || Number(pending?.cargoServicio) || 0;
+
+  if (!resolvedSesionId || resolvedMonto <= 0) {
+    clearPagarPendingPayment();
+    setPagarMessage('error', 'No se pudo vincular el pago con tu sesión.');
+    return true;
+  }
+
+  let resolvedRestauranteId = restauranteId;
+  if (!resolvedRestauranteId) {
+    const { data: sesion, error } = await supabaseClient
+      .from('sesiones')
+      .select('restaurante_id')
+      .eq('id', resolvedSesionId)
+      .maybeSingle();
+
+    if (error) throw error;
+    resolvedRestauranteId = sesion?.restaurante_id;
+  }
+
+  if (!resolvedRestauranteId) {
+    clearPagarPendingPayment();
+    setPagarMessage('error', 'No se pudo vincular el pago con tu sesión.');
+    return true;
+  }
+
+  const referenciaWompi = wompiId || reference;
+
+  await handleApprovedPayment(resolvedMonto, resolvedSesionId, referenciaWompi, resolvedRestauranteId, {
+    cargoServicio: resolvedCargoServicio,
+  });
+
+  clearPagarPendingPayment();
+  return true;
 }
 
 async function openWompiCheckout({ monto, sesionId, parte, publicKey, restauranteId, cargoServicio = 0 }) {
@@ -178,6 +288,14 @@ async function openWompiCheckout({ monto, sesionId, parte, publicKey, restaurant
     : `sesion-${sesionId}-${Date.now()}`;
   const amountInCents = Math.round(monto * 100);
 
+  savePagarPendingPayment({
+    sesionId,
+    monto,
+    reference,
+    cargoServicio,
+    parte,
+  });
+
   try {
     const { signature, publicKey: signedPublicKey } = await fetchWompiSignature(
       amountInCents,
@@ -190,7 +308,7 @@ async function openWompiCheckout({ monto, sesionId, parte, publicKey, restaurant
       reference,
       publicKey: signedPublicKey || publicKey,
       signature: { integrity: signature },
-      redirectUrl: buildPagarRedirectUrl(),
+      redirectUrl: window.location.href,
     });
 
     checkout.open(async (result) => {
@@ -200,6 +318,7 @@ async function openWompiCheckout({ monto, sesionId, parte, publicKey, restaurant
         try {
           const referencia = transaction.id || transaction.reference || reference;
           await handleApprovedPayment(monto, sesionId, referencia, restauranteId, { cargoServicio });
+          clearPagarPendingPayment();
         } catch (error) {
           console.error(error);
           await clearPaymentInProgress(sesionId);
@@ -208,23 +327,30 @@ async function openWompiCheckout({ monto, sesionId, parte, publicKey, restaurant
         return;
       }
 
+      clearPagarPendingPayment();
       await clearPaymentInProgress(sesionId);
       setPagarMessage('error', 'El pago no se completó. Puedes intentar de nuevo.');
     });
   } catch (error) {
     console.error(error);
+    clearPagarPendingPayment();
     await clearPaymentInProgress(sesionId);
     setPagarMessage('error', error.message || 'No se pudo iniciar el pago con Wompi.');
   }
 }
 
 async function initPagar() {
-  const params = new URLSearchParams(window.location.search);
-  const monto = Number(params.get('monto'));
-  const sesionId = params.get('sesion');
-  const parte = params.get('parte');
+  const params = getPagarParams();
+  const hasWompiReturn = Boolean(params.get('id') && params.get('status'));
+  const reference = params.get('reference');
+  const pending = hasWompiReturn ? loadPagarPendingPayment(reference || undefined) : null;
 
-  if (!monto || monto <= 0 || !sesionId) {
+  let monto = Number(params.get('monto')) || Number(pending?.monto) || 0;
+  let sesionId = params.get('sesion') || pending?.sesionId || parseSesionIdFromPagarReference(reference);
+  const parte = params.get('parte') || pending?.parte || null;
+  const cargoServicio = Number(params.get('servicio')) || Number(pending?.cargoServicio) || 0;
+
+  if (!sesionId || monto <= 0) {
     setPagarMessage('error', 'Enlace de pago inválido.');
     return;
   }
@@ -242,6 +368,16 @@ async function initPagar() {
     if (!sesion) {
       setPagarMessage('error', 'Sesión no encontrada.');
       return;
+    }
+
+    if (hasWompiReturn) {
+      const handled = await handleWompiRedirectReturn({
+        sesionId: sesion.id,
+        monto,
+        cargoServicio,
+        restauranteId: sesion.restaurante_id,
+      });
+      if (handled) return;
     }
 
     if (sesion.activa === false) {
@@ -269,11 +405,9 @@ async function initPagar() {
 
     const publicKey = restaurante?.wompi_public_key || WOMPI_PUBLIC_KEY;
 
-    const cargoServicio = Number(params.get('servicio')) || 0;
-
     await openWompiCheckout({
       monto,
-      sesionId,
+      sesionId: sesion.id,
       parte,
       publicKey,
       restauranteId: sesion.restaurante_id,
