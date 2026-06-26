@@ -127,6 +127,19 @@
           <span>TOTAL</span>
           <strong id="modalTotal">$0</strong>
         </div>
+        <div class="modal__bulk-actions" id="modalBulkActions" hidden>
+          <p class="modal__bulk-hint">Cobrar todas las cuentas de la mesa de una vez</p>
+          <button
+            type="button"
+            class="modal__session-btn modal__session-btn--dataphone"
+            data-action="cobrar-dataphone-todo"
+          >Cobrar todo con datáfono</button>
+          <button
+            type="button"
+            class="modal__session-btn modal__session-btn--qr"
+            data-action="enviar-qr-todo"
+          >Enviar QR de pago total</button>
+        </div>
       </div>
     </div>
 

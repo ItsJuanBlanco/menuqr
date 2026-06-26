@@ -13,6 +13,7 @@ let realtimeChannel = null;
 let realtimeRefreshTimer = null;
 let dataphoneModalState = null;
 let paymentQrModalState = null;
+let accountModalState = null;
 let openMesaQrNumero = null;
 let mesaQrAddOpen = false;
 
@@ -1010,13 +1011,31 @@ function formatAccountSessionHeading(session) {
   return session.label || 'Cuenta';
 }
 
+function getChargeableAccountSessions(mesaId) {
+  return (mesaSessionBreakdown[mesaId] || []).filter((session) => session.total > 0);
+}
+
 function openAccountModal(mesaId, mesaNum) {
   const sessions = mesaSessionBreakdown[mesaId] || [];
   const sessionItems = mesaSessionItems[mesaId] || {};
+  const chargeableSessions = getChargeableAccountSessions(mesaId);
   const total = sessions.reduce((sum, session) => sum + session.total, 0);
+
+  accountModalState = {
+    mesaId,
+    mesaNum,
+    allSessions: sessions,
+    chargeableSessions,
+    combinedTotal: chargeableSessions.reduce((sum, session) => sum + session.total, 0),
+  };
 
   document.getElementById('modalTitle').textContent = `Cuenta · Mesa ${mesaNum}`;
   document.getElementById('modalTotal').textContent = formatCOP(total);
+
+  const bulkActions = document.getElementById('modalBulkActions');
+  if (bulkActions) {
+    bulkActions.hidden = sessions.length < 2 || total <= 0;
+  }
 
   const list = document.getElementById('modalInvoice');
   list.innerHTML =
@@ -1085,6 +1104,47 @@ function closeAccountModal() {
   const modal = document.getElementById('accountModal');
   modal.hidden = true;
   modal.setAttribute('aria-hidden', 'true');
+  accountModalState = null;
+}
+
+function openDataphoneModalBulk() {
+  if (!accountModalState || accountModalState.chargeableSessions.length === 0) return;
+
+  const { mesaId, mesaNum, allSessions, combinedTotal } = accountModalState;
+
+  dataphoneModalState = {
+    bulk: true,
+    sesionIds: allSessions.map((session) => session.id),
+    mesaId,
+    mesaNum,
+    sessionLabel: `Todas las cuentas · Mesa ${mesaNum}`,
+    subtotal: combinedTotal,
+    serviceChargeEnabled: true,
+  };
+
+  document.getElementById('dataphoneLabel').textContent = dataphoneModalState.sessionLabel;
+  const toggle = document.getElementById('dataphoneServiceToggle');
+  if (toggle) toggle.checked = true;
+  updateDataphoneModalUI();
+
+  const modal = document.getElementById('dataphoneModal');
+  modal.hidden = false;
+  modal.setAttribute('aria-hidden', 'false');
+}
+
+function openPaymentQrModalBulk() {
+  if (!accountModalState || accountModalState.chargeableSessions.length === 0) return;
+
+  const { mesaNum, chargeableSessions, combinedTotal } = accountModalState;
+  const primarySession = chargeableSessions.reduce((largest, session) =>
+    session.total > largest.total ? session : largest
+  );
+
+  openPaymentQrModal({
+    sesionId: primarySession.id,
+    sessionLabel: `Todas las cuentas · Mesa ${mesaNum}`,
+    sessionTotal: combinedTotal,
+  });
 }
 
 function openDataphoneModal({ sesionId, sessionLabel, sessionTotal, mesaId, mesaNum }) {
@@ -1207,6 +1267,10 @@ function handleAccountModalAction(event) {
     openDataphoneModal({ sesionId, sessionLabel, sessionTotal, mesaId, mesaNum });
   } else if (action === 'enviar-qr') {
     openPaymentQrModal({ sesionId, sessionLabel, sessionTotal });
+  } else if (action === 'cobrar-dataphone-todo') {
+    openDataphoneModalBulk();
+  } else if (action === 'enviar-qr-todo') {
+    openPaymentQrModalBulk();
   }
 }
 
@@ -1223,12 +1287,11 @@ function initModal() {
     el.addEventListener('click', closePaymentQrModal);
   });
 
-  document.getElementById('modalInvoice')?.addEventListener('click', handleAccountModalAction);
+  document.getElementById('accountModal')?.addEventListener('click', handleAccountModalAction);
 
   document.getElementById('dataphoneConfirmBtn')?.addEventListener('click', async () => {
     if (!dataphoneModalState) return;
 
-    const { sesionId, mesaId, mesaNum } = dataphoneModalState;
     const breakdown = getPanelPaymentBreakdown(
       dataphoneModalState.subtotal,
       dataphoneModalState.serviceChargeEnabled
@@ -1238,9 +1301,24 @@ function initModal() {
     btn.textContent = 'Confirmando…';
 
     try {
-      await confirmSessionPayment(sesionId, mesaId, mesaNum, 'Cobro confirmado', {
-        cargoServicio: breakdown.cargoServicio,
-      });
+      if (dataphoneModalState.bulk && dataphoneModalState.sesionIds?.length) {
+        const { sesionIds, mesaId, mesaNum } = dataphoneModalState;
+
+        for (let index = 0; index < sesionIds.length; index += 1) {
+          const isLast = index === sesionIds.length - 1;
+          await confirmSessionPayment(sesionIds[index], mesaId, mesaNum, isLast ? 'Cobro total confirmado' : '', {
+            cargoServicio: index === 0 ? breakdown.cargoServicio : 0,
+            skipToast: !isLast,
+            skipRefresh: !isLast,
+          });
+        }
+      } else {
+        const { sesionId, mesaId, mesaNum } = dataphoneModalState;
+        await confirmSessionPayment(sesionId, mesaId, mesaNum, 'Cobro confirmado', {
+          cargoServicio: breakdown.cargoServicio,
+        });
+      }
+
       closeDataphoneModal();
       closeAccountModal();
     } finally {
@@ -1254,7 +1332,7 @@ function initModal() {
 }
 
 async function confirmSessionPayment(sesionId, mesaId, mesaNum, successMessage = 'Sesión cerrada', options = {}) {
-  const { cargoServicio = 0 } = options;
+  const { cargoServicio = 0, skipToast = false, skipRefresh = false } = options;
 
   if (updating.has(`pay-${sesionId}`)) return;
 
@@ -1300,8 +1378,8 @@ async function confirmSessionPayment(sesionId, mesaId, mesaNum, successMessage =
       if (mesaError) throw mesaError;
     }
 
-    showToast(successMessage, 'success');
-    await refreshPanelData();
+    if (!skipToast && successMessage) showToast(successMessage, 'success');
+    if (!skipRefresh) await refreshPanelData();
   } catch (error) {
     console.error(error);
     showToast(error.message || 'No se pudo confirmar el pago.', 'error');
