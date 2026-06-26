@@ -1024,6 +1024,83 @@ function buildWompiPaymentReference() {
   return `listo-${state.sesionId}-${Date.now()}`;
 }
 
+const WOMPI_PENDING_STORAGE_KEY = 'listo_wompi_pending_payment';
+const WOMPI_REDIRECT_SUCCESS_MESSAGE =
+  '¡Pago exitoso! ✓ El mesero confirmará tu cuenta en un momento.';
+
+function buildWompiRedirectUrl() {
+  const url = new URL(window.location.href);
+  url.searchParams.delete('id');
+  url.searchParams.delete('status');
+  url.searchParams.delete('reference');
+  return url.toString();
+}
+
+function getWompiRedirectParams() {
+  const params = new URLSearchParams(window.location.search);
+  const id = params.get('id');
+  const status = params.get('status');
+  const reference = params.get('reference');
+
+  if (!id || !status || !reference) return null;
+
+  return { id, status, reference };
+}
+
+function clearWompiRedirectParamsFromUrl() {
+  const url = new URL(window.location.href);
+  let changed = false;
+
+  ['id', 'status', 'reference'].forEach((key) => {
+    if (url.searchParams.has(key)) {
+      url.searchParams.delete(key);
+      changed = true;
+    }
+  });
+
+  if (changed) {
+    window.history.replaceState({}, '', url.pathname + url.search + url.hash);
+  }
+}
+
+function saveWompiPendingPayment({ amount, reference, cargoServicio = 0, propina = 0 }) {
+  if (!state.sesionId) return;
+
+  sessionStorage.setItem(
+    WOMPI_PENDING_STORAGE_KEY,
+    JSON.stringify({
+      sesionId: state.sesionId,
+      amount,
+      reference,
+      cargoServicio,
+      propina,
+    })
+  );
+}
+
+function loadWompiPendingPayment(reference) {
+  try {
+    const raw = sessionStorage.getItem(WOMPI_PENDING_STORAGE_KEY);
+    if (!raw) return null;
+
+    const data = JSON.parse(raw);
+    if (data.reference !== reference) return null;
+
+    return data;
+  } catch {
+    return null;
+  }
+}
+
+function clearWompiPendingPayment() {
+  sessionStorage.removeItem(WOMPI_PENDING_STORAGE_KEY);
+}
+
+function extractSesionIdFromWompiReference(reference) {
+  const match = String(reference || '').match(/^listo-(.+)-(\d+)$/);
+  return match ? match[1] : null;
+}
+
 async function fetchWompiSignature(amountInCents, reference) {
   const response = await fetch(WOMPI_SIGNATURE_URL, {
     method: 'POST',
@@ -1625,11 +1702,14 @@ async function handleApprovedWompiPayment(monto, referenciaWompi, extras = {}) {
     await loadGroupPayments();
 
     if (breakdown.total > 0 && paidTotal >= breakdown.total) {
-      if (extras.manualConfirmation) {
-        await markPaymentPendingConfirmation(PAYMENT_PENDING_MESSAGE, {
-          skipSubmittingGuard: true,
-          referenciaWompi: referenciaWompi,
-        });
+      if (extras.manualConfirmation || extras.fromRedirect) {
+        await markPaymentPendingConfirmation(
+          extras.fromRedirect ? WOMPI_REDIRECT_SUCCESS_MESSAGE : PAYMENT_PENDING_MESSAGE,
+          {
+            skipSubmittingGuard: true,
+            referenciaWompi: referenciaWompi,
+          }
+        );
       } else {
         await closeSessionAfterWompiPayment(referenciaWompi, breakdown.total);
       }
@@ -1684,6 +1764,55 @@ async function markPaymentPendingConfirmation(successMessage, options = {}) {
   }
 }
 
+async function handleWompiRedirectReturn() {
+  const wompiParams = getWompiRedirectParams();
+  if (!wompiParams) return false;
+
+  clearWompiRedirectParamsFromUrl();
+
+  const { id, status, reference } = wompiParams;
+  const normalizedStatus = String(status).toUpperCase();
+
+  if (normalizedStatus !== 'APPROVED') {
+    clearWompiPendingPayment();
+    await clearPaymentInProgress();
+    showToast('El pago no se completó. Podés intentar de nuevo.', 'error');
+    return true;
+  }
+
+  if (!state.sesionId) {
+    clearWompiPendingPayment();
+    showToast('No se pudo vincular el pago con tu sesión.', 'error');
+    return true;
+  }
+
+  const sesionFromRef = extractSesionIdFromWompiReference(reference);
+  if (sesionFromRef && sesionFromRef !== state.sesionId) {
+    clearWompiPendingPayment();
+    showToast('El pago no corresponde a tu sesión actual.', 'error');
+    return true;
+  }
+
+  const pending = loadWompiPendingPayment(reference);
+  const referenciaWompi = id || reference;
+
+  if (pending?.amount > 0) {
+    await handleApprovedWompiPayment(pending.amount, referenciaWompi, {
+      cargoServicio: pending.cargoServicio,
+      propina: pending.propina,
+      fromRedirect: true,
+    });
+  } else {
+    await markPaymentPendingConfirmation(WOMPI_REDIRECT_SUCCESS_MESSAGE, {
+      referenciaWompi,
+    });
+  }
+
+  clearWompiPendingPayment();
+  switchTab('cuenta');
+  return true;
+}
+
 async function openWompiCheckout(amount, options = {}) {
   if (typeof WidgetCheckout === 'undefined') {
     showToast('No se pudo cargar Wompi. Recarga la página.', 'error');
@@ -1703,6 +1832,13 @@ async function openWompiCheckout(amount, options = {}) {
   const reference = options.reference || buildWompiPaymentReference();
   const amountInCents = Math.round(amount * 100);
 
+  saveWompiPendingPayment({
+    amount,
+    reference,
+    cargoServicio: options.cargoServicio || 0,
+    propina: options.propina || 0,
+  });
+
   try {
     const { signature, publicKey } = await fetchWompiSignature(amountInCents, reference);
 
@@ -1712,22 +1848,26 @@ async function openWompiCheckout(amount, options = {}) {
       reference,
       publicKey,
       signature: { integrity: signature },
+      redirectUrl: buildWompiRedirectUrl(),
     });
 
     checkout.open((result) => {
       const transaction = result?.transaction;
       if (transaction?.status === 'APPROVED') {
+        clearWompiPendingPayment();
         const referencia = transaction.id || transaction.reference || reference;
         handleApprovedWompiPayment(amount, referencia, {
           cargoServicio: options.cargoServicio || 0,
           propina: options.propina || 0,
         });
       } else {
+        clearWompiPendingPayment();
         clearPaymentInProgress();
       }
     });
   } catch (error) {
     console.error(error);
+    clearWompiPendingPayment();
     await clearPaymentInProgress();
     showToast(error.message || 'No se pudo iniciar el pago con Wompi.', 'error');
   }
@@ -2053,6 +2193,7 @@ async function init() {
     }
 
     await loadAccountItems();
+    await handleWompiRedirectReturn();
     subscribeToRealtime();
   } catch (error) {
     console.error('Error inicializando Supabase:', error);
