@@ -188,7 +188,7 @@
             <section class="account__split" id="splitBillSection" hidden>
               <h3 class="account__section-title">Dividir y pagar</h3>
               <div class="account__split-row">
-                <span class="account__split-label">¿Entre cuántos dividen?</span>
+                <span class="account__split-label">¿Cuántos van a pagar?</span>
                 <div class="account__split-stepper">
                   <button type="button" class="account__split-stepper-btn" id="splitCountMinus" aria-label="Menos personas">−</button>
                   <input
@@ -205,17 +205,20 @@
                   <button type="button" class="account__split-stepper-btn" id="splitCountPlus" aria-label="Más personas">+</button>
                 </div>
               </div>
-              <p class="account__split-share" id="splitShareAmount">Cada uno paga: $0</p>
+              <button type="button" class="account__split-create-btn" id="createSplitGroupBtn">
+                Crear grupo de pago
+              </button>
               <p class="account__split-progress" id="splitPaymentProgress" hidden></p>
 
-              <div class="account__split-qr" id="splitQrBox">
+              <div class="account__split-qr" id="splitQrBox" hidden>
+                <p class="account__split-share" id="splitShareAmount">Cada uno paga: $0</p>
+                <div class="account__split-qr-canvas account__split-qr-canvas--large" id="splitQrCanvas"></div>
+                <p class="account__split-qr-hint" id="splitQrHint"></p>
                 <p class="account__split-restaurant-qr-amount" id="splitRestaurantQrAmount" hidden></p>
                 <button type="button" class="wompi-pay-btn account__split-link-btn" id="splitPaymentLinkBtn" hidden>
                   Abrir link de pago
                 </button>
                 <p class="account__split-payment-divider" id="splitPaymentDivider" hidden>o escaneá el QR</p>
-                <div class="account__split-qr-canvas" id="splitQrCanvas"></div>
-                <p class="account__split-qr-hint">Cada persona escanea este QR y paga su parte</p>
                 <button type="button" class="wompi-pay-btn account__split-pay-btn" id="splitPayBtn">
                   Pagar mi parte
                 </button>
