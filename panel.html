@@ -67,11 +67,27 @@
           <p class="mesa-qr-toolbar__hint">QR de acceso a la carta por mesa</p>
           <button type="button" class="menu-toolbar__btn" id="printAllQrBtn">Imprimir todos</button>
         </div>
-        <div class="panel-empty" id="mesaQrEmpty" hidden>
-          <p class="panel-empty__title">Sin mesas registradas</p>
-          <p class="panel-empty__text">Las mesas aparecerán aquí cuando estén creadas en Supabase.</p>
+        <div class="mesa-qr-list" id="mesaQrList"></div>
+        <div class="mesa-qr-add" id="mesaQrAdd">
+          <button type="button" class="mesa-qr-add__btn" id="mesaQrAddBtn">+ Agregar mesa</button>
+          <form class="mesa-qr-add__form" id="mesaQrAddForm" hidden>
+            <label class="mesa-qr-add__label" for="mesaQrAddInput">Número de mesa</label>
+            <div class="mesa-qr-add__row">
+              <input
+                type="number"
+                class="mesa-qr-add__input"
+                id="mesaQrAddInput"
+                min="1"
+                step="1"
+                inputmode="numeric"
+                placeholder="Ej: 6"
+                required
+              >
+              <button type="submit" class="mesa-qr-add__confirm" id="mesaQrAddSubmit">Confirmar</button>
+              <button type="button" class="mesa-qr-add__cancel" id="mesaQrAddCancel">Cancelar</button>
+            </div>
+          </form>
         </div>
-        <div class="mesa-qr-grid" id="mesaQrGrid"></div>
       </section>
     </main>
 

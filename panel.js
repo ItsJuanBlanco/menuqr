@@ -13,6 +13,8 @@ let realtimeChannel = null;
 let realtimeRefreshTimer = null;
 let dataphoneModalState = null;
 let paymentQrModalState = null;
+let openMesaQrNumero = null;
+let mesaQrAddOpen = false;
 
 const PANEL_SERVICE_PERCENT = 10;
 
@@ -312,8 +314,8 @@ function getQrImageDataUrl(container) {
 }
 
 function downloadMesaQr(mesaNumero) {
-  const card = document.querySelector(`[data-mesa-qr="${mesaNumero}"]`);
-  const canvasWrap = card?.querySelector('.mesa-qr-card__canvas');
+  const item = document.querySelector(`[data-mesa-qr="${mesaNumero}"]`);
+  const canvasWrap = item?.querySelector('.mesa-qr-accordion__canvas');
   const dataUrl = getQrImageDataUrl(canvasWrap);
 
   if (!dataUrl) {
@@ -325,6 +327,50 @@ function downloadMesaQr(mesaNumero) {
   link.href = dataUrl;
   link.download = `mesa-${mesaNumero}-qr.png`;
   link.click();
+}
+
+function toggleMesaQrAccordion(mesaNumero) {
+  openMesaQrNumero = openMesaQrNumero === mesaNumero ? null : mesaNumero;
+  renderMesaQrs();
+}
+
+function renderOpenMesaQrCode() {
+  if (!openMesaQrNumero) return;
+  const container = document.getElementById(`mesaQrCanvas-${openMesaQrNumero}`);
+  createMesaQrCode(container, buildMesaMenuUrl(openMesaQrNumero));
+}
+
+async function addMesaFromQrTab(rawNumero) {
+  const numero = parseInt(String(rawNumero).trim(), 10);
+  if (!Number.isFinite(numero) || numero < 1) {
+    throw new Error('Ingresá un número de mesa válido.');
+  }
+
+  if (mesas.some((mesa) => mesa.numero === numero)) {
+    throw new Error(`Ya existe la Mesa ${numero}.`);
+  }
+
+  const { data, error } = await supabaseClient
+    .from('mesas')
+    .insert({
+      restaurante_id: RESTAURANTE_ID,
+      numero,
+      estado: 'libre',
+      mesero_requerido: false,
+    })
+    .select('id, numero, estado, mesero_requerido')
+    .single();
+
+  if (error) throw error;
+
+  mesas.push(data);
+  mesas.sort((a, b) => a.numero - b.numero);
+  mesaQrAddOpen = false;
+  openMesaQrNumero = data.numero;
+  renderMesas();
+  renderMesaQrs();
+  showToast(`Mesa ${numero} creada`, 'success');
+  return data;
 }
 
 function printAllMesaQrs() {
@@ -372,62 +418,128 @@ function printAllMesaQrs() {
 }
 
 function renderMesaQrs() {
-  const grid = document.getElementById('mesaQrGrid');
-  const empty = document.getElementById('mesaQrEmpty');
-  if (!grid) return;
+  const list = document.getElementById('mesaQrList');
+  const addBtn = document.getElementById('mesaQrAddBtn');
+  const addForm = document.getElementById('mesaQrAddForm');
+  if (!list) return;
+
+  if (addBtn) addBtn.hidden = mesaQrAddOpen;
+  if (addForm) addForm.hidden = !mesaQrAddOpen;
 
   if (typeof QRCode === 'undefined') {
-    grid.innerHTML = '<p class="panel-empty__text">No se pudo cargar QRCode.js.</p>';
-    if (empty) empty.hidden = true;
+    list.innerHTML = '<p class="panel-empty__text">No se pudo cargar QRCode.js.</p>';
     return;
   }
 
   if (!RESTAURANTE_SLUG) {
-    grid.innerHTML = '<p class="panel-empty__text">No se pudo identificar el restaurante.</p>';
-    if (empty) empty.hidden = true;
+    list.innerHTML = '<p class="panel-empty__text">No se pudo identificar el restaurante.</p>';
     return;
   }
 
   if (!mesas.length) {
-    grid.innerHTML = '';
-    if (empty) empty.hidden = false;
+    list.innerHTML = '<p class="mesa-qr-list__empty">Todavía no hay mesas. Agregá la primera abajo.</p>';
     return;
   }
 
-  if (empty) empty.hidden = true;
+  if (openMesaQrNumero && !mesas.some((mesa) => mesa.numero === openMesaQrNumero)) {
+    openMesaQrNumero = null;
+  }
 
-  grid.innerHTML = mesas
-    .map(
-      (mesa) => `
-        <article class="mesa-qr-card" data-mesa-qr="${mesa.numero}">
-          <div class="mesa-qr-card__canvas" id="mesaQrCanvas-${mesa.numero}"></div>
-          <p class="mesa-qr-card__label">Mesa ${mesa.numero}</p>
-          <button type="button" class="mesa-qr-card__download" data-download-qr="${mesa.numero}">
-            Descargar
+  list.innerHTML = mesas
+    .map((mesa) => {
+      const isOpen = openMesaQrNumero === mesa.numero;
+      return `
+        <article class="mesa-qr-accordion__item${isOpen ? ' mesa-qr-accordion__item--open' : ''}" data-mesa-qr="${mesa.numero}">
+          <button
+            type="button"
+            class="mesa-qr-accordion__trigger"
+            data-toggle-qr="${mesa.numero}"
+            aria-expanded="${isOpen}"
+          >
+            <span class="mesa-qr-accordion__arrow" aria-hidden="true">${isOpen ? '▼' : '▶'}</span>
+            Mesa ${mesa.numero}
           </button>
+          <div class="mesa-qr-accordion__panel"${isOpen ? '' : ' hidden'}>
+            <div class="mesa-qr-accordion__canvas" id="mesaQrCanvas-${mesa.numero}"></div>
+            <button type="button" class="mesa-qr-accordion__download" data-download-qr="${mesa.numero}">
+              Descargar
+            </button>
+          </div>
         </article>
-      `
-    )
+      `;
+    })
     .join('');
 
-  mesas.forEach((mesa) => {
-    const container = document.getElementById(`mesaQrCanvas-${mesa.numero}`);
-    createMesaQrCode(container, buildMesaMenuUrl(mesa.numero));
-  });
+  renderOpenMesaQrCode();
+}
+
+function setMesaQrAddFormOpen(open) {
+  mesaQrAddOpen = open;
+  const addBtn = document.getElementById('mesaQrAddBtn');
+  const addForm = document.getElementById('mesaQrAddForm');
+  const input = document.getElementById('mesaQrAddInput');
+
+  if (addBtn) addBtn.hidden = open;
+  if (addForm) addForm.hidden = !open;
+
+  if (open) {
+    if (input) {
+      input.value = '';
+      input.focus();
+    }
+  }
 }
 
 function initMesaQrSection() {
-  const grid = document.getElementById('mesaQrGrid');
-  if (grid && !grid.dataset.bound) {
-    grid.dataset.bound = 'true';
-    grid.addEventListener('click', (event) => {
-      const btn = event.target.closest('[data-download-qr]');
-      if (!btn) return;
-      downloadMesaQr(Number(btn.dataset.downloadQr));
+  const list = document.getElementById('mesaQrList');
+  if (list && !list.dataset.bound) {
+    list.dataset.bound = 'true';
+    list.addEventListener('click', (event) => {
+      const toggleBtn = event.target.closest('[data-toggle-qr]');
+      if (toggleBtn) {
+        toggleMesaQrAccordion(Number(toggleBtn.dataset.toggleQr));
+        return;
+      }
+
+      const downloadBtn = event.target.closest('[data-download-qr]');
+      if (downloadBtn) {
+        event.stopPropagation();
+        downloadMesaQr(Number(downloadBtn.dataset.downloadQr));
+      }
     });
   }
 
   document.getElementById('printAllQrBtn')?.addEventListener('click', printAllMesaQrs);
+
+  document.getElementById('mesaQrAddBtn')?.addEventListener('click', () => {
+    setMesaQrAddFormOpen(true);
+  });
+
+  document.getElementById('mesaQrAddCancel')?.addEventListener('click', () => {
+    setMesaQrAddFormOpen(false);
+  });
+
+  const addForm = document.getElementById('mesaQrAddForm');
+  addForm?.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const input = document.getElementById('mesaQrAddInput');
+    const submitBtn = document.getElementById('mesaQrAddSubmit');
+    const numero = input?.value;
+
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Guardando…';
+
+    try {
+      await addMesaFromQrTab(numero);
+      setMesaQrAddFormOpen(false);
+    } catch (error) {
+      console.error(error);
+      showToast(error.message || 'No se pudo crear la mesa.', 'error');
+    } finally {
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Confirmar';
+    }
+  });
 }
 
 function initTabs() {

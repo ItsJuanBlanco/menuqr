@@ -1240,58 +1240,168 @@ button {
   color: var(--text-muted);
 }
 
-.mesa-qr-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 16px;
+.mesa-qr-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
 }
 
-.mesa-qr-card {
+.mesa-qr-list__empty {
+  padding: 24px 16px;
+  text-align: center;
+  font-size: 0.9375rem;
+  color: var(--text-muted);
+  background: var(--bg-card);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+}
+
+.mesa-qr-accordion__item {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+.mesa-qr-accordion__item--open {
+  border-color: rgba(234, 88, 12, 0.35);
+}
+
+.mesa-qr-accordion__trigger {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 18px;
+  font-size: 1rem;
+  font-weight: 600;
+  text-align: left;
+  color: var(--text);
+  background: transparent;
+}
+
+.mesa-qr-accordion__trigger:hover {
+  background: #fafafa;
+}
+
+.mesa-qr-accordion__arrow {
+  width: 1rem;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.mesa-qr-accordion__panel {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 12px;
-  padding: 20px 16px;
+  gap: 14px;
+  padding: 0 18px 20px;
+  border-top: 1px solid var(--border);
+  background: #fafafa;
+}
+
+.mesa-qr-accordion__panel[hidden] {
+  display: none;
+}
+
+.mesa-qr-accordion__canvas {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 16px;
+  padding: 12px;
+  background: #fff;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+}
+
+.mesa-qr-accordion__canvas img,
+.mesa-qr-accordion__canvas canvas {
+  display: block;
+}
+
+.mesa-qr-accordion__download {
+  padding: 8px 16px;
+  border-radius: var(--radius-sm);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  border: 1px solid var(--border);
+  background: #fff;
+  color: var(--text);
+}
+
+.mesa-qr-accordion__download:hover {
+  border-color: rgba(234, 88, 12, 0.35);
+  color: var(--accent);
+}
+
+.mesa-qr-add {
+  margin-top: 8px;
+}
+
+.mesa-qr-add__btn {
+  width: 100%;
+  padding: 14px 18px;
+  border-radius: var(--radius);
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: var(--accent);
+  background: var(--accent-soft);
+  border: 1px dashed rgba(234, 88, 12, 0.35);
+}
+
+.mesa-qr-add__form {
+  padding: 16px;
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
 }
 
-.mesa-qr-card__canvas {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 10px;
-  background: #fff;
-  border-radius: 12px;
-  border: 1px solid var(--border);
-}
-
-.mesa-qr-card__canvas img,
-.mesa-qr-card__canvas canvas {
+.mesa-qr-add__label {
   display: block;
-}
-
-.mesa-qr-card__label {
-  font-size: 1rem;
-  font-weight: 700;
-  color: var(--text);
-}
-
-.mesa-qr-card__download {
-  padding: 8px 14px;
-  border-radius: var(--radius-sm);
+  margin-bottom: 8px;
   font-size: 0.8125rem;
   font-weight: 600;
-  border: 1px solid var(--border);
-  background: var(--bg);
-  color: var(--text);
+  color: var(--text-muted);
 }
 
-.mesa-qr-card__download:hover {
-  border-color: rgba(234, 88, 12, 0.35);
-  color: var(--accent);
+.mesa-qr-add__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.mesa-qr-add__input {
+  flex: 1 1 120px;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 0.9375rem;
+  background: #fff;
+}
+
+.mesa-qr-add__confirm {
+  padding: 10px 16px;
+  border-radius: var(--radius-sm);
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: #fff;
+  background: var(--accent);
+}
+
+.mesa-qr-add__cancel {
+  padding: 10px 16px;
+  border-radius: var(--radius-sm);
+  font-size: 0.875rem;
+  font-weight: 600;
+  border: 1px solid var(--border);
+  background: #fff;
+  color: var(--text-muted);
 }
 
 .mesa-qr-print {
