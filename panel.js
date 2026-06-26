@@ -358,11 +358,11 @@ function switchPanel(panelId) {
 }
 
 function buildMesaMenuUrl(mesaNumero) {
-  const slug = encodeURIComponent(RESTAURANTE_SLUG || '');
+  const slug = RESTAURANTE_SLUG || '';
   if (window.location.hostname === 'localhost') {
-    return `http://localhost:8080/index.html?slug=${slug}&mesa=${mesaNumero}`;
+    return `http://localhost:8080/index.html?slug=${encodeURIComponent(slug)}&mesa=${mesaNumero}`;
   }
-  return `https://menuqr-virid.vercel.app/${slug}?mesa=${mesaNumero}`;
+  return `https://listoapp.com.co/${slug}?mesa=${mesaNumero}`;
 }
 
 function createMesaQrCode(container, url, size = 180) {
