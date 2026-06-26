@@ -86,7 +86,7 @@ async function updateRestaurantSettingsFields(fields, successMessage) {
       .update(fields)
       .eq('id', RESTAURANTE_ID)
       .select(
-        'id, slug, nombre, ciudad, logo_url, foto_portada, foto_portada_posicion, color_primario, color_fondo, wompi_public_key, metodo_pago, qr_pago_url, link_pago'
+        'id, slug, nombre, ciudad, logo_url, foto_portada, foto_portada_posicion, color_primario, color_fondo, wompi_public_key, metodo_pago, qr_pago_url, link_pago, google_review_url'
       )
       .single();
 
@@ -144,6 +144,15 @@ function normalizeLinkPago(value) {
   if (!raw) return null;
   if (!/^https?:\/\//i.test(raw)) {
     throw new Error('El link de pago debe empezar con http:// o https://');
+  }
+  return raw;
+}
+
+function normalizeGoogleReviewUrl(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return null;
+  if (!/^https?:\/\//i.test(raw)) {
+    throw new Error('El link de Google Reviews debe empezar con http:// o https://');
   }
   return raw;
 }
@@ -352,13 +361,16 @@ function populateSettingsForm(restaurant) {
 
   const linkInput = document.getElementById('settingsLinkPago');
   if (linkInput) linkInput.value = restaurant?.link_pago || '';
+
+  const googleReviewInput = document.getElementById('settingsGoogleReviewUrl');
+  if (googleReviewInput) googleReviewInput.value = restaurant?.google_review_url || '';
 }
 
 async function fetchRestaurantSettings() {
   const { data, error } = await supabaseClient
     .from('restaurantes')
     .select(
-      'id, slug, nombre, ciudad, logo_url, foto_portada, foto_portada_posicion, color_primario, color_fondo, metodo_pago, qr_pago_url, link_pago'
+      'id, slug, nombre, ciudad, logo_url, foto_portada, foto_portada_posicion, color_primario, color_fondo, metodo_pago, qr_pago_url, link_pago, google_review_url'
     )
     .eq('id', RESTAURANTE_ID)
     .single();
@@ -393,10 +405,13 @@ async function saveRestaurantSettings(event) {
   const foto_portada_posicion = normalizeCoverPosition(coverPositionInput?.value);
   const metodo_pago = getSelectedMetodoPago();
   const linkInput = document.getElementById('settingsLinkPago');
+  const googleReviewInput = document.getElementById('settingsGoogleReviewUrl');
   let link_pago = null;
+  let google_review_url = null;
 
   try {
     link_pago = normalizeLinkPago(linkInput?.value);
+    google_review_url = normalizeGoogleReviewUrl(googleReviewInput?.value);
   } catch (error) {
     if (errorEl) {
       errorEl.textContent = error.message;
@@ -459,10 +474,11 @@ async function saveRestaurantSettings(event) {
         metodo_pago,
         qr_pago_url,
         link_pago,
+        google_review_url,
       })
       .eq('id', RESTAURANTE_ID)
       .select(
-        'id, slug, nombre, ciudad, logo_url, foto_portada, foto_portada_posicion, color_primario, color_fondo, wompi_public_key, metodo_pago, qr_pago_url, link_pago'
+        'id, slug, nombre, ciudad, logo_url, foto_portada, foto_portada_posicion, color_primario, color_fondo, wompi_public_key, metodo_pago, qr_pago_url, link_pago, google_review_url'
       )
       .single();
 
