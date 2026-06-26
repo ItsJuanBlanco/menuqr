@@ -117,29 +117,39 @@
     <!-- Modal cuenta mesa -->
     <div class="modal" id="accountModal" hidden aria-hidden="true">
       <div class="modal__backdrop" data-close-modal></div>
-      <div class="modal__box" role="dialog" aria-labelledby="modalTitle">
-        <header class="modal__head">
+      <div class="modal__box modal__box--account" role="dialog" aria-labelledby="modalTitle">
+        <header class="modal__head modal__head--account">
           <h2 class="modal__title" id="modalTitle">Cuenta Mesa 1</h2>
           <button type="button" class="modal__close" data-close-modal aria-label="Cerrar">×</button>
         </header>
-        <ul class="modal__invoice" id="modalInvoice"></ul>
-        <div class="modal__total">
-          <span>TOTAL</span>
-          <strong id="modalTotal">$0</strong>
+        <div class="modal__account-scroll">
+          <ul class="modal__invoice" id="modalInvoice"></ul>
         </div>
-        <div class="modal__bulk-actions" id="modalBulkActions" hidden>
-          <p class="modal__bulk-hint">Cobrar todas las cuentas de la mesa de una vez</p>
-          <button
-            type="button"
-            class="modal__session-btn modal__session-btn--dataphone"
-            data-action="cobrar-dataphone-todo"
-          >Cobrar todo con datáfono</button>
-          <button
-            type="button"
-            class="modal__session-btn modal__session-btn--qr"
-            data-action="enviar-qr-todo"
-          >Enviar QR de pago total</button>
-        </div>
+        <footer class="modal__account-footer">
+          <div class="modal__account-total">
+            <div class="modal__account-total-main">
+              <span class="modal__account-total-label">Total mesa</span>
+              <strong class="modal__account-total-amount" id="modalTotal">$0</strong>
+            </div>
+            <span class="modal__account-count" id="modalAccountCount" hidden></span>
+          </div>
+          <div class="modal__account-pay-grid" id="modalSingleActions" hidden></div>
+          <div class="modal__bulk-actions" id="modalBulkActions" hidden>
+            <p class="modal__bulk-label">Cobrar todas las cuentas</p>
+            <div class="modal__account-pay-grid">
+              <button
+                type="button"
+                class="modal__pay-btn modal__pay-btn--dataphone"
+                data-action="cobrar-dataphone-todo"
+              >Datáfono</button>
+              <button
+                type="button"
+                class="modal__pay-btn modal__pay-btn--qr"
+                data-action="enviar-qr-todo"
+              >QR total</button>
+            </div>
+          </div>
+        </footer>
       </div>
     </div>
 

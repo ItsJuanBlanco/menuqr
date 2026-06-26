@@ -1006,14 +1006,154 @@ button {
   background: var(--bg);
 }
 
+.modal__box--account {
+  display: flex;
+  flex-direction: column;
+  max-width: 440px;
+  max-height: min(90dvh, 680px);
+  padding: 0;
+  overflow: hidden;
+}
+
+.modal__head--account {
+  flex-shrink: 0;
+  margin-bottom: 0;
+  padding: 18px 20px 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.modal__account-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 14px 20px;
+  -webkit-overflow-scrolling: touch;
+}
+
+.modal__account-footer {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px 20px calc(18px + env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid var(--border);
+  background: var(--bg);
+  box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.06);
+}
+
+.modal__account-total {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.modal__account-total-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.modal__account-total-label {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+
+.modal__account-total-amount {
+  font-size: 1.625rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+
+.modal__account-count {
+  flex-shrink: 0;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  background: #fff;
+  border: 1px solid var(--border);
+}
+
+.modal__account-count[hidden] {
+  display: none !important;
+}
+
+.modal__account-pay-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.modal__account-pay-grid[hidden] {
+  display: none !important;
+}
+
+.modal__account-pay-grid--session {
+  margin-top: 10px;
+}
+
+.modal__pay-btn {
+  padding: 11px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  text-align: center;
+  border: 1px solid var(--border);
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+
+.modal__pay-btn:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.modal__pay-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.modal__pay-btn--dataphone {
+  color: var(--text);
+  background: #fff;
+}
+
+.modal__pay-btn--dataphone:hover:not(:disabled) {
+  background: var(--bg);
+}
+
+.modal__pay-btn--qr {
+  color: #fff;
+  background: #16a34a;
+  border-color: #16a34a;
+}
+
+.modal__pay-btn--qr:hover:not(:disabled) {
+  background: #15803d;
+  border-color: #15803d;
+}
+
 .modal__invoice {
   list-style: none;
   display: flex;
   flex-direction: column;
   gap: 10px;
-  margin-bottom: 16px;
-  padding-bottom: 16px;
-  border-bottom: 1px dashed var(--border);
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.modal__invoice-empty {
+  margin: 0;
+  padding: 24px 12px;
+  text-align: center;
+  font-size: 0.9375rem;
+  color: var(--text-muted);
 }
 
 .modal__invoice-line {
@@ -1033,17 +1173,17 @@ button {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding: 12px;
+  padding: 14px;
   border-radius: var(--radius-sm);
-  background: var(--bg);
+  background: #fff;
   border: 1px solid var(--border);
 }
 
 .modal__invoice-group-head {
   display: flex;
   justify-content: space-between;
+  align-items: center;
   gap: 12px;
-  font-size: 0.875rem;
 }
 
 .modal__invoice-group-head--title strong {
@@ -1052,15 +1192,12 @@ button {
   letter-spacing: 0.02em;
 }
 
-.modal__invoice-group-head--subtotal {
-  padding-top: 4px;
-  border-top: 1px dashed var(--border);
-  font-weight: 600;
-}
-
-.modal__invoice-group-head--subtotal span:last-child {
-  font-weight: 700;
+.modal__session-amount {
+  font-size: 0.9375rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
   color: var(--text);
+  white-space: nowrap;
 }
 
 .modal__invoice-sublist {
@@ -1068,13 +1205,35 @@ button {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  padding-left: 8px;
-  border-left: 2px solid var(--border);
+  margin: 0;
+  padding: 0;
 }
 
 .modal__invoice-line--nested {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: baseline;
+  gap: 8px;
   font-size: 0.8125rem;
   color: var(--text-muted);
+}
+
+.modal__item-qty {
+  font-weight: 700;
+  color: var(--text);
+}
+
+.modal__item-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.modal__item-price {
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
 }
 
 .modal__invoice-note {
@@ -1083,50 +1242,23 @@ button {
   font-style: italic;
 }
 
-.modal__total {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding-top: 4px;
-  text-align: center;
-}
-
-.modal__total span {
-  font-size: 0.6875rem;
-  font-weight: 700;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-}
-
-.modal__total strong {
-  font-size: 1.5rem;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-  line-height: 1.2;
-}
-
 .modal__bulk-actions {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  margin-top: 16px;
-  padding-top: 16px;
-  border-top: 1px dashed var(--border);
 }
 
 .modal__bulk-actions[hidden] {
   display: none !important;
 }
 
-.modal__bulk-hint {
-  margin: 0 0 4px;
-  font-size: 0.8125rem;
-  font-weight: 600;
+.modal__bulk-label {
+  margin: 0;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
   color: var(--text-muted);
-  text-align: center;
 }
 
 .modal__session-actions {
@@ -2054,6 +2186,17 @@ body.mesa-qr-printing .mesa-qr-print {
 }
 
 @media (max-width: 640px) {
+  #accountModal.modal {
+    align-items: flex-end;
+    padding: 0;
+  }
+
+  .modal__box--account {
+    max-width: none;
+    max-height: 92dvh;
+    border-radius: var(--radius) var(--radius) 0 0;
+  }
+
   .daily-summary__head {
     flex-direction: column;
     align-items: stretch;

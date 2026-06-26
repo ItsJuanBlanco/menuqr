@@ -1015,11 +1015,116 @@ function getChargeableAccountSessions(mesaId) {
   return (mesaSessionBreakdown[mesaId] || []).filter((session) => session.total > 0);
 }
 
+function renderAccountSessionCard(session, items, mesaId, mesaNum, showSessionActions) {
+  const grouped = groupDeliveredItems(items);
+  const heading = formatAccountSessionHeading(session);
+  const hasTotal = session.total > 0;
+
+  const itemsHtml =
+    grouped.length === 0
+      ? '<li class="modal__invoice-line modal__invoice-line--nested"><span>Sin productos entregados</span></li>'
+      : grouped
+          .map(
+            (item) => `
+              <li class="modal__invoice-line modal__invoice-line--nested">
+                <span class="modal__item-qty">×${item.qty}</span>
+                <span class="modal__item-name">${escapeHtml(item.name)}</span>
+                <span class="modal__item-price">${formatCOP(item.subtotal)}</span>
+              </li>
+            `
+          )
+          .join('');
+
+  const sessionActionsHtml = showSessionActions
+    ? ''
+    : `
+      <div class="modal__account-pay-grid modal__account-pay-grid--session">
+        <button
+          type="button"
+          class="modal__pay-btn modal__pay-btn--dataphone"
+          data-action="cobrar-dataphone"
+          data-sesion-id="${session.id}"
+          data-session-label="${escapeHtml(heading)}"
+          data-session-total="${session.total}"
+          data-mesa-id="${mesaId}"
+          data-mesa-num="${mesaNum}"
+          ${hasTotal ? '' : 'disabled'}
+        >Datáfono</button>
+        <button
+          type="button"
+          class="modal__pay-btn modal__pay-btn--qr"
+          data-action="enviar-qr"
+          data-sesion-id="${session.id}"
+          data-session-label="${escapeHtml(heading)}"
+          data-session-total="${session.total}"
+          ${hasTotal ? '' : 'disabled'}
+        >QR</button>
+      </div>
+    `;
+
+  return `
+    <li class="modal__invoice-group">
+      <div class="modal__invoice-group-head modal__invoice-group-head--title">
+        <strong>${escapeHtml(heading)}</strong>
+        <span class="modal__session-amount">${formatCOP(session.total)}</span>
+      </div>
+      <ul class="modal__invoice-sublist">${itemsHtml}</ul>
+      ${sessionActionsHtml}
+    </li>
+  `;
+}
+
+function renderAccountModalFooter(sessions, mesaId, mesaNum, total) {
+  const bulkActions = document.getElementById('modalBulkActions');
+  const singleActions = document.getElementById('modalSingleActions');
+  const countEl = document.getElementById('modalAccountCount');
+  const showBulk = sessions.length >= 2 && total > 0;
+  const singleSession = sessions.length === 1 ? sessions[0] : null;
+  const showSingle = singleSession && singleSession.total > 0;
+
+  if (bulkActions) bulkActions.hidden = !showBulk;
+  if (countEl) {
+    countEl.hidden = !showBulk;
+    countEl.textContent = showBulk ? `${sessions.length} cuentas` : '';
+  }
+
+  if (singleActions) {
+    if (showSingle) {
+      const heading = formatAccountSessionHeading(singleSession);
+      singleActions.hidden = false;
+      singleActions.innerHTML = `
+        <button
+          type="button"
+          class="modal__pay-btn modal__pay-btn--dataphone"
+          data-action="cobrar-dataphone"
+          data-sesion-id="${singleSession.id}"
+          data-session-label="${escapeHtml(heading)}"
+          data-session-total="${singleSession.total}"
+          data-mesa-id="${mesaId}"
+          data-mesa-num="${mesaNum}"
+        >Cobrar con datáfono</button>
+        <button
+          type="button"
+          class="modal__pay-btn modal__pay-btn--qr"
+          data-action="enviar-qr"
+          data-sesion-id="${singleSession.id}"
+          data-session-label="${escapeHtml(heading)}"
+          data-session-total="${singleSession.total}"
+        >Enviar QR de pago</button>
+      `;
+    } else {
+      singleActions.hidden = true;
+      singleActions.innerHTML = '';
+    }
+  }
+}
+
 function openAccountModal(mesaId, mesaNum) {
   const sessions = mesaSessionBreakdown[mesaId] || [];
   const sessionItems = mesaSessionItems[mesaId] || {};
   const chargeableSessions = getChargeableAccountSessions(mesaId);
   const total = sessions.reduce((sum, session) => sum + session.total, 0);
+  const showSessionActions = sessions.length === 1;
 
   accountModalState = {
     mesaId,
@@ -1032,67 +1137,22 @@ function openAccountModal(mesaId, mesaNum) {
   document.getElementById('modalTitle').textContent = `Cuenta · Mesa ${mesaNum}`;
   document.getElementById('modalTotal').textContent = formatCOP(total);
 
-  const bulkActions = document.getElementById('modalBulkActions');
-  if (bulkActions) {
-    bulkActions.hidden = sessions.length < 2 || total <= 0;
-  }
+  renderAccountModalFooter(sessions, mesaId, mesaNum, total);
 
   const list = document.getElementById('modalInvoice');
   list.innerHTML =
     sessions.length === 0
-      ? '<li class="modal__invoice-line"><span>Sin productos entregados</span></li>'
+      ? '<li class="modal__invoice-empty">Sin productos entregados en esta mesa.</li>'
       : sessions
-          .map((session) => {
-            const items = sessionItems[session.sesionId] || [];
-            const grouped = groupDeliveredItems(items);
-            const heading = formatAccountSessionHeading(session);
-
-            return `
-              <li class="modal__invoice-group">
-                <div class="modal__invoice-group-head modal__invoice-group-head--title">
-                  <strong>${escapeHtml(heading)}</strong>
-                </div>
-                <ul class="modal__invoice-sublist">
-                  ${grouped
-                    .map(
-                      (item) => `
-                        <li class="modal__invoice-line modal__invoice-line--nested">
-                          <span>x${item.qty} ${escapeHtml(item.name)}</span>
-                          <span>— ${formatCOP(item.subtotal)}</span>
-                        </li>
-                      `
-                    )
-                    .join('')}
-                </ul>
-                <div class="modal__invoice-group-head modal__invoice-group-head--subtotal">
-                  <span>Subtotal</span>
-                  <span>— ${formatCOP(session.total)}</span>
-                </div>
-                <div class="modal__session-actions">
-                  <button
-                    type="button"
-                    class="modal__session-btn modal__session-btn--dataphone"
-                    data-action="cobrar-dataphone"
-                    data-sesion-id="${session.id}"
-                    data-session-label="${escapeHtml(heading)}"
-                    data-session-total="${session.total}"
-                    data-mesa-id="${mesaId}"
-                    data-mesa-num="${mesaNum}"
-                    ${session.total <= 0 ? 'disabled' : ''}
-                  >Cobrar con datáfono</button>
-                  <button
-                    type="button"
-                    class="modal__session-btn modal__session-btn--qr"
-                    data-action="enviar-qr"
-                    data-sesion-id="${session.id}"
-                    data-session-label="${escapeHtml(heading)}"
-                    data-session-total="${session.total}"
-                    ${session.total <= 0 ? 'disabled' : ''}
-                  >Enviar QR de pago</button>
-                </div>
-              </li>
-            `;
-          })
+          .map((session) =>
+            renderAccountSessionCard(
+              session,
+              sessionItems[session.sesionId] || [],
+              mesaId,
+              mesaNum,
+              showSessionActions
+            )
+          )
           .join('');
 
   const modal = document.getElementById('accountModal');
