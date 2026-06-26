@@ -1563,6 +1563,20 @@ ul {
   line-height: 1.45;
 }
 
+.account__split-join {
+  margin-top: 1.25rem;
+  padding: 1rem;
+  border-radius: 16px;
+  background: var(--surface-elevated, #fafafa);
+  border: 1px solid var(--border, #e4e4e7);
+}
+
+.account__split-join-amount {
+  margin: 0.5rem 0 1rem;
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+
 /* ── Modal QR de pago del restaurante ── */
 .restaurant-qr-pay-modal {
   position: fixed;
