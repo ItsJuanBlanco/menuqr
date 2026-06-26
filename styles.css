@@ -181,12 +181,10 @@ ul {
 
 .app-powered__logo {
   display: block;
-  height: 32px;
+  height: 40px;
   width: auto;
-  max-width: 107px;
+  max-width: 133px;
   object-fit: contain;
-  filter: brightness(0) invert(1);
-  opacity: 0.92;
 }
 
 .panel[hidden] {
