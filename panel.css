@@ -277,6 +277,18 @@ button {
   pointer-events: none;
 }
 
+.panel-tabs__badge--pendiente {
+  background: #2563eb;
+}
+
+.panel-tabs__badge--en-preparacion {
+  background: #16a34a;
+}
+
+.panel-tabs__badge--mixto {
+  background: #ea580c;
+}
+
 .panel-view[hidden] {
   display: none !important;
 }

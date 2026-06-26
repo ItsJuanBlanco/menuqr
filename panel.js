@@ -233,7 +233,7 @@ function showMesasPanelToast(messageHtml) {
   showToast._timer = setTimeout(() => toast.classList.remove('panel-toast--visible'), 7000);
 }
 
-function updatePanelTabBadge(tabId, count, ariaLabel = '') {
+function updatePanelTabBadge(tabId, count, ariaLabel = '', tone = '') {
   const tab = document.getElementById(tabId);
   if (!tab) return;
 
@@ -246,10 +246,10 @@ function updatePanelTabBadge(tabId, count, ariaLabel = '') {
 
   if (!badge) {
     badge = document.createElement('span');
-    badge.className = 'panel-tabs__badge';
     tab.appendChild(badge);
   }
 
+  badge.className = 'panel-tabs__badge' + (tone ? ` panel-tabs__badge--${tone}` : '');
   badge.textContent = count > 99 ? '99+' : String(count);
   if (ariaLabel) badge.setAttribute('aria-label', ariaLabel);
   else badge.removeAttribute('aria-label');
@@ -257,10 +257,12 @@ function updatePanelTabBadge(tabId, count, ariaLabel = '') {
 
 function updatePedidosTabBadge() {
   const count = orders.length;
+  const tone = getOrdersBadgeState();
   updatePanelTabBadge(
     'tabPedidos',
     count,
-    `${count} pedido${count !== 1 ? 's' : ''} pendiente${count !== 1 ? 's' : ''}`
+    `${count} pedido${count !== 1 ? 's' : ''} pendiente${count !== 1 ? 's' : ''}`,
+    tone || ''
   );
 }
 
@@ -632,9 +634,9 @@ function orderHasPendingItems(order) {
   return (order.pedido_items || []).some((item) => !isItemDelivered(item));
 }
 
-function getOrderCardStateClass(order) {
-  const undelivered = (order.pedido_items || []).filter((item) => !isItemDelivered(item));
-  if (undelivered.length === 0) return '';
+function getUndeliveredItemsState(items) {
+  const undelivered = (items || []).filter((item) => !isItemDelivered(item));
+  if (undelivered.length === 0) return null;
 
   let hasPendiente = false;
   let hasPreparacion = false;
@@ -645,9 +647,19 @@ function getOrderCardStateClass(order) {
     else hasPreparacion = true;
   });
 
-  if (hasPendiente && hasPreparacion) return 'order-card--mixto';
-  if (hasPendiente) return 'order-card--pendiente';
-  return 'order-card--en-preparacion';
+  if (hasPendiente && hasPreparacion) return 'mixto';
+  if (hasPendiente) return 'pendiente';
+  return 'en-preparacion';
+}
+
+function getOrderCardStateClass(order) {
+  const state = getUndeliveredItemsState(order.pedido_items);
+  return state ? `order-card--${state}` : '';
+}
+
+function getOrdersBadgeState() {
+  const allItems = orders.flatMap((order) => order.pedido_items || []);
+  return getUndeliveredItemsState(allItems);
 }
 
 function formatSessionLineLabel(session) {
