@@ -136,6 +136,7 @@ const state = {
   splitCount: 2,
   groupPayments: [],
   lastSplitQrUrl: '',
+  sessionSplitCode: null,
   splitJoinAmount: null,
   serviceChargeEnabled: true,
   serviceChargePercent: 10,
@@ -770,9 +771,9 @@ function cleanupLegacySplitUi() {
   document.querySelectorAll('.account__split-qr-nav').forEach((el) => el.remove());
 }
 
-function buildSplitPaymentUrl(monto) {
+function buildSplitPaymentUrl(monto, splitCode) {
   const params = new URLSearchParams({
-    unirse: state.sesionId,
+    split: splitCode,
     monto: String(monto),
   });
   return `${buildMenuBaseUrl()}&${params.toString()}`;
@@ -782,7 +783,7 @@ function clearSplitJoinParamsFromUrl() {
   const url = new URL(window.location.href);
   let changed = false;
 
-  ['unirse', 'monto'].forEach((key) => {
+  ['split', 'monto', 'unirse'].forEach((key) => {
     if (url.searchParams.has(key)) {
       url.searchParams.delete(key);
       changed = true;
@@ -796,17 +797,17 @@ function clearSplitJoinParamsFromUrl() {
 
 async function tryJoinFromSplitQrParams() {
   const params = new URLSearchParams(window.location.search);
-  const sesionId = params.get('unirse')?.trim();
+  const splitCode = params.get('split')?.trim();
   const montoRaw = params.get('monto');
 
-  if (!sesionId || montoRaw == null) return null;
+  if (!splitCode || montoRaw == null) return null;
 
   const monto = Number(montoRaw);
   if (!Number.isFinite(monto) || monto <= 0) {
     throw new Error('El monto del enlace no es válido.');
   }
 
-  const session = await joinSessionById(state.mesaId, sesionId);
+  const session = await joinSessionBySplitCode(state.mesaId, splitCode);
   state.splitJoinAmount = Math.round(monto);
   clearSplitJoinParamsFromUrl();
   return session;
@@ -1118,10 +1119,10 @@ function renderSplitPaymentQr(shareAmount) {
     return;
   }
 
-  renderSplitQr(shareAmount);
+  void renderSplitQr(shareAmount);
 }
 
-function renderSplitQr(shareAmount) {
+async function renderSplitQr(shareAmount) {
   const canvas = document.getElementById('splitQrCanvas');
   const box = document.getElementById('splitQrBox');
   const hint = box?.querySelector('.account__split-qr-hint');
@@ -1135,7 +1136,22 @@ function renderSplitQr(shareAmount) {
   }
 
   box.hidden = false;
-  const url = buildSplitPaymentUrl(shareAmount);
+
+  let splitCode = state.sessionSplitCode;
+  if (!splitCode) {
+    try {
+      splitCode = await ensureSessionSplitCode(state.sesionId);
+      state.sessionSplitCode = splitCode;
+    } catch (error) {
+      console.error(error);
+      canvas.innerHTML = '';
+      canvas.textContent = 'No se pudo generar el código QR.';
+      state.lastSplitQrUrl = '';
+      return;
+    }
+  }
+
+  const url = buildSplitPaymentUrl(shareAmount, splitCode);
 
   if (url === state.lastSplitQrUrl && canvas.childNodes.length > 0) return;
 
@@ -2364,6 +2380,7 @@ function applySession(session) {
   state.sessionTipo = session.tipo;
   state.sessionNumero = session.numero;
   state.splitCount = 2;
+  state.sessionSplitCode = null;
   paymentSuccessShown = false;
   clearSplitQrCanvas();
   updateSessionBadge(session);

@@ -91,11 +91,11 @@ function buildPagarUrl(monto, sesionId, cargoServicio = 0, parte = null) {
   return `${getPagarBaseUrl()}?${params.toString()}`;
 }
 
-function buildSplitJoinUrl(mesaNumero, sesionId, monto) {
+function buildSplitJoinUrl(mesaNumero, splitCode, monto) {
   const slug = RESTAURANTE_SLUG || '';
   const mesa = encodeURIComponent(String(mesaNumero));
   const params = new URLSearchParams({
-    unirse: sesionId,
+    split: splitCode,
     monto: String(monto),
   });
   if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
@@ -1786,7 +1786,7 @@ function getSelectedSplitPaymentSession() {
   };
 }
 
-function renderSplitPaymentQr(share, partNumber) {
+async function renderSplitPaymentQr(share, partNumber) {
   const box = document.getElementById('splitPaymentQrBox');
   const canvas = document.getElementById('splitPaymentQrCanvas');
   if (!box || !canvas || typeof QRCode === 'undefined') return;
@@ -1799,10 +1799,20 @@ function renderSplitPaymentQr(share, partNumber) {
 
   box.hidden = false;
   canvas.innerHTML = '';
+
+  let splitCode;
+  try {
+    splitCode = await ensureSessionSplitCode(splitPaymentState.sesionId);
+  } catch (error) {
+    console.error(error);
+    canvas.textContent = 'No se pudo generar el QR.';
+    return;
+  }
+
   new QRCode(canvas, {
     text: buildSplitJoinUrl(
       splitPaymentState.mesaNum,
-      splitPaymentState.sesionId,
+      splitCode,
       share.shareTotal
     ),
     width: 220,
@@ -1880,7 +1890,7 @@ async function refreshSplitPaymentModal() {
     qrBtn.disabled = splitPaymentState.submitting || isComplete || share.shareTotal <= 0;
   }
 
-  renderSplitPaymentQr(share, nextPart);
+  await renderSplitPaymentQr(share, nextPart);
 }
 
 function closeSplitPaymentModal() {
