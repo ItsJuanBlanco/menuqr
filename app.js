@@ -553,6 +553,66 @@ function clearSplitQrCanvas() {
   state.lastSplitQrUrl = '';
 }
 
+function usesRestaurantQrPayment() {
+  return RESTAURANTE?.metodo_pago === 'qr_propio' && Boolean(RESTAURANTE?.qr_pago_url?.trim());
+}
+
+let restaurantQrPayState = { amount: 0, extras: {} };
+
+function openRestaurantQrPayModal(amount, extras = {}, hint = '') {
+  const url = RESTAURANTE?.qr_pago_url?.trim();
+  if (!url) {
+    showToast('El restaurante no configuró su QR de pago.', 'error');
+    return;
+  }
+
+  restaurantQrPayState = { amount, extras };
+  const amountEl = document.getElementById('restaurantQrPayAmount');
+  const hintEl = document.getElementById('restaurantQrPayHint');
+  const imgEl = document.getElementById('restaurantQrPayImage');
+  const modal = document.getElementById('restaurantQrPayModal');
+
+  if (amountEl) amountEl.textContent = formatCOP(amount);
+  if (hintEl) {
+    hintEl.textContent = hint || 'Escaneá el QR y transferí el monto indicado.';
+  }
+  if (imgEl) imgEl.src = url;
+  if (modal) {
+    modal.hidden = false;
+    modal.setAttribute('aria-hidden', 'false');
+  }
+}
+
+function closeRestaurantQrPayModal() {
+  const modal = document.getElementById('restaurantQrPayModal');
+  if (modal) {
+    modal.hidden = true;
+    modal.setAttribute('aria-hidden', 'true');
+  }
+}
+
+async function confirmRestaurantQrPayment() {
+  const { amount, extras } = restaurantQrPayState;
+  if (!amount || state.paymentSubmitting) return;
+
+  closeRestaurantQrPayModal();
+  await handleApprovedWompiPayment(amount, `qr-propio-${Date.now()}`, extras);
+}
+
+function startPaymentFlow(amount, options = {}) {
+  if (usesRestaurantQrPayment()) {
+    openRestaurantQrPayModal(amount, options, options.hint);
+    return;
+  }
+
+  if (RESTAURANTE?.metodo_pago === 'qr_propio' && !RESTAURANTE?.qr_pago_url?.trim()) {
+    showToast('El restaurante no configuró su QR de pago.', 'error');
+    return;
+  }
+
+  openWompiCheckout(amount, options);
+}
+
 function updatePaymentExtrasUI(deliveredTotal) {
   const section = document.getElementById('paymentExtrasSection');
   const tipCustomField = document.getElementById('tipCustomField');
@@ -643,9 +703,56 @@ function refreshPaymentUi() {
   updateSplitBillUI(deliveredTotal);
 }
 
+function renderRestaurantSplitQr(shareAmount) {
+  const canvas = document.getElementById('splitQrCanvas');
+  const box = document.getElementById('splitQrBox');
+  const hint = box?.querySelector('.account__split-qr-hint');
+
+  if (!canvas || !box || !state.sesionId || shareAmount <= 0) {
+    if (box) box.hidden = true;
+    clearSplitQrCanvas();
+    return;
+  }
+
+  const url = RESTAURANTE.qr_pago_url.trim();
+  const cacheKey = `qr-propio-${shareAmount}-${url}`;
+
+  box.hidden = false;
+  if (cacheKey === state.lastSplitQrUrl && canvas.childNodes.length > 0) return;
+
+  state.lastSplitQrUrl = cacheKey;
+  canvas.innerHTML = '';
+
+  const amountEl = document.createElement('p');
+  amountEl.className = 'account__split-restaurant-qr-amount';
+  amountEl.textContent = formatCOP(shareAmount);
+
+  const img = document.createElement('img');
+  img.className = 'account__split-restaurant-qr-img';
+  img.src = url;
+  img.alt = 'QR de pago Nequi/Daviplata';
+
+  canvas.appendChild(amountEl);
+  canvas.appendChild(img);
+
+  if (hint) {
+    hint.textContent = 'Transferí tu parte escaneando este QR';
+  }
+}
+
+function renderSplitPaymentQr(shareAmount) {
+  if (usesRestaurantQrPayment()) {
+    renderRestaurantSplitQr(shareAmount);
+    return;
+  }
+
+  renderSplitQr(shareAmount);
+}
+
 function renderSplitQr(shareAmount) {
   const canvas = document.getElementById('splitQrCanvas');
   const box = document.getElementById('splitQrBox');
+  const hint = box?.querySelector('.account__split-qr-hint');
 
   if (!canvas || !box || !state.sesionId || shareAmount <= 0) {
     if (box) box.hidden = true;
@@ -674,6 +781,10 @@ function renderSplitQr(shareAmount) {
     colorLight: '#ffffff',
     correctLevel: QRCode.CorrectLevel.M,
   });
+
+  if (hint) {
+    hint.textContent = 'Cada persona escanea este QR y paga su parte';
+  }
 }
 
 function updateSplitBillUI(deliveredTotal) {
@@ -726,7 +837,7 @@ function updateSplitBillUI(deliveredTotal) {
     return;
   }
 
-  renderSplitQr(shareAmount);
+  renderSplitPaymentQr(shareAmount);
 
   if (splitPayBtn) {
     splitPayBtn.disabled = state.paymentSubmitting || shareAmount <= 0;
@@ -1203,7 +1314,12 @@ function renderAccount() {
     totalEl.hidden = false;
 
     const showPayButton = deliveredTotal > 0 && !state.paymentPendingConfirmation && !isGrupal;
-    if (wompiPayBtn) wompiPayBtn.hidden = !showPayButton;
+    if (wompiPayBtn) {
+      wompiPayBtn.hidden = !showPayButton;
+      if (showPayButton) {
+        wompiPayBtn.textContent = usesRestaurantQrPayment() ? 'Pagar' : 'Pagar con Wompi';
+      }
+    }
     if (paymentWaiting) paymentWaiting.hidden = !state.paymentPendingConfirmation;
     updatePaymentExtrasUI(deliveredTotal);
     updateSplitBillUI(deliveredTotal);
@@ -1489,11 +1605,19 @@ function initPaymentExtras() {
 function initWompiPayment() {
   document.getElementById('wompiPayBtn')?.addEventListener('click', () => {
     const breakdown = getPaymentBreakdown();
-    openWompiCheckout(breakdown.total, {
+    startPaymentFlow(breakdown.total, {
       cargoServicio: breakdown.cargoServicio,
       propina: breakdown.propina,
     });
   });
+
+  document.querySelectorAll('[data-close-restaurant-qr-pay]').forEach((el) => {
+    if (el.dataset.bound) return;
+    el.dataset.bound = 'true';
+    el.addEventListener('click', closeRestaurantQrPayModal);
+  });
+
+  document.getElementById('restaurantQrPayConfirmBtn')?.addEventListener('click', confirmRestaurantQrPayment);
 }
 
 function initSplitBill() {
@@ -1535,10 +1659,11 @@ function initSplitBill() {
         return;
       }
 
-      openWompiCheckout(share.total, {
+      startPaymentFlow(share.total, {
         reference: `sesion-${state.sesionId}-grupo-${Date.now()}`,
         cargoServicio: share.cargoServicio,
         propina: share.propina,
+        hint: 'Transferí tu parte con el monto indicado.',
       });
     });
   }

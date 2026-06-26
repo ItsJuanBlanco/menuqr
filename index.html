@@ -298,6 +298,24 @@
       </button>
     </nav>
 
+    <!-- Modal QR de pago del restaurante -->
+    <div class="restaurant-qr-pay-modal" id="restaurantQrPayModal" hidden aria-hidden="true" role="dialog" aria-labelledby="restaurantQrPayTitle">
+      <div class="restaurant-qr-pay-modal__backdrop" data-close-restaurant-qr-pay></div>
+      <div class="restaurant-qr-pay-modal__box">
+        <header class="restaurant-qr-pay-modal__head">
+          <h2 class="restaurant-qr-pay-modal__title" id="restaurantQrPayTitle">Pagar</h2>
+          <button type="button" class="restaurant-qr-pay-modal__close" data-close-restaurant-qr-pay aria-label="Cerrar">×</button>
+        </header>
+        <p class="restaurant-qr-pay-modal__amount" id="restaurantQrPayAmount">$0</p>
+        <p class="restaurant-qr-pay-modal__hint" id="restaurantQrPayHint">Escaneá el QR y transferí el monto indicado.</p>
+        <div class="restaurant-qr-pay-modal__qr-wrap">
+          <img id="restaurantQrPayImage" class="restaurant-qr-pay-modal__qr" alt="QR de pago del restaurante">
+        </div>
+        <button type="button" class="wompi-pay-btn" id="restaurantQrPayConfirmBtn">Ya pagué</button>
+        <button type="button" class="restaurant-qr-pay-modal__cancel" data-close-restaurant-qr-pay>Cerrar</button>
+      </div>
+    </div>
+
     <!-- Toast -->
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
   </div>

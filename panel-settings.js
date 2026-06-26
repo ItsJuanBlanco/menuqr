@@ -3,14 +3,18 @@ const ALLOWED_SETTINGS_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/
 const DEFAULT_COLOR_PRIMARY = '#FF6B00';
 const DEFAULT_COLOR_BG = '#0a0a0c';
 const DEFAULT_COVER_POSITION = '50%';
+const DEFAULT_METODO_PAGO = 'wompi';
 
 let settingsSaving = false;
 let pendingLogoFile = null;
 let pendingCoverFile = null;
+let pendingQrPagoFile = null;
 let pendingLogoPreviewUrl = null;
 let pendingCoverPreviewUrl = null;
+let pendingQrPagoPreviewUrl = null;
 let currentLogoUrl = null;
 let currentCoverUrl = null;
+let currentQrPagoUrl = null;
 
 function normalizeHexColor(value, fallback) {
   const raw = String(value || '').trim();
@@ -82,7 +86,7 @@ async function updateRestaurantSettingsFields(fields, successMessage) {
       .update(fields)
       .eq('id', RESTAURANTE_ID)
       .select(
-        'id, slug, nombre, ciudad, logo_url, foto_portada, foto_portada_posicion, color_primario, color_fondo, wompi_public_key'
+        'id, slug, nombre, ciudad, logo_url, foto_portada, foto_portada_posicion, color_primario, color_fondo, wompi_public_key, metodo_pago, qr_pago_url'
       )
       .single();
 
@@ -91,6 +95,7 @@ async function updateRestaurantSettingsFields(fields, successMessage) {
     await syncRestaurantSettings(data);
     pendingLogoFile = null;
     pendingCoverFile = null;
+    pendingQrPagoFile = null;
     showToast(successMessage, 'success');
   } catch (error) {
     console.error(error);
@@ -116,6 +121,39 @@ async function removeRestaurantCover() {
     { foto_portada: null, foto_portada_posicion: DEFAULT_COVER_POSITION },
     'Portada quitada'
   );
+}
+
+async function removeRestaurantQrPago() {
+  if (!currentQrPagoUrl && !pendingQrPagoFile) return;
+  if (!window.confirm('¿Quitar el QR de pago?')) return;
+
+  await updateRestaurantSettingsFields({ qr_pago_url: null }, 'QR de pago quitado');
+}
+
+function normalizeMetodoPago(value) {
+  return value === 'qr_propio' ? 'qr_propio' : DEFAULT_METODO_PAGO;
+}
+
+function getSelectedMetodoPago() {
+  const selected = document.querySelector('input[name="settingsMetodoPago"]:checked');
+  return normalizeMetodoPago(selected?.value);
+}
+
+function updatePaymentMethodSection(metodo) {
+  const qrSection = document.getElementById('settingsQrPagoSection');
+  if (qrSection) qrSection.hidden = metodo !== 'qr_propio';
+}
+
+function updateQrPagoRemoveButton(hasImage) {
+  const btn = document.getElementById('settingsQrPagoRemoveBtn');
+  if (btn) btn.hidden = !hasImage;
+}
+
+function revokePendingQrPagoPreview() {
+  if (pendingQrPagoPreviewUrl) {
+    URL.revokeObjectURL(pendingQrPagoPreviewUrl);
+    pendingQrPagoPreviewUrl = null;
+  }
 }
 
 function getSettingsAssetPath(filename) {
@@ -219,6 +257,38 @@ function resetLogoField(url = '') {
   updateLogoRemoveButton(false);
 }
 
+function resetQrPagoField(url = '') {
+  const input = document.getElementById('settingsQrPagoInput');
+  pendingQrPagoFile = null;
+  currentQrPagoUrl = url || null;
+  revokePendingQrPagoPreview();
+  if (input) input.value = '';
+
+  if (url) {
+    updateSettingsImageUI({
+      previewId: 'settingsQrPagoPreview',
+      imgId: 'settingsQrPagoPreviewImg',
+      hintId: 'settingsQrPagoHint',
+      btnId: 'settingsQrPagoBtnText',
+      src: url,
+      hint: 'QR actual. Elegí otra imagen para reemplazarlo.',
+      btnText: 'Cambiar QR',
+    });
+    updateQrPagoRemoveButton(true);
+    return;
+  }
+
+  updateSettingsImageUI({
+    previewId: 'settingsQrPagoPreview',
+    imgId: 'settingsQrPagoPreviewImg',
+    hintId: 'settingsQrPagoHint',
+    btnId: 'settingsQrPagoBtnText',
+    hint: 'JPG, PNG o WEBP',
+    btnText: 'Subir QR',
+  });
+  updateQrPagoRemoveButton(false);
+}
+
 function resetCoverField(url = '', position = DEFAULT_COVER_POSITION) {
   const input = document.getElementById('settingsCoverInput');
   pendingCoverFile = null;
@@ -263,12 +333,21 @@ function populateSettingsForm(restaurant) {
 
   resetLogoField(restaurant?.logo_url || '');
   resetCoverField(restaurant?.foto_portada || '', restaurant?.foto_portada_posicion || DEFAULT_COVER_POSITION);
+
+  const metodo = normalizeMetodoPago(restaurant?.metodo_pago);
+  document.querySelectorAll('input[name="settingsMetodoPago"]').forEach((input) => {
+    input.checked = input.value === metodo;
+  });
+  updatePaymentMethodSection(metodo);
+  resetQrPagoField(restaurant?.qr_pago_url || '');
 }
 
 async function fetchRestaurantSettings() {
   const { data, error } = await supabaseClient
     .from('restaurantes')
-    .select('id, slug, nombre, ciudad, logo_url, foto_portada, foto_portada_posicion, color_primario, color_fondo')
+    .select(
+      'id, slug, nombre, ciudad, logo_url, foto_portada, foto_portada_posicion, color_primario, color_fondo, metodo_pago, qr_pago_url'
+    )
     .eq('id', RESTAURANTE_ID)
     .single();
 
@@ -300,6 +379,17 @@ async function saveRestaurantSettings(event) {
   const color_primario = normalizeHexColor(primaryInput?.value, DEFAULT_COLOR_PRIMARY);
   const color_fondo = normalizeHexColor(bgInput?.value, DEFAULT_COLOR_BG);
   const foto_portada_posicion = normalizeCoverPosition(coverPositionInput?.value);
+  const metodo_pago = getSelectedMetodoPago();
+
+  if (metodo_pago === 'qr_propio' && !currentQrPagoUrl && !pendingQrPagoFile) {
+    if (errorEl) {
+      errorEl.textContent = 'Subí la imagen del QR para usar pagos con QR propio.';
+      errorEl.hidden = false;
+    } else {
+      showToast('Subí la imagen del QR para usar pagos con QR propio.', 'error');
+    }
+    return;
+  }
 
   if (primaryInput) primaryInput.value = color_primario;
   if (bgInput) bgInput.value = color_fondo;
@@ -312,6 +402,7 @@ async function saveRestaurantSettings(event) {
   try {
     let logo_url = currentLogoUrl;
     let foto_portada = currentCoverUrl;
+    let qr_pago_url = currentQrPagoUrl;
 
     if (pendingLogoFile) {
       logo_url = await uploadSettingsAsset(`logo.${getImageExtension(pendingLogoFile)}`, pendingLogoFile);
@@ -324,6 +415,13 @@ async function saveRestaurantSettings(event) {
       );
     }
 
+    if (pendingQrPagoFile) {
+      qr_pago_url = await uploadSettingsAsset(
+        `qr-pago.${getImageExtension(pendingQrPagoFile)}`,
+        pendingQrPagoFile
+      );
+    }
+
     const { data, error } = await supabaseClient
       .from('restaurantes')
       .update({
@@ -332,10 +430,12 @@ async function saveRestaurantSettings(event) {
         logo_url,
         foto_portada,
         foto_portada_posicion,
+        metodo_pago,
+        qr_pago_url,
       })
       .eq('id', RESTAURANTE_ID)
       .select(
-        'id, slug, nombre, ciudad, logo_url, foto_portada, foto_portada_posicion, color_primario, color_fondo, wompi_public_key'
+        'id, slug, nombre, ciudad, logo_url, foto_portada, foto_portada_posicion, color_primario, color_fondo, wompi_public_key, metodo_pago, qr_pago_url'
       )
       .single();
 
@@ -344,6 +444,7 @@ async function saveRestaurantSettings(event) {
     await syncRestaurantSettings(data);
     pendingLogoFile = null;
     pendingCoverFile = null;
+    pendingQrPagoFile = null;
 
     showToast('Ajustes guardados', 'success');
   } catch (error) {
@@ -432,8 +533,36 @@ function bindSettingsForm() {
       ),
   });
 
+  bindSettingsImageField('settingsQrPagoInput', {
+    onFile: (file) => {
+      pendingQrPagoFile = file;
+      revokePendingQrPagoPreview();
+      pendingQrPagoPreviewUrl = URL.createObjectURL(file);
+      updateSettingsImageUI({
+        previewId: 'settingsQrPagoPreview',
+        imgId: 'settingsQrPagoPreviewImg',
+        hintId: 'settingsQrPagoHint',
+        btnId: 'settingsQrPagoBtnText',
+        src: pendingQrPagoPreviewUrl,
+        hint: file.name,
+        btnText: 'Cambiar QR',
+      });
+      updateQrPagoRemoveButton(true);
+    },
+    onReset: () => resetQrPagoField(currentQrPagoUrl || ''),
+  });
+
+  document.querySelectorAll('input[name="settingsMetodoPago"]').forEach((input) => {
+    if (input.dataset.bound) return;
+    input.dataset.bound = 'true';
+    input.addEventListener('change', () => {
+      updatePaymentMethodSection(getSelectedMetodoPago());
+    });
+  });
+
   document.getElementById('settingsLogoRemoveBtn')?.addEventListener('click', removeRestaurantLogo);
   document.getElementById('settingsCoverRemoveBtn')?.addEventListener('click', removeRestaurantCover);
+  document.getElementById('settingsQrPagoRemoveBtn')?.addEventListener('click', removeRestaurantQrPago);
 
   document.getElementById('settingsCoverPosition')?.addEventListener('input', (event) => {
     applyCoverPositionPreview(event.target.value);
