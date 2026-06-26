@@ -800,14 +800,17 @@ async function tryJoinFromSplitQrParams() {
 
   if (!splitCode || montoRaw == null) return null;
 
-  const monto = Number(montoRaw);
+  const monto = Math.round(Number(montoRaw));
   if (!Number.isFinite(monto) || monto <= 0) {
     throw new Error('El monto del enlace no es válido.');
   }
 
   const session = await joinSessionBySplitCode(state.mesaId, splitCode);
-  state.splitJoinAmount = Math.round(monto);
+
+  state.splitJoinAmount = monto;
+
   clearSplitJoinParamsFromUrl();
+
   return session;
 }
 
@@ -2463,8 +2466,11 @@ async function init() {
     await loadMesa();
 
     let session = null;
+    let joinedViaSplitQr = false;
+
     try {
       session = await tryJoinFromSplitQrParams();
+      if (session) joinedViaSplitQr = true;
     } catch (joinError) {
       console.error(joinError);
       showToast(joinError.message || 'No se pudo unir a la cuenta.', 'error');
@@ -2472,7 +2478,10 @@ async function init() {
 
     if (!session) {
       session = await startSessionFlow(state.mesaId, state.mesaNumero);
+    } else {
+      hideSessionGate();
     }
+
     if (!session) return;
 
     applySession(session);
@@ -2487,7 +2496,12 @@ async function init() {
     initPaymentExtras();
     initWompiPayment();
     initSplitBill();
-    handleInitialRoute();
+
+    if (joinedViaSplitQr && state.splitJoinAmount) {
+      switchTab('cuenta');
+    } else {
+      handleInitialRoute();
+    }
 
     document.querySelectorAll('.bottom-nav__item').forEach((btn) => {
       btn.addEventListener('click', () => switchTab(btn.dataset.tab));
