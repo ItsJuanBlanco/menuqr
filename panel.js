@@ -2657,6 +2657,8 @@ function handleAccountModalAction(event) {
 }
 
 function initModal() {
+  initCloseMesaModal();
+
   document.querySelectorAll('[data-close-modal]').forEach((el) => {
     el.addEventListener('click', closeAccountModal);
   });
@@ -2837,12 +2839,62 @@ async function markWaiterAttended(mesaId) {
   }
 }
 
+let closeMesaModalResolver = null;
+
+function openCloseMesaModal(mesaId, mesaNum) {
+  return new Promise((resolve) => {
+    closeMesaModalResolver = resolve;
+
+    const titleEl = document.getElementById('closeMesaModalTitle');
+    const modal = document.getElementById('closeMesaModal');
+
+    if (titleEl) titleEl.textContent = `Cerrar Mesa ${mesaNum}`;
+    if (!modal) {
+      resolve(false);
+      closeMesaModalResolver = null;
+      return;
+    }
+
+    modal.dataset.mesaId = mesaId;
+    modal.dataset.mesaNum = String(mesaNum);
+    modal.hidden = false;
+    modal.setAttribute('aria-hidden', 'false');
+  });
+}
+
+function closeCloseMesaModal(confirmed) {
+  const modal = document.getElementById('closeMesaModal');
+  if (modal) {
+    modal.hidden = true;
+    modal.setAttribute('aria-hidden', 'true');
+  }
+
+  if (closeMesaModalResolver) {
+    closeMesaModalResolver(confirmed === true);
+    closeMesaModalResolver = null;
+  }
+}
+
+function initCloseMesaModal() {
+  const modal = document.getElementById('closeMesaModal');
+  if (!modal || modal.dataset.bound) return;
+  modal.dataset.bound = 'true';
+
+  modal.addEventListener('click', (event) => {
+    const btn = event.target.closest('[data-close-close-mesa]');
+    if (!btn) return;
+    closeCloseMesaModal(btn.dataset.closeCloseMesa === 'confirm');
+  });
+
+  document.getElementById('closeMesaConfirmBtn')?.addEventListener('click', () => {
+    closeCloseMesaModal(true);
+  });
+}
+
 async function closeMesa(mesaId, mesaNum) {
   if (updating.has(`close-${mesaId}`)) return;
 
-  const confirmed = window.confirm(
-    `¿Cerrar la Mesa ${mesaNum}? Se archivarán los pedidos y la mesa quedará libre.`
-  );
+  const confirmed = await openCloseMesaModal(mesaId, mesaNum);
   if (!confirmed) return;
 
   updating.add(`close-${mesaId}`);

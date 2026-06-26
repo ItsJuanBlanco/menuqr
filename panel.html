@@ -530,6 +530,28 @@
       </div>
     </div>
 
+    <!-- Modal cerrar mesa -->
+    <div class="modal" id="closeMesaModal" hidden aria-hidden="true">
+      <div class="modal__backdrop" data-close-close-mesa="cancel"></div>
+      <div class="modal__box modal__box--form" role="dialog" aria-labelledby="closeMesaModalTitle">
+        <header class="modal__head">
+          <h2 class="modal__title" id="closeMesaModalTitle">Cerrar Mesa 1</h2>
+          <button type="button" class="modal__close" data-close-close-mesa="cancel" aria-label="Cerrar">×</button>
+        </header>
+        <p class="panel-session-modal__hint">
+          ¿Estás seguro? Se archivarán todos los pedidos y la mesa quedará libre.
+        </p>
+        <div class="product-form__actions">
+          <button type="button" class="product-form__btn product-form__btn--ghost" data-close-close-mesa="cancel">
+            Cancelar
+          </button>
+          <button type="button" class="product-form__btn product-form__btn--dark" id="closeMesaConfirmBtn">
+            Cerrar mesa
+          </button>
+        </div>
+      </div>
+    </div>
+
     <!-- Modal producto -->
     <div class="modal" id="productModal" hidden aria-hidden="true">
       <div class="modal__backdrop" data-close-product-modal></div>
