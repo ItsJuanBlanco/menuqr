@@ -210,6 +210,29 @@ function showNewOrderToast(mesaNum) {
   showToast._timer = setTimeout(() => toast.classList.remove('panel-toast--visible'), 7000);
 }
 
+function showMesasPanelToast(messageHtml) {
+  const toast = document.getElementById('toast');
+  if (!toast) return;
+
+  clearTimeout(showToast._timer);
+  toast.className = 'panel-toast panel-toast--visible panel-toast--action';
+  toast.innerHTML = `
+    <span class="panel-toast__message">${messageHtml}</span>
+    <button type="button" class="panel-toast__action">Ver mesas</button>
+  `;
+
+  toast.querySelector('.panel-toast__action')?.addEventListener(
+    'click',
+    () => {
+      toast.classList.remove('panel-toast--visible');
+      switchPanel('mesas');
+    },
+    { once: true }
+  );
+
+  showToast._timer = setTimeout(() => toast.classList.remove('panel-toast--visible'), 7000);
+}
+
 function updatePanelTabBadge(tabId, count, ariaLabel = '') {
   const tab = document.getElementById(tabId);
   if (!tab) return;
@@ -450,8 +473,13 @@ function handleWaiterCallsDetected(previousWaiterMesaIds) {
     (mesa) => mesa.mesero_requerido && !previousWaiterMesaIds.has(mesa.id)
   );
 
-  if (newCalls.length > 0) {
-    playWaiterCallSound();
+  if (newCalls.length === 0) return;
+
+  playWaiterCallSound();
+
+  if (activePanel !== 'mesas') {
+    const latestCall = newCalls[newCalls.length - 1];
+    showMesasPanelToast(`🔔 Llamada — Mesa ${escapeHtml(String(latestCall.numero))}`);
   }
 }
 
@@ -471,10 +499,14 @@ function snapshotSessionPaymentFlags(breakdown = mesaSessionBreakdown) {
 }
 
 function detectPaymentStartFromSnapshot(previousSnapshot, breakdown = mesaSessionBreakdown) {
-  let paymentStarted = false;
+  if (!panelAlertsInitialized) return;
 
-  Object.values(breakdown).forEach((sessions) => {
-    sessions.forEach((session) => {
+  const started = [];
+
+  Object.entries(breakdown).forEach(([mesaId, sessions]) => {
+    const mesaNum = resolveMesaNumeroFromId(mesaId);
+
+    (sessions || []).forEach((session) => {
       const previous = previousSnapshot.get(session.id);
       const isPayingNow =
         session.pago_en_proceso === true && session.pago_pendiente_confirmacion !== true;
@@ -482,13 +514,21 @@ function detectPaymentStartFromSnapshot(previousSnapshot, breakdown = mesaSessio
         previous?.pago_en_proceso === true && previous?.pago_pendiente_confirmacion !== true;
 
       if (isPayingNow && !wasPayingBefore) {
-        paymentStarted = true;
+        started.push({ mesaNum, sessionNum: session.numero });
       }
     });
   });
 
-  if (panelAlertsInitialized && paymentStarted) {
-    playPaymentStartSound();
+  if (started.length === 0) return;
+
+  playPaymentStartSound();
+
+  if (activePanel !== 'mesas') {
+    const latest = started[started.length - 1];
+    const code = formatSessionCode(latest.sessionNum);
+    showMesasPanelToast(
+      `💳 Pagando — Mesa ${escapeHtml(String(latest.mesaNum))} Cuenta #${escapeHtml(code)}`
+    );
   }
 }
 
