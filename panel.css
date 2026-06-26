@@ -3263,7 +3263,7 @@ body.mesa-qr-printing .mesa-qr-print {
   }
 
   .panel-mesas {
-    gap: 8px;
+    gap: 4px;
   }
 
   .panel-orders {
@@ -3399,23 +3399,20 @@ body.mesa-qr-printing .mesa-qr-print {
   /* Mesas libres — fila compacta; expandir al tocar */
   .mesa-card--libre {
     box-shadow: none;
-  }
-
-  .mesa-card--libre:not(.mesa-card--expanded) {
-    max-height: 50px;
+    border-radius: 6px;
   }
 
   .mesa-card--libre .mesa-card__head {
-    padding: 0 12px;
-    min-height: 48px;
-    max-height: 50px;
+    padding: 8px 16px;
+    min-height: 0;
+    max-height: none;
     border-bottom: none;
     cursor: pointer;
     -webkit-tap-highlight-color: transparent;
   }
 
   .mesa-card--libre .mesa-card__num {
-    font-size: 0.875rem;
+    font-size: 14px;
     font-weight: 700;
     white-space: nowrap;
   }
@@ -3425,9 +3422,9 @@ body.mesa-qr-printing .mesa-qr-print {
   }
 
   .mesa-card--libre .mesa-card__status {
-    padding: 2px 8px;
-    font-size: 0.5625rem;
-    letter-spacing: 0.04em;
+    padding: 1px 6px;
+    font-size: 0.5rem;
+    letter-spacing: 0.03em;
   }
 
   .mesa-card--libre:not(.mesa-card--expanded) .mesa-card__details {
@@ -3441,7 +3438,7 @@ body.mesa-qr-printing .mesa-qr-print {
   .mesa-card--libre.mesa-card--expanded .mesa-card__head {
     max-height: none;
     min-height: 0;
-    padding: 10px 12px;
+    padding: 8px 16px;
     border-bottom: 1px solid color-mix(in srgb, var(--border) 75%, transparent);
   }
 
