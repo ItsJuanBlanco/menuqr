@@ -1,4 +1,4 @@
-const SETTINGS_ASSETS_BUCKET = 'assets';
+const SETTINGS_ASSETS_BUCKET = 'restaurantes';
 const ALLOWED_SETTINGS_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 const DEFAULT_COLOR_PRIMARY = '#FF6B00';
 const DEFAULT_COLOR_BG = '#0a0a0c';
