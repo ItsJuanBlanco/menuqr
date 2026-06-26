@@ -29,45 +29,50 @@
         <p class="session-gate__loading" id="sessionGateLoading">Verificando sesión…</p>
 
         <div class="session-gate__options" id="sessionGateOptions" hidden>
-          <button type="button" class="session-gate__option" data-session-mode="individual">
-            <span class="session-gate__option-icon" aria-hidden="true">👤</span>
-            <span class="session-gate__option-text">
-              <strong>Cuenta propia</strong>
-              <small>Pedís y pagás solo lo tuyo</small>
-            </span>
-          </button>
-          <button type="button" class="session-gate__option" data-session-mode="grupal">
-            <span class="session-gate__option-icon" aria-hidden="true">👥</span>
-            <span class="session-gate__option-text">
-              <strong>Cuenta grupal</strong>
-              <small>Una sola cuenta para toda la mesa</small>
-            </span>
-          </button>
-          <button type="button" class="session-gate__option" data-session-mode="join">
-            <span class="session-gate__option-icon" aria-hidden="true">🔗</span>
-            <span class="session-gate__option-text">
-              <strong>Unirme a una cuenta</strong>
-              <small>Usá el código de 4 dígitos</small>
-            </span>
-          </button>
-        </div>
-
-        <form class="session-gate__join" id="sessionJoinForm" hidden>
-          <label class="session-gate__join-label" for="sessionJoinCode">Código de cuenta</label>
-          <div class="session-gate__join-row">
-            <input
-              type="text"
-              class="session-gate__join-input"
-              id="sessionJoinCode"
-              inputmode="numeric"
-              pattern="[0-9]*"
-              maxlength="4"
-              placeholder="0000"
-              autocomplete="one-time-code"
-            >
-            <button type="submit" class="session-gate__join-btn" id="sessionJoinSubmit">Unirme</button>
+          <div class="session-gate__cards">
+            <button type="button" class="session-gate__card" data-session-mode="individual">
+              <span class="session-gate__card-icon" aria-hidden="true">👤</span>
+              <span class="session-gate__card-title">Solo yo</span>
+              <span class="session-gate__card-desc">Pedís y pagás solo lo tuyo</span>
+            </button>
+            <button type="button" class="session-gate__card" data-session-mode="grupal">
+              <span class="session-gate__card-icon" aria-hidden="true">👥</span>
+              <span class="session-gate__card-title">Con el grupo</span>
+              <span class="session-gate__card-desc">Una cuenta para toda la mesa</span>
+            </button>
           </div>
-        </form>
+
+          <div class="session-gate__join-section">
+            <button
+              type="button"
+              class="session-gate__join-toggle"
+              id="sessionJoinToggle"
+              data-session-mode="join"
+              aria-expanded="false"
+              aria-controls="sessionJoinForm"
+            >
+              <span class="session-gate__join-toggle-icon" aria-hidden="true">🔗</span>
+              Unirme a una cuenta existente
+            </button>
+
+            <form class="session-gate__join" id="sessionJoinForm" hidden>
+              <label class="session-gate__join-label" for="sessionJoinCode">Código de 4 dígitos</label>
+              <div class="session-gate__join-row">
+                <input
+                  type="text"
+                  class="session-gate__join-input"
+                  id="sessionJoinCode"
+                  inputmode="numeric"
+                  pattern="[0-9]*"
+                  maxlength="4"
+                  placeholder="0000"
+                  autocomplete="one-time-code"
+                >
+                <button type="submit" class="session-gate__join-btn" id="sessionJoinSubmit">Unirme</button>
+              </div>
+            </form>
+          </div>
+        </div>
 
         <p class="session-gate__error" id="sessionGateError" hidden role="alert"></p>
       </div>
