@@ -147,6 +147,8 @@ const PAYMENT_PENDING_MESSAGE = 'Pago recibido ✓ El mesero lo confirmará en u
 
 let paymentSuccessReviewTimer = null;
 let sessionClosedLocally = false;
+let paymentSuccessShown = false;
+let mesaRealtimeChannel = null;
 
 function getGoogleReviewUrl() {
   const url = RESTAURANTE?.google_review_url;
@@ -246,9 +248,24 @@ async function handleSessionDeactivated(payload) {
     return;
   }
 
-  const totalPaid = await resolveSessionPaidTotal(state.sesionId);
+  if (paymentSuccessShown) return;
+
+  const sesionId = state.sesionId;
+  const immediateTotal = getPaymentBreakdown().total || getAccountDeliveredTotal();
+
+  paymentSuccessShown = true;
   clearClientSessionState();
-  showPaymentSuccessScreen(totalPaid);
+  showPaymentSuccessScreen(immediateTotal);
+
+  try {
+    const refinedTotal = await resolveSessionPaidTotal(sesionId);
+    if (refinedTotal > 0 && refinedTotal !== immediateTotal) {
+      const amountEl = document.getElementById('paymentSuccessAmount');
+      if (amountEl) amountEl.textContent = formatCOP(refinedTotal);
+    }
+  } catch (error) {
+    console.error(error);
+  }
 }
 
 async function closeSessionAfterWompiPayment(referenciaWompi, totalPaid) {
@@ -298,6 +315,7 @@ async function closeSessionAfterWompiPayment(referenciaWompi, totalPaid) {
   }
 
   sessionClosedLocally = true;
+  paymentSuccessShown = true;
   clearClientSessionState();
   showPaymentSuccessScreen(totalPaid);
 }
@@ -1257,11 +1275,18 @@ async function callWaiter() {
 }
 
 function subscribeToRealtime() {
-  if (!state.mesaId) return;
+  if (!state.mesaId || !supabaseClient) return;
 
-  const channel = supabaseClient.channel(`mesa-${state.mesaId}`);
+  if (mesaRealtimeChannel) {
+    supabaseClient.removeChannel(mesaRealtimeChannel);
+    mesaRealtimeChannel = null;
+  }
 
-  channel
+  mesaRealtimeChannel = supabaseClient.channel(
+    `mesa-${state.mesaId}-sesion-${state.sesionId || 'none'}`
+  );
+
+  mesaRealtimeChannel
     .on(
       'postgres_changes',
       { event: '*', schema: 'public', table: 'pedidos', filter: `mesa_id=eq.${state.mesaId}` },
@@ -1274,18 +1299,14 @@ function subscribeToRealtime() {
     );
 
   if (state.sesionId) {
-    channel.on(
+    mesaRealtimeChannel.on(
       'postgres_changes',
       { event: 'UPDATE', schema: 'public', table: 'sesiones', filter: `id=eq.${state.sesionId}` },
       (payload) => {
-        handleSessionDeactivated(payload).then(() => {
-          if (state.sesionId) {
-            loadSessionPaymentStatus().then(() => renderAccount());
-          }
-        });
+        void handleSessionDeactivated(payload);
       }
     );
-    channel.on(
+    mesaRealtimeChannel.on(
       'postgres_changes',
       { event: '*', schema: 'public', table: 'pagos_grupo', filter: `sesion_id=eq.${state.sesionId}` },
       () => {
@@ -1294,7 +1315,7 @@ function subscribeToRealtime() {
     );
   }
 
-  channel.subscribe();
+  mesaRealtimeChannel.subscribe();
 }
 
 /* ── Render: categorías ── */
@@ -2225,8 +2246,10 @@ function applySession(session) {
   state.sessionTipo = session.tipo;
   state.sessionNumero = session.numero;
   state.splitCount = 2;
+  paymentSuccessShown = false;
   clearSplitQrCanvas();
   updateSessionBadge(session);
+  subscribeToRealtime();
 }
 
 /* ── Init ── */

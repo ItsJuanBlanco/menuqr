@@ -1025,12 +1025,17 @@ function scheduleRealtimeRefresh() {
   }, 250);
 }
 
+function resolveMesaNumeroFromId(mesaId) {
+  const mesa = mesas.find((entry) => entry.id === mesaId);
+  return mesa?.numero ?? '?';
+}
+
 function handleSesionWompiPaymentClosed(payload) {
   const oldRow = payload.old;
   const newRow = payload.new;
 
-  if (!newRow || newRow.activa !== false) return;
-  if (oldRow?.activa === false) return;
+  if (!newRow || newRow.activa !== false) return false;
+  if (oldRow?.activa === false) return false;
 
   const referencia = newRow.referencia_wompi;
   const hadPaymentActivity =
@@ -1038,13 +1043,13 @@ function handleSesionWompiPaymentClosed(payload) {
     oldRow?.pago_en_proceso === true ||
     oldRow?.pago_pendiente_confirmacion === true;
 
-  if (!hadPaymentActivity) return;
-  if (referencia && String(referencia).startsWith('qr-propio')) return;
+  if (!hadPaymentActivity) return false;
+  if (referencia && String(referencia).startsWith('qr-propio')) return false;
 
-  const mesa = mesas.find((entry) => entry.id === newRow.mesa_id);
-  const mesaNum = mesa?.numero ?? '?';
+  const mesaNum = resolveMesaNumeroFromId(newRow.mesa_id);
   const code = formatSessionCode(newRow.numero);
-  showToast(`✅ Mesa ${mesaNum} — Cuenta #${code} pagada automáticamente`, 'success');
+  showToast(`✅ Pago recibido — Mesa ${mesaNum} Cuenta #${code}`, 'success');
+  return true;
 }
 
 function onSesionesRealtimeUpdate(payload) {
