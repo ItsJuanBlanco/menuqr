@@ -2764,6 +2764,27 @@ body.mesa-qr-printing .mesa-qr-print {
   color: var(--text);
 }
 
+.settings-form__field--full {
+  width: 100%;
+  margin-bottom: 16px;
+}
+
+.settings-form__text {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-card);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.9375rem;
+}
+
+.settings-form__text:focus {
+  outline: 2px solid color-mix(in srgb, var(--accent) 45%, transparent);
+  outline-offset: 1px;
+}
+
 .settings-payment-toggle {
   display: grid;
   grid-template-columns: 1fr 1fr;

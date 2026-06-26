@@ -259,7 +259,18 @@
 
 /* ── New restaurant modal ── */
 .admin-modal {
-  max-width: 480px;
+  max-width: 520px;
+  max-height: 92dvh;
+  overflow-y: auto;
+}
+
+.admin-form__optional {
+  font-weight: 500;
+  color: var(--text-dim);
+}
+
+.admin-form__qr-upload {
+  margin-top: 4px;
 }
 
 .admin-form {

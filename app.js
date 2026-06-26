@@ -554,29 +554,77 @@ function clearSplitQrCanvas() {
 }
 
 function usesRestaurantQrPayment() {
-  return RESTAURANTE?.metodo_pago === 'qr_propio' && Boolean(RESTAURANTE?.qr_pago_url?.trim());
+  return RESTAURANTE?.metodo_pago === 'qr_propio';
+}
+
+function getRestaurantPaymentLink() {
+  return RESTAURANTE?.link_pago?.trim() || '';
+}
+
+function getRestaurantPaymentQrUrl() {
+  return RESTAURANTE?.qr_pago_url?.trim() || '';
+}
+
+function canUseRestaurantQrPayment() {
+  return usesRestaurantQrPayment() && (getRestaurantPaymentLink() || getRestaurantPaymentQrUrl());
+}
+
+function openRestaurantPaymentLink() {
+  const link = getRestaurantPaymentLink();
+  if (!link) {
+    showToast('El restaurante no configuró su link de pago.', 'error');
+    return;
+  }
+
+  window.open(link, '_blank', 'noopener,noreferrer');
+}
+
+function updateRestaurantQrPayModalUi() {
+  const link = getRestaurantPaymentLink();
+  const qrUrl = getRestaurantPaymentQrUrl();
+  const linkBtn = document.getElementById('restaurantQrPayLinkBtn');
+  const divider = document.getElementById('restaurantQrPayDivider');
+  const qrWrap = document.getElementById('restaurantQrPayQrWrap');
+  const imgEl = document.getElementById('restaurantQrPayImage');
+  const hintEl = document.getElementById('restaurantQrPayHint');
+
+  if (linkBtn) linkBtn.hidden = !link;
+  if (divider) divider.hidden = !(link && qrUrl);
+  if (qrWrap) qrWrap.hidden = !qrUrl;
+  if (imgEl) {
+    if (qrUrl) imgEl.src = qrUrl;
+    else imgEl.removeAttribute('src');
+  }
+
+  if (hintEl) {
+    if (link && qrUrl) {
+      hintEl.textContent = 'Abrí el link o escaneá el QR y transferí el monto indicado.';
+    } else if (link) {
+      hintEl.textContent = 'Abrí el link y transferí el monto indicado.';
+    } else {
+      hintEl.textContent = 'Escaneá el QR y transferí el monto indicado.';
+    }
+  }
 }
 
 let restaurantQrPayState = { amount: 0, extras: {} };
 
 function openRestaurantQrPayModal(amount, extras = {}, hint = '') {
-  const url = RESTAURANTE?.qr_pago_url?.trim();
-  if (!url) {
-    showToast('El restaurante no configuró su QR de pago.', 'error');
+  if (!canUseRestaurantQrPayment()) {
+    showToast('El restaurante no configuró métodos de pago propios.', 'error');
     return;
   }
 
   restaurantQrPayState = { amount, extras };
   const amountEl = document.getElementById('restaurantQrPayAmount');
-  const hintEl = document.getElementById('restaurantQrPayHint');
-  const imgEl = document.getElementById('restaurantQrPayImage');
   const modal = document.getElementById('restaurantQrPayModal');
 
   if (amountEl) amountEl.textContent = formatCOP(amount);
-  if (hintEl) {
-    hintEl.textContent = hint || 'Escaneá el QR y transferí el monto indicado.';
-  }
-  if (imgEl) imgEl.src = url;
+  updateRestaurantQrPayModalUi();
+
+  const hintEl = document.getElementById('restaurantQrPayHint');
+  if (hint && hintEl) hintEl.textContent = hint;
+
   if (modal) {
     modal.hidden = false;
     modal.setAttribute('aria-hidden', 'false');
@@ -601,12 +649,12 @@ async function confirmRestaurantQrPayment() {
 
 function startPaymentFlow(amount, options = {}) {
   if (usesRestaurantQrPayment()) {
-    openRestaurantQrPayModal(amount, options, options.hint);
-    return;
-  }
+    if (!canUseRestaurantQrPayment()) {
+      showToast('El restaurante no configuró métodos de pago propios.', 'error');
+      return;
+    }
 
-  if (RESTAURANTE?.metodo_pago === 'qr_propio' && !RESTAURANTE?.qr_pago_url?.trim()) {
-    showToast('El restaurante no configuró su QR de pago.', 'error');
+    openRestaurantQrPayModal(amount, options, options.hint);
     return;
   }
 
@@ -703,40 +751,72 @@ function refreshPaymentUi() {
   updateSplitBillUI(deliveredTotal);
 }
 
+function hideRestaurantSplitPaymentExtras() {
+  const amountEl = document.getElementById('splitRestaurantQrAmount');
+  const linkBtn = document.getElementById('splitPaymentLinkBtn');
+  const divider = document.getElementById('splitPaymentDivider');
+  const canvas = document.getElementById('splitQrCanvas');
+
+  if (amountEl) {
+    amountEl.textContent = '';
+    amountEl.hidden = true;
+  }
+  if (linkBtn) linkBtn.hidden = true;
+  if (divider) divider.hidden = true;
+  if (canvas) canvas.hidden = false;
+}
+
 function renderRestaurantSplitQr(shareAmount) {
   const canvas = document.getElementById('splitQrCanvas');
   const box = document.getElementById('splitQrBox');
   const hint = box?.querySelector('.account__split-qr-hint');
+  const amountEl = document.getElementById('splitRestaurantQrAmount');
+  const linkBtn = document.getElementById('splitPaymentLinkBtn');
+  const divider = document.getElementById('splitPaymentDivider');
+  const link = getRestaurantPaymentLink();
+  const qrUrl = getRestaurantPaymentQrUrl();
 
   if (!canvas || !box || !state.sesionId || shareAmount <= 0) {
     if (box) box.hidden = true;
     clearSplitQrCanvas();
+    hideRestaurantSplitPaymentExtras();
     return;
   }
 
-  const url = RESTAURANTE.qr_pago_url.trim();
-  const cacheKey = `qr-propio-${shareAmount}-${url}`;
+  const cacheKey = `qr-propio-${shareAmount}-${link}-${qrUrl}`;
 
   box.hidden = false;
   if (cacheKey === state.lastSplitQrUrl && canvas.childNodes.length > 0) return;
 
   state.lastSplitQrUrl = cacheKey;
+
+  if (amountEl) {
+    amountEl.textContent = formatCOP(shareAmount);
+    amountEl.hidden = false;
+  }
+  if (linkBtn) linkBtn.hidden = !link;
+  if (divider) divider.hidden = !(link && qrUrl);
+
   canvas.innerHTML = '';
-
-  const amountEl = document.createElement('p');
-  amountEl.className = 'account__split-restaurant-qr-amount';
-  amountEl.textContent = formatCOP(shareAmount);
-
-  const img = document.createElement('img');
-  img.className = 'account__split-restaurant-qr-img';
-  img.src = url;
-  img.alt = 'QR de pago Nequi/Daviplata';
-
-  canvas.appendChild(amountEl);
-  canvas.appendChild(img);
+  if (qrUrl) {
+    canvas.hidden = false;
+    const img = document.createElement('img');
+    img.className = 'account__split-restaurant-qr-img';
+    img.src = qrUrl;
+    img.alt = 'QR de pago Nequi/Daviplata';
+    canvas.appendChild(img);
+  } else {
+    canvas.hidden = true;
+  }
 
   if (hint) {
-    hint.textContent = 'Transferí tu parte escaneando este QR';
+    if (link && qrUrl) {
+      hint.textContent = 'Abrí el link o escaneá el QR para transferir tu parte';
+    } else if (link) {
+      hint.textContent = 'Abrí el link para transferir tu parte';
+    } else {
+      hint.textContent = 'Transferí tu parte escaneando este QR';
+    }
   }
 }
 
@@ -753,6 +833,8 @@ function renderSplitQr(shareAmount) {
   const canvas = document.getElementById('splitQrCanvas');
   const box = document.getElementById('splitQrBox');
   const hint = box?.querySelector('.account__split-qr-hint');
+
+  hideRestaurantSplitPaymentExtras();
 
   if (!canvas || !box || !state.sesionId || shareAmount <= 0) {
     if (box) box.hidden = true;
@@ -845,9 +927,34 @@ function updateSplitBillUI(deliveredTotal) {
 }
 
 const WOMPI_PUBLIC_KEY = 'pub_test_sLvY32q8txNx6ygl0BrYaNo5w1aUkfMT';
+const WOMPI_SIGNATURE_URL = `${SUPABASE_URL}/functions/v1/wompi-signature`;
 
 function getWompiPublicKey() {
   return RESTAURANTE?.wompi_public_key || WOMPI_PUBLIC_KEY;
+}
+
+function buildWompiPaymentReference() {
+  return `listo-${state.sesionId}-${Date.now()}`;
+}
+
+async function fetchWompiSignature(amountInCents, reference) {
+  const response = await fetch(WOMPI_SIGNATURE_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ amount: amountInCents, reference }),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.error || 'No se pudo obtener la firma de Wompi.');
+  }
+
+  if (!data.signature || !data.publicKey) {
+    throw new Error('Respuesta inválida del servidor de pagos.');
+  }
+
+  return data;
 }
 
 function groupDeliveredItems(items) {
@@ -1493,27 +1600,37 @@ async function openWompiCheckout(amount, options = {}) {
   const started = await markPaymentInProgress();
   if (!started) return;
 
-  const reference = options.reference || `sesion-${state.sesionId}-${Date.now()}`;
+  const reference = options.reference || buildWompiPaymentReference();
+  const amountInCents = Math.round(amount * 100);
 
-  const checkout = new WidgetCheckout({
-    currency: 'COP',
-    amountInCents: Math.round(amount * 100),
-    reference,
-    publicKey: getWompiPublicKey(),
-  });
+  try {
+    const { signature, publicKey } = await fetchWompiSignature(amountInCents, reference);
 
-  checkout.open((result) => {
-    const transaction = result?.transaction;
-    if (transaction?.status === 'APPROVED') {
-      const referencia = transaction.id || transaction.reference || reference;
-      handleApprovedWompiPayment(amount, referencia, {
-        cargoServicio: options.cargoServicio || 0,
-        propina: options.propina || 0,
-      });
-    } else {
-      clearPaymentInProgress();
-    }
-  });
+    const checkout = new WidgetCheckout({
+      currency: 'COP',
+      amountInCents,
+      reference,
+      publicKey,
+      signature: { integrity: signature },
+    });
+
+    checkout.open((result) => {
+      const transaction = result?.transaction;
+      if (transaction?.status === 'APPROVED') {
+        const referencia = transaction.id || transaction.reference || reference;
+        handleApprovedWompiPayment(amount, referencia, {
+          cargoServicio: options.cargoServicio || 0,
+          propina: options.propina || 0,
+        });
+      } else {
+        clearPaymentInProgress();
+      }
+    });
+  } catch (error) {
+    console.error(error);
+    await clearPaymentInProgress();
+    showToast(error.message || 'No se pudo iniciar el pago con Wompi.', 'error');
+  }
 }
 
 function initPaymentExtras() {
@@ -1611,6 +1728,9 @@ function initWompiPayment() {
     });
   });
 
+  document.getElementById('restaurantQrPayLinkBtn')?.addEventListener('click', openRestaurantPaymentLink);
+  document.getElementById('splitPaymentLinkBtn')?.addEventListener('click', openRestaurantPaymentLink);
+
   document.querySelectorAll('[data-close-restaurant-qr-pay]').forEach((el) => {
     if (el.dataset.bound) return;
     el.dataset.bound = 'true';
@@ -1660,7 +1780,6 @@ function initSplitBill() {
       }
 
       startPaymentFlow(share.total, {
-        reference: `sesion-${state.sesionId}-grupo-${Date.now()}`,
         cargoServicio: share.cargoServicio,
         propina: share.propina,
         hint: 'Transferí tu parte con el monto indicado.',

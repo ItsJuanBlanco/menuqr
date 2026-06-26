@@ -86,7 +86,7 @@ async function updateRestaurantSettingsFields(fields, successMessage) {
       .update(fields)
       .eq('id', RESTAURANTE_ID)
       .select(
-        'id, slug, nombre, ciudad, logo_url, foto_portada, foto_portada_posicion, color_primario, color_fondo, wompi_public_key, metodo_pago, qr_pago_url'
+        'id, slug, nombre, ciudad, logo_url, foto_portada, foto_portada_posicion, color_primario, color_fondo, wompi_public_key, metodo_pago, qr_pago_url, link_pago'
       )
       .single();
 
@@ -137,6 +137,15 @@ function normalizeMetodoPago(value) {
 function getSelectedMetodoPago() {
   const selected = document.querySelector('input[name="settingsMetodoPago"]:checked');
   return normalizeMetodoPago(selected?.value);
+}
+
+function normalizeLinkPago(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return null;
+  if (!/^https?:\/\//i.test(raw)) {
+    throw new Error('El link de pago debe empezar con http:// o https://');
+  }
+  return raw;
 }
 
 function updatePaymentMethodSection(metodo) {
@@ -340,13 +349,16 @@ function populateSettingsForm(restaurant) {
   });
   updatePaymentMethodSection(metodo);
   resetQrPagoField(restaurant?.qr_pago_url || '');
+
+  const linkInput = document.getElementById('settingsLinkPago');
+  if (linkInput) linkInput.value = restaurant?.link_pago || '';
 }
 
 async function fetchRestaurantSettings() {
   const { data, error } = await supabaseClient
     .from('restaurantes')
     .select(
-      'id, slug, nombre, ciudad, logo_url, foto_portada, foto_portada_posicion, color_primario, color_fondo, metodo_pago, qr_pago_url'
+      'id, slug, nombre, ciudad, logo_url, foto_portada, foto_portada_posicion, color_primario, color_fondo, metodo_pago, qr_pago_url, link_pago'
     )
     .eq('id', RESTAURANTE_ID)
     .single();
@@ -380,13 +392,27 @@ async function saveRestaurantSettings(event) {
   const color_fondo = normalizeHexColor(bgInput?.value, DEFAULT_COLOR_BG);
   const foto_portada_posicion = normalizeCoverPosition(coverPositionInput?.value);
   const metodo_pago = getSelectedMetodoPago();
+  const linkInput = document.getElementById('settingsLinkPago');
+  let link_pago = null;
 
-  if (metodo_pago === 'qr_propio' && !currentQrPagoUrl && !pendingQrPagoFile) {
+  try {
+    link_pago = normalizeLinkPago(linkInput?.value);
+  } catch (error) {
     if (errorEl) {
-      errorEl.textContent = 'Subí la imagen del QR para usar pagos con QR propio.';
+      errorEl.textContent = error.message;
       errorEl.hidden = false;
     } else {
-      showToast('Subí la imagen del QR para usar pagos con QR propio.', 'error');
+      showToast(error.message, 'error');
+    }
+    return;
+  }
+
+  if (metodo_pago === 'qr_propio' && !link_pago && !currentQrPagoUrl && !pendingQrPagoFile) {
+    if (errorEl) {
+      errorEl.textContent = 'Agregá un link de pago o subí la imagen del QR.';
+      errorEl.hidden = false;
+    } else {
+      showToast('Agregá un link de pago o subí la imagen del QR.', 'error');
     }
     return;
   }
@@ -432,10 +458,11 @@ async function saveRestaurantSettings(event) {
         foto_portada_posicion,
         metodo_pago,
         qr_pago_url,
+        link_pago,
       })
       .eq('id', RESTAURANTE_ID)
       .select(
-        'id, slug, nombre, ciudad, logo_url, foto_portada, foto_portada_posicion, color_primario, color_fondo, wompi_public_key, metodo_pago, qr_pago_url'
+        'id, slug, nombre, ciudad, logo_url, foto_portada, foto_portada_posicion, color_primario, color_fondo, wompi_public_key, metodo_pago, qr_pago_url, link_pago'
       )
       .single();
 

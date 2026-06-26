@@ -2,11 +2,17 @@ const ADMIN_SESSION_KEY = 'menuqr:adminSession';
 const ADMIN_USER = 'admin';
 const ADMIN_PASS = 'admin123';
 const DEFAULT_MESAS_COUNT = 5;
+const DEFAULT_METODO_PAGO = 'wompi';
+const ADMIN_ASSETS_BUCKET = 'restaurantes';
+const ALLOWED_PAYMENT_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 
 let restaurants = [];
 let slugManuallyEdited = false;
 let busyIds = new Set();
 let restaurantModalMode = 'create';
+let pendingAdminQrPagoFile = null;
+let pendingAdminQrPagoPreviewUrl = null;
+let currentAdminQrPagoUrl = null;
 
 function showToast(message, type = '') {
   const toast = document.getElementById('toast');
@@ -281,6 +287,187 @@ function setRestaurantFormError(message) {
   }
 }
 
+function normalizeMetodoPago(value) {
+  return value === 'qr_propio' ? 'qr_propio' : DEFAULT_METODO_PAGO;
+}
+
+function getAdminSelectedMetodoPago() {
+  const selected = document.querySelector('input[name="adminMetodoPago"]:checked');
+  return normalizeMetodoPago(selected?.value);
+}
+
+function normalizeLinkPago(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return null;
+  if (!/^https?:\/\//i.test(raw)) {
+    throw new Error('El link de pago debe empezar con http:// o https://');
+  }
+  return raw;
+}
+
+function updateAdminPaymentFieldsVisibility(metodo) {
+  const wompiFields = document.getElementById('adminWompiFields');
+  const qrFields = document.getElementById('adminQrPropioFields');
+  const linkOptional = document.getElementById('adminLinkPagoOptional');
+  const linkHint = document.getElementById('adminLinkPagoHint');
+
+  if (wompiFields) wompiFields.hidden = metodo !== 'wompi';
+  if (qrFields) qrFields.hidden = metodo !== 'qr_propio';
+  if (linkOptional) linkOptional.hidden = metodo !== 'wompi';
+  if (linkHint) {
+    linkHint.textContent =
+      metodo === 'qr_propio'
+        ? 'Link de Nequi, Daviplata o Bancolombia'
+        : 'Nequi, Daviplata o Bancolombia (opcional)';
+  }
+}
+
+function revokePendingAdminQrPagoPreview() {
+  if (pendingAdminQrPagoPreviewUrl) {
+    URL.revokeObjectURL(pendingAdminQrPagoPreviewUrl);
+    pendingAdminQrPagoPreviewUrl = null;
+  }
+}
+
+function updateAdminQrPagoRemoveButton(hasImage) {
+  const btn = document.getElementById('adminQrPagoRemoveBtn');
+  if (btn) btn.hidden = !hasImage;
+}
+
+function updateAdminQrPagoImageUI({ src = '', hint = '', btnText = 'Subir QR' }) {
+  const preview = document.getElementById('adminQrPagoPreview');
+  const img = document.getElementById('adminQrPagoPreviewImg');
+  const hintEl = document.getElementById('adminQrPagoHint');
+  const btnTextEl = document.getElementById('adminQrPagoBtnText');
+
+  if (img) {
+    if (src) img.src = src;
+    else img.removeAttribute('src');
+  }
+  if (preview) preview.hidden = !src;
+  if (hintEl) hintEl.textContent = hint;
+  if (btnTextEl) btnTextEl.textContent = btnText;
+}
+
+function resetAdminQrPagoField(url = '') {
+  const input = document.getElementById('adminQrPagoInput');
+  pendingAdminQrPagoFile = null;
+  currentAdminQrPagoUrl = url || null;
+  revokePendingAdminQrPagoPreview();
+  if (input) input.value = '';
+
+  if (url) {
+    updateAdminQrPagoImageUI({
+      src: url,
+      hint: 'QR actual. Elegí otra imagen para reemplazarlo.',
+      btnText: 'Cambiar QR',
+    });
+    updateAdminQrPagoRemoveButton(true);
+    return;
+  }
+
+  updateAdminQrPagoImageUI({ hint: 'JPG, PNG o WEBP', btnText: 'Subir QR' });
+  updateAdminQrPagoRemoveButton(false);
+}
+
+function resetAdminPaymentForm() {
+  document.querySelectorAll('input[name="adminMetodoPago"]').forEach((input) => {
+    input.checked = input.value === DEFAULT_METODO_PAGO;
+  });
+  document.getElementById('adminWompiPublicKey').value = '';
+  document.getElementById('adminLinkPago').value = '';
+  updateAdminPaymentFieldsVisibility(DEFAULT_METODO_PAGO);
+  resetAdminQrPagoField('');
+}
+
+function populateAdminPaymentForm(restaurant = {}) {
+  const metodo = normalizeMetodoPago(restaurant.metodo_pago);
+  document.querySelectorAll('input[name="adminMetodoPago"]').forEach((input) => {
+    input.checked = input.value === metodo;
+  });
+  document.getElementById('adminWompiPublicKey').value = restaurant.wompi_public_key || '';
+  document.getElementById('adminLinkPago').value = restaurant.link_pago || '';
+  updateAdminPaymentFieldsVisibility(metodo);
+  resetAdminQrPagoField(restaurant.qr_pago_url || '');
+}
+
+function validateAdminPaymentImageFile(file) {
+  if (!file) return null;
+  if (!ALLOWED_PAYMENT_IMAGE_TYPES.has(file.type)) {
+    throw new Error('Solo se permiten imágenes JPG, PNG o WEBP.');
+  }
+  return file;
+}
+
+function getPaymentImageExtension(file) {
+  if (file.type === 'image/png') return 'png';
+  if (file.type === 'image/webp') return 'webp';
+  return 'jpg';
+}
+
+function getAdminAssetPath(restaurantId, filename) {
+  return `${restaurantId}/${filename}`;
+}
+
+function getAdminAssetPublicUrl(restaurantId, filename) {
+  return `${SUPABASE_URL}/storage/v1/object/public/${ADMIN_ASSETS_BUCKET}/${getAdminAssetPath(restaurantId, filename)}`;
+}
+
+async function uploadAdminQrPagoAsset(restaurantId, file) {
+  const filename = `qr-pago.${getPaymentImageExtension(file)}`;
+  const path = getAdminAssetPath(restaurantId, filename);
+  const contentType =
+    file.type === 'image/png' ? 'image/png' : file.type === 'image/webp' ? 'image/webp' : 'image/jpeg';
+
+  const client = assertSupabaseClient();
+  const { error } = await client.storage.from(ADMIN_ASSETS_BUCKET).upload(path, file, {
+    upsert: true,
+    contentType,
+  });
+
+  if (error) throw error;
+  return getAdminAssetPublicUrl(restaurantId, filename);
+}
+
+function readAdminPaymentFormValues() {
+  const metodo_pago = getAdminSelectedMetodoPago();
+  const wompi_public_key = document.getElementById('adminWompiPublicKey')?.value?.trim() || null;
+  const link_pago = normalizeLinkPago(document.getElementById('adminLinkPago')?.value);
+
+  return {
+    metodo_pago,
+    wompi_public_key,
+    link_pago,
+    qr_pago_url: currentAdminQrPagoUrl,
+  };
+}
+
+function validateAdminPaymentFormValues(values) {
+  if (values.metodo_pago === 'qr_propio' && !values.link_pago && !values.qr_pago_url && !pendingAdminQrPagoFile) {
+    return 'Con QR propio, agregá un link de pago o subí la imagen del QR.';
+  }
+
+  return '';
+}
+
+async function removeAdminQrPagoImage() {
+  if (!currentAdminQrPagoUrl && !pendingAdminQrPagoFile) return;
+  if (!window.confirm('¿Quitar el QR de pago?')) return;
+
+  const restaurantId = document.getElementById('restaurantId')?.value;
+  if (restaurantModalMode === 'edit' && restaurantId) {
+    const client = assertSupabaseClient();
+    const { error } = await client.from('restaurantes').update({ qr_pago_url: null }).eq('id', restaurantId);
+    if (error) {
+      showToast(error.message || 'No se pudo quitar el QR.', 'error');
+      return;
+    }
+  }
+
+  resetAdminQrPagoField('');
+  showToast('QR quitado', 'success');
+}
+
 function readRestaurantFormValues() {
   return {
     nombre: document.getElementById('restaurantName')?.value?.trim(),
@@ -328,6 +515,7 @@ function openNewRestaurantModal() {
 
   setRestaurantFormError('');
   updateSlugPreview('');
+  resetAdminPaymentForm();
   openRestaurantModal();
   document.getElementById('restaurantName')?.focus();
 }
@@ -344,7 +532,7 @@ async function openEditRestaurantModal(restaurantId) {
     const client = assertSupabaseClient();
     const { data, error } = await client
       .from('restaurantes')
-      .select('id, nombre, slug, ciudad, email, pin_mesero, pin_admin')
+      .select('id, nombre, slug, ciudad, email, pin_mesero, pin_admin, metodo_pago, wompi_public_key, link_pago, qr_pago_url')
       .eq('id', restaurantId)
       .single();
 
@@ -358,6 +546,7 @@ async function openEditRestaurantModal(restaurantId) {
     document.getElementById('restaurantEmail').value = data.email || '';
     document.getElementById('restaurantPinMesero').value = data.pin_mesero || '';
     document.getElementById('restaurantPinAdmin').value = data.pin_admin || '';
+    populateAdminPaymentForm(data);
 
     document.getElementById('restaurantModalTitle').textContent = `Editar · ${data.nombre || 'Restaurante'}`;
     document.getElementById('restaurantSubmitBtn').textContent = 'Guardar cambios';
@@ -395,6 +584,7 @@ function closeRestaurantModal() {
   modal?.setAttribute('aria-hidden', 'true');
   restaurantModalMode = 'create';
   setRestaurantFormError('');
+  resetAdminPaymentForm();
 }
 
 function updateSlugPreview(slug) {
@@ -402,8 +592,41 @@ function updateSlugPreview(slug) {
   if (preview) preview.textContent = slug || 'slug';
 }
 
+async function saveRestaurantPaymentSettings(restaurantId) {
+  const payment = readAdminPaymentFormValues();
+  let qr_pago_url = payment.qr_pago_url;
+
+  if (pendingAdminQrPagoFile) {
+    qr_pago_url = await uploadAdminQrPagoAsset(restaurantId, pendingAdminQrPagoFile);
+  }
+
+  const client = assertSupabaseClient();
+  const { error } = await client
+    .from('restaurantes')
+    .update({
+      metodo_pago: payment.metodo_pago,
+      wompi_public_key: payment.wompi_public_key,
+      link_pago: payment.link_pago,
+      qr_pago_url,
+    })
+    .eq('id', restaurantId);
+
+  if (error) throw error;
+
+  pendingAdminQrPagoFile = null;
+  revokePendingAdminQrPagoPreview();
+  currentAdminQrPagoUrl = qr_pago_url;
+}
+
 async function createRestaurant({ nombre, slug, ciudad, email, pin_mesero, pin_admin }) {
   const client = assertSupabaseClient();
+  let payment;
+
+  try {
+    payment = readAdminPaymentFormValues();
+  } catch (error) {
+    throw error;
+  }
 
   const { data: restaurant, error: restaurantError } = await client
     .from('restaurantes')
@@ -415,11 +638,18 @@ async function createRestaurant({ nombre, slug, ciudad, email, pin_mesero, pin_a
       pin_mesero,
       pin_admin,
       activo: true,
+      metodo_pago: payment.metodo_pago,
+      wompi_public_key: payment.wompi_public_key,
+      link_pago: payment.link_pago,
     })
     .select('id, nombre, slug, ciudad, email, activo, created_at')
     .single();
 
   if (restaurantError) throw restaurantError;
+
+  if (pendingAdminQrPagoFile) {
+    await saveRestaurantPaymentSettings(restaurant.id);
+  }
 
   const mesas = Array.from({ length: DEFAULT_MESAS_COUNT }, (_, index) => ({
     restaurante_id: restaurant.id,
@@ -454,6 +684,8 @@ async function updateRestaurant(restaurantId, { nombre, ciudad, email, pin_meser
     .single();
 
   if (error) throw error;
+
+  await saveRestaurantPaymentSettings(restaurantId);
   return data;
 }
 
@@ -509,6 +741,45 @@ function bindRestaurantModal() {
     }
   });
 
+  document.querySelectorAll('input[name="adminMetodoPago"]').forEach((input) => {
+    if (input.dataset.bound) return;
+    input.dataset.bound = 'true';
+    input.addEventListener('change', () => {
+      updateAdminPaymentFieldsVisibility(getAdminSelectedMetodoPago());
+    });
+  });
+
+  const qrInput = document.getElementById('adminQrPagoInput');
+  if (qrInput && !qrInput.dataset.bound) {
+    qrInput.dataset.bound = 'true';
+    qrInput.addEventListener('change', () => {
+      const file = qrInput.files?.[0];
+      if (!file) {
+        resetAdminQrPagoField(currentAdminQrPagoUrl || '');
+        return;
+      }
+
+      try {
+        validateAdminPaymentImageFile(file);
+        pendingAdminQrPagoFile = file;
+        revokePendingAdminQrPagoPreview();
+        pendingAdminQrPagoPreviewUrl = URL.createObjectURL(file);
+        updateAdminQrPagoImageUI({
+          src: pendingAdminQrPagoPreviewUrl,
+          hint: file.name,
+          btnText: 'Cambiar QR',
+        });
+        updateAdminQrPagoRemoveButton(true);
+      } catch (error) {
+        qrInput.value = '';
+        showToast(error.message, 'error');
+        resetAdminQrPagoField(currentAdminQrPagoUrl || '');
+      }
+    });
+  }
+
+  document.getElementById('adminQrPagoRemoveBtn')?.addEventListener('click', removeAdminQrPagoImage);
+
   form?.addEventListener('submit', async (event) => {
     event.preventDefault();
     if (submitBtn?.disabled) return;
@@ -518,6 +789,20 @@ function bindRestaurantModal() {
 
     if (validationError) {
       setRestaurantFormError(validationError);
+      return;
+    }
+
+    let paymentValues;
+    try {
+      paymentValues = readAdminPaymentFormValues();
+    } catch (error) {
+      setRestaurantFormError(error.message);
+      return;
+    }
+
+    const paymentError = validateAdminPaymentFormValues(paymentValues);
+    if (paymentError) {
+      setRestaurantFormError(paymentError);
       return;
     }
 

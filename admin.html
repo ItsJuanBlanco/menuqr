@@ -52,7 +52,7 @@
       <div class="panel-header__left panel-header__left--listo">
         <img class="listo-logo listo-logo--header" src="/logo-listo.png" alt="Listo">
         <div class="panel-header__brand-copy">
-          <h1 class="panel-header__title">MenuQR Admin</h1>
+          <h1 class="panel-header__title">Admin</h1>
           <p class="panel-header__subtitle" id="adminUserLabel">Plataforma</p>
         </div>
       </div>
@@ -148,6 +148,80 @@
                 placeholder="Dueño / gerente"
               >
             </label>
+          </div>
+        </div>
+        <div class="admin-form__section" id="adminPaymentSection">
+          <p class="admin-form__section-title">Pagos</p>
+          <p class="admin-form__section-hint">
+            El secreto de integridad de Wompi se configura en Supabase Edge Functions, no aquí.
+          </p>
+          <div class="settings-payment-toggle" role="radiogroup" aria-label="Método de pago">
+            <label class="settings-payment-toggle__option">
+              <input type="radio" name="adminMetodoPago" value="wompi" id="adminMetodoPagoWompi" checked>
+              <span class="settings-payment-toggle__card">
+                <span class="settings-payment-toggle__name">Wompi</span>
+                <span class="settings-payment-toggle__desc">Pagos digitales integrados</span>
+              </span>
+            </label>
+            <label class="settings-payment-toggle__option">
+              <input type="radio" name="adminMetodoPago" value="qr_propio" id="adminMetodoPagoQr">
+              <span class="settings-payment-toggle__card">
+                <span class="settings-payment-toggle__name">QR propio</span>
+                <span class="settings-payment-toggle__desc">Nequi/Daviplata con QR o link</span>
+              </span>
+            </label>
+          </div>
+          <div id="adminWompiFields">
+            <label class="admin-form__field" for="adminWompiPublicKey">
+              <span class="admin-form__label">Llave pública Wompi</span>
+              <input
+                type="text"
+                class="admin-form__input"
+                id="adminWompiPublicKey"
+                autocomplete="off"
+                placeholder="pub_prod_… o pub_test_…"
+              >
+            </label>
+          </div>
+          <label class="admin-form__field" for="adminLinkPago" id="adminLinkPagoWrap">
+            <span class="admin-form__label">
+              Link de pago
+              <span class="admin-form__optional" id="adminLinkPagoOptional">(opcional)</span>
+            </span>
+            <input
+              type="url"
+              class="admin-form__input"
+              id="adminLinkPago"
+              autocomplete="off"
+              inputmode="url"
+              placeholder="https://..."
+            >
+            <span class="admin-form__hint" id="adminLinkPagoHint">Nequi, Daviplata o Bancolombia</span>
+          </label>
+          <div id="adminQrPropioFields" hidden>
+            <div class="product-form__image admin-form__qr-upload">
+              <span class="product-form__image-label">QR de pago</span>
+              <div class="product-form__image-body">
+                <div class="product-form__image-preview" id="adminQrPagoPreview" hidden>
+                  <img id="adminQrPagoPreviewImg" alt="Vista previa del QR de pago">
+                </div>
+                <div class="product-form__image-controls">
+                  <label class="product-form__file-label">
+                    <input
+                      type="file"
+                      id="adminQrPagoInput"
+                      class="product-form__file-input"
+                      accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
+                    >
+                    <span id="adminQrPagoBtnText">Subir QR</span>
+                  </label>
+                  <p class="product-form__image-hint" id="adminQrPagoHint">JPG, PNG o WEBP</p>
+                  <button type="button" class="settings-form__remove-btn" id="adminQrPagoRemoveBtn" hidden>
+                    Quitar QR
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
         <p class="admin-form__note" id="restaurantFormNote">Se crearán automáticamente 5 mesas (Mesa 1–5).</p>
