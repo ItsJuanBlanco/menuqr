@@ -33,7 +33,10 @@ function getStoredActivePanelTab() {
 }
 
 function restoreActivePanelTab() {
-  switchPanel(getStoredActivePanelTab() || 'pedidos');
+  const stored = getStoredActivePanelTab();
+  const allowed = getAllowedPanelTabs(window.PANEL_ACCESS_ROLE || 'mesero');
+  const panelId = stored && allowed.has(stored) ? stored : 'pedidos';
+  switchPanel(panelId);
 }
 
 function getPanelPaymentBreakdown(subtotal, serviceEnabled = true) {
@@ -258,6 +261,8 @@ function updateHeaderCount() {
 
 /* ── Tabs ── */
 function switchPanel(panelId) {
+  const allowed = getAllowedPanelTabs(window.PANEL_ACCESS_ROLE || 'mesero');
+  if (!allowed.has(panelId)) panelId = 'pedidos';
   if (!VALID_PANEL_TABS.has(panelId)) return;
 
   activePanel = panelId;
@@ -2093,6 +2098,14 @@ async function init() {
   const restaurant = await window.restaurantReady;
   if (!restaurant) return;
 
+  const slug = RESTAURANTE_SLUG;
+  const session = getPanelSession(slug);
+  if (!session) {
+    redirectToLogin(slug);
+    return;
+  }
+
+  applyPanelRoleAccess(session.role);
   initTabs();
   initMesaQrSection();
   initModal();

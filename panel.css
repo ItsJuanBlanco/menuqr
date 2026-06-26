@@ -150,6 +150,10 @@ button {
   border-color: var(--border);
 }
 
+.panel-tabs__btn[hidden] {
+  display: none !important;
+}
+
 .panel-view[hidden] {
   display: none !important;
 }

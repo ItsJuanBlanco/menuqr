@@ -113,6 +113,35 @@
           <span class="admin-form__label">Email de contacto</span>
           <input type="email" class="admin-form__input" id="restaurantEmail" required maxlength="120">
         </label>
+        <div class="admin-form__row">
+          <label class="admin-form__field">
+            <span class="admin-form__label">PIN mesero</span>
+            <input
+              type="text"
+              class="admin-form__input"
+              id="restaurantPinMesero"
+              required
+              minlength="4"
+              maxlength="20"
+              inputmode="numeric"
+              autocomplete="off"
+              placeholder="1234"
+            >
+          </label>
+          <label class="admin-form__field">
+            <span class="admin-form__label">PIN admin</span>
+            <input
+              type="text"
+              class="admin-form__input"
+              id="restaurantPinAdmin"
+              required
+              minlength="4"
+              maxlength="20"
+              autocomplete="off"
+              placeholder="Dueño / gerente"
+            >
+          </label>
+        </div>
         <p class="admin-form__note">Se crearán automáticamente 5 mesas (Mesa 1–5).</p>
         <p class="admin-form__error" id="newRestaurantError" hidden role="alert"></p>
         <button type="submit" class="dataphone-modal__confirm" id="newRestaurantSubmit">Guardar restaurante</button>
@@ -124,6 +153,7 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="/config.js"></script>
+  <script src="/panel-auth.js"></script>
   <script src="/admin.js"></script>
 </body>
 </html>

@@ -221,11 +221,7 @@ function renderRestaurants() {
 }
 
 function buildRestaurantPanelUrl(slug) {
-  const safeSlug = encodeURIComponent(slug);
-  if (window.location.hostname === 'localhost') {
-    return `http://localhost:8080/panel.html?slug=${safeSlug}`;
-  }
-  return `https://menuqr-virid.vercel.app/${safeSlug}/panel`;
+  return buildLoginUrl(slug);
 }
 
 function openRestaurantPanel(slug) {
@@ -290,7 +286,7 @@ function updateSlugPreview(slug) {
   if (preview) preview.textContent = slug || 'slug';
 }
 
-async function createRestaurant({ nombre, slug, ciudad, email }) {
+async function createRestaurant({ nombre, slug, ciudad, email, pin_mesero, pin_admin }) {
   const client = assertSupabaseClient();
 
   const { data: restaurant, error: restaurantError } = await client
@@ -300,6 +296,8 @@ async function createRestaurant({ nombre, slug, ciudad, email }) {
       slug,
       ciudad,
       email,
+      pin_mesero,
+      pin_admin,
       activo: true,
     })
     .select('id, nombre, slug, ciudad, email, activo, created_at')
@@ -378,10 +376,20 @@ function bindNewRestaurantModal() {
     const slug = slugifyName(slugInput?.value?.trim());
     const ciudad = document.getElementById('restaurantCity')?.value?.trim();
     const email = normalizeEmail(document.getElementById('restaurantEmail')?.value);
+    const pin_mesero = document.getElementById('restaurantPinMesero')?.value?.trim();
+    const pin_admin = document.getElementById('restaurantPinAdmin')?.value?.trim();
 
-    if (!nombre || !slug || !ciudad || !email) {
+    if (!nombre || !slug || !ciudad || !email || !pin_mesero || !pin_admin) {
       if (errorEl) {
         errorEl.textContent = 'Completá todos los campos.';
+        errorEl.hidden = false;
+      }
+      return;
+    }
+
+    if (pin_mesero.length < 4 || pin_admin.length < 4) {
+      if (errorEl) {
+        errorEl.textContent = 'Los PIN deben tener al menos 4 caracteres.';
         errorEl.hidden = false;
       }
       return;
@@ -392,7 +400,14 @@ function bindNewRestaurantModal() {
     if (errorEl) errorEl.hidden = true;
 
     try {
-      const restaurant = await createRestaurant({ nombre, slug, ciudad, email });
+      const restaurant = await createRestaurant({
+        nombre,
+        slug,
+        ciudad,
+        email,
+        pin_mesero,
+        pin_admin,
+      });
       restaurants.unshift(restaurant);
       renderRestaurants();
       closeNewRestaurantModal();
