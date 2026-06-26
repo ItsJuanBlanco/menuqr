@@ -1,4 +1,5 @@
 const WOMPI_PUBLIC_KEY = 'pub_test_sLvY32q8txNx6ygl0BrYaNo5w1aUkfMT';
+const WOMPI_SIGNATURE_URL = `${SUPABASE_URL}/functions/v1/wompi-signature`;
 
 function formatCOP(amount) {
   return new Intl.NumberFormat('es-CO', {
@@ -133,6 +134,37 @@ async function handleApprovedPayment(monto, sesionId, referenciaWompi, restauran
   setPagarMessage('success', 'Pago registrado. Tu parte fue acreditada a la cuenta.');
 }
 
+async function fetchWompiSignature(amountInCents, reference) {
+  const response = await fetch(WOMPI_SIGNATURE_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+    },
+    body: JSON.stringify({ amount: amountInCents, reference }),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.error || 'No se pudo obtener la firma de Wompi.');
+  }
+
+  if (!data.signature || !data.publicKey) {
+    throw new Error('Respuesta inválida del servidor de pagos.');
+  }
+
+  return data;
+}
+
+function buildPagarRedirectUrl() {
+  const url = new URL(window.location.href);
+  url.searchParams.delete('id');
+  url.searchParams.delete('status');
+  url.searchParams.delete('reference');
+  return url.toString();
+}
+
 async function openWompiCheckout({ monto, sesionId, parte, publicKey, restauranteId, cargoServicio = 0 }) {
   if (typeof WidgetCheckout === 'undefined') {
     setPagarMessage('error', 'No se pudo cargar Wompi. Recarga la página.');
@@ -144,31 +176,46 @@ async function openWompiCheckout({ monto, sesionId, parte, publicKey, restaurant
   const reference = parte
     ? `sesion-${sesionId}-parte-${parte}-${Date.now()}`
     : `sesion-${sesionId}-${Date.now()}`;
-  const checkout = new WidgetCheckout({
-    currency: 'COP',
-    amountInCents: Math.round(monto * 100),
-    reference,
-    publicKey,
-  });
+  const amountInCents = Math.round(monto * 100);
 
-  checkout.open(async (result) => {
-    const transaction = result?.transaction;
+  try {
+    const { signature, publicKey: signedPublicKey } = await fetchWompiSignature(
+      amountInCents,
+      reference
+    );
 
-    if (transaction?.status === 'APPROVED') {
-      try {
-        const referencia = transaction.id || transaction.reference || reference;
-        await handleApprovedPayment(monto, sesionId, referencia, restauranteId, { cargoServicio });
-      } catch (error) {
-        console.error(error);
-        await clearPaymentInProgress(sesionId);
-        setPagarMessage('error', error.message || 'No se pudo registrar el pago.');
+    const checkout = new WidgetCheckout({
+      currency: 'COP',
+      amountInCents,
+      reference,
+      publicKey: signedPublicKey || publicKey,
+      signature: { integrity: signature },
+      redirectUrl: buildPagarRedirectUrl(),
+    });
+
+    checkout.open(async (result) => {
+      const transaction = result?.transaction;
+
+      if (transaction?.status === 'APPROVED') {
+        try {
+          const referencia = transaction.id || transaction.reference || reference;
+          await handleApprovedPayment(monto, sesionId, referencia, restauranteId, { cargoServicio });
+        } catch (error) {
+          console.error(error);
+          await clearPaymentInProgress(sesionId);
+          setPagarMessage('error', error.message || 'No se pudo registrar el pago.');
+        }
+        return;
       }
-      return;
-    }
 
+      await clearPaymentInProgress(sesionId);
+      setPagarMessage('error', 'El pago no se completó. Puedes intentar de nuevo.');
+    });
+  } catch (error) {
+    console.error(error);
     await clearPaymentInProgress(sesionId);
-    setPagarMessage('error', 'El pago no se completó. Puedes intentar de nuevo.');
-  });
+    setPagarMessage('error', error.message || 'No se pudo iniciar el pago con Wompi.');
+  }
 }
 
 async function initPagar() {
