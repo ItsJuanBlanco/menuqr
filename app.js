@@ -1486,26 +1486,64 @@ function subscribeToRealtime() {
     mesaRealtimeChannel = null;
   }
 
-  mesaRealtimeChannel = supabaseClient.channel(`mesa-${state.mesaId}`);
+  mesaRealtimeChannel = supabaseClient.channel(`mesa-${state.mesaId}-${state.sesionId || 'guest'}`);
+
+  const refreshAccountFromRealtime = () => {
+    void loadAccountItems();
+  };
 
   mesaRealtimeChannel
     .on(
       'postgres_changes',
-      { event: '*', schema: 'public', table: 'pedidos', filter: `mesa_id=eq.${state.mesaId}` },
-      () => loadAccountItems()
+      { event: 'INSERT', schema: 'public', table: 'pedidos', filter: `mesa_id=eq.${state.mesaId}` },
+      refreshAccountFromRealtime
     )
     .on(
       'postgres_changes',
-      { event: '*', schema: 'public', table: 'pedido_items' },
-      () => loadAccountItems()
+      { event: 'UPDATE', schema: 'public', table: 'pedidos', filter: `mesa_id=eq.${state.mesaId}` },
+      refreshAccountFromRealtime
+    )
+    .on(
+      'postgres_changes',
+      { event: 'DELETE', schema: 'public', table: 'pedidos', filter: `mesa_id=eq.${state.mesaId}` },
+      refreshAccountFromRealtime
+    )
+    .on(
+      'postgres_changes',
+      { event: 'INSERT', schema: 'public', table: 'pedido_items' },
+      refreshAccountFromRealtime
+    )
+    .on(
+      'postgres_changes',
+      { event: 'UPDATE', schema: 'public', table: 'pedido_items' },
+      refreshAccountFromRealtime
+    )
+    .on(
+      'postgres_changes',
+      { event: 'DELETE', schema: 'public', table: 'pedido_items' },
+      refreshAccountFromRealtime
     );
 
   if (state.sesionId) {
     mesaRealtimeChannel.on(
       'postgres_changes',
-      { event: '*', schema: 'public', table: 'pagos_grupo', filter: `sesion_id=eq.${state.sesionId}` },
+      { event: 'INSERT', schema: 'public', table: 'pagos_grupo', filter: `sesion_id=eq.${state.sesionId}` },
       () => {
-        loadGroupPayments().then(() => renderAccount());
+        void loadGroupPayments().then(() => renderAccount());
+      }
+    );
+    mesaRealtimeChannel.on(
+      'postgres_changes',
+      { event: 'UPDATE', schema: 'public', table: 'pagos_grupo', filter: `sesion_id=eq.${state.sesionId}` },
+      () => {
+        void loadGroupPayments().then(() => renderAccount());
+      }
+    );
+    mesaRealtimeChannel.on(
+      'postgres_changes',
+      { event: 'DELETE', schema: 'public', table: 'pagos_grupo', filter: `sesion_id=eq.${state.sesionId}` },
+      () => {
+        void loadGroupPayments().then(() => renderAccount());
       }
     );
   }
@@ -1739,6 +1777,7 @@ async function sendOrder() {
     renderProducts();
     updateCartBar();
     await loadAccountItems();
+    switchTab('cuenta');
   } catch (error) {
     console.error('Error al enviar pedido:', error);
     hideToast();
@@ -2488,6 +2527,7 @@ async function init() {
 
     let session = null;
     let joinedViaSplitQr = false;
+    let sessionFromChoice = false;
 
     try {
       session = await tryJoinFromSplitQrParams();
@@ -2498,7 +2538,9 @@ async function init() {
     }
 
     if (!session) {
-      session = await startSessionFlow(state.mesaId, state.mesaNumero);
+      const flow = await startSessionFlow(state.mesaId, state.mesaNumero);
+      session = flow.session;
+      sessionFromChoice = flow.fromChoice;
     } else {
       hideSessionGate();
     }
@@ -2521,6 +2563,8 @@ async function init() {
 
     if (joinedViaSplitQr && state.splitJoinAmount) {
       switchTab('cuenta');
+    } else if (sessionFromChoice) {
+      switchTab('carta');
     } else {
       handleInitialRoute();
     }
@@ -2546,7 +2590,6 @@ async function init() {
     await handleWompiRedirectReturn();
 
     if (state.splitJoinAmount) {
-      switchTab('cuenta');
       updateSplitJoinUI();
     }
   } catch (error) {

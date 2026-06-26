@@ -450,12 +450,12 @@ async function startSessionFlow(mesaId, mesaNumero) {
   const resumed = await tryResumeStoredSession(mesaId);
   if (resumed) {
     hideSessionGate();
-    return resumed;
+    return { session: resumed, fromChoice: false };
   }
 
   const session = await waitForSessionChoice(mesaId);
   hideSessionGate();
-  return session;
+  return { session, fromChoice: true };
 }
 
 function formatSessionLabel(session) {

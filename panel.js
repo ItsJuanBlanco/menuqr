@@ -331,6 +331,30 @@ function updateHeaderCount() {
 }
 
 /* ── Tabs ── */
+async function refreshActivePanelData(panelId) {
+  try {
+    if (panelId === 'pedidos') {
+      await fetchOrders();
+    } else if (panelId === 'mesas') {
+      await fetchMesas();
+    } else if (panelId === 'menu' && typeof fetchMenuProducts === 'function') {
+      await fetchMenuProducts();
+    } else if (panelId === 'resumen' && typeof fetchDailySummary === 'function') {
+      await fetchDailySummary(true);
+    } else if (panelId === 'historial' && typeof fetchPaymentHistory === 'function') {
+      await fetchPaymentHistory(true);
+    } else if (panelId === 'qr') {
+      await fetchMesas();
+      renderMesaQrs();
+    } else if (panelId === 'ajustes' && typeof loadRestaurantSettings === 'function') {
+      await loadRestaurantSettings();
+    }
+  } catch (error) {
+    console.error(error);
+    showToast(error.message || 'No se pudieron actualizar los datos del panel.', 'error');
+  }
+}
+
 function switchPanel(panelId) {
   const allowed = getAllowedPanelTabs(window.PANEL_ACCESS_ROLE || 'mesero');
   if (!allowed.has(panelId)) panelId = 'pedidos';
@@ -352,14 +376,7 @@ function switchPanel(panelId) {
   });
 
   updateHeaderCount();
-
-  if (panelId === 'pedidos') renderOrders();
-  if (panelId === 'mesas') renderMesas();
-  if (panelId === 'menu' && typeof fetchMenuProducts === 'function') fetchMenuProducts();
-  if (panelId === 'resumen' && typeof fetchDailySummary === 'function') fetchDailySummary();
-  if (panelId === 'historial' && typeof fetchPaymentHistory === 'function') fetchPaymentHistory(true);
-  if (panelId === 'qr') renderMesaQrs();
-  if (panelId === 'ajustes' && typeof loadRestaurantSettings === 'function') loadRestaurantSettings();
+  void refreshActivePanelData(panelId);
 }
 
 function buildMesaMenuUrl(mesaNumero) {
