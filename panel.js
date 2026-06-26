@@ -1186,7 +1186,7 @@ function renderOrders() {
           data-action="todo-preparacion"
           data-pedido-id="${order.id}"
           ${updating.has(`bulk-prep-${order.id}`) ? 'disabled' : ''}
-        >Todo en prep.</button>`);
+        >Todo en preparación</button>`);
       }
 
       if (undeliveredCount > 0 && pendingCount === 0) {

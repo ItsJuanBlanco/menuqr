@@ -3370,7 +3370,8 @@ body.mesa-qr-printing .mesa-qr-print {
   }
 
   .order-card__items .item-row__qty {
-    font-size: 13px;
+    font-size: 15px;
+    font-weight: 700;
     color: var(--text-dim);
   }
 
