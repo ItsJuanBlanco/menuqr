@@ -195,6 +195,30 @@ async function joinSessionByCode(mesaId, codeInput) {
   return data;
 }
 
+async function joinSessionById(mesaId, sesionId) {
+  const { data, error } = await supabaseClient
+    .from('sesiones')
+    .select('id, tipo, numero, session_token, activa, mesa_id, restaurante_id')
+    .eq('id', sesionId)
+    .maybeSingle();
+
+  if (error) throw error;
+  if (!data) throw new Error('No encontramos esa cuenta.');
+  if (data.activa !== true) throw new Error('Esta cuenta ya fue cerrada.');
+  if (data.mesa_id !== mesaId) throw new Error('Esta cuenta no corresponde a esta mesa.');
+  if (data.restaurante_id !== RESTAURANTE_ID) {
+    throw new Error('Esta cuenta no pertenece a este restaurante.');
+  }
+
+  saveStoredSession(mesaId, {
+    sesionId: data.id,
+    sessionToken: data.session_token,
+    tipo: data.tipo,
+  });
+
+  return data;
+}
+
 async function switchSessionByCode(mesaId, currentSesionId, codeInput) {
   const destSession = await findActiveSessionByCode(mesaId, codeInput);
 

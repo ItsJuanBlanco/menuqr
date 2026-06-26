@@ -136,6 +136,7 @@ const state = {
   splitCount: 2,
   groupPayments: [],
   lastSplitQrUrl: '',
+  splitJoinAmount: null,
   serviceChargeEnabled: true,
   serviceChargePercent: 10,
   tipPercent: null,
@@ -753,11 +754,13 @@ async function loadGroupPayments() {
   state.groupPayments = data || [];
 }
 
-function getPagarBaseUrl() {
+function buildMenuBaseUrl() {
+  const slug = RESTAURANTE_SLUG || '';
+  const mesa = encodeURIComponent(String(state.mesaNumero));
   if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-    return `${window.location.origin}/pagar`;
+    return `${window.location.origin}/index.html?slug=${encodeURIComponent(slug)}&mesa=${mesa}`;
   }
-  return 'https://listoapp.com.co/pagar';
+  return `https://listoapp.com.co/${encodeURIComponent(slug)}?mesa=${mesa}`;
 }
 
 function cleanupLegacySplitUi() {
@@ -769,11 +772,44 @@ function cleanupLegacySplitUi() {
 
 function buildSplitPaymentUrl(monto) {
   const params = new URLSearchParams({
+    unirse: state.sesionId,
     monto: String(monto),
-    sesion: state.sesionId,
   });
-  if (RESTAURANTE_SLUG) params.set('slug', RESTAURANTE_SLUG);
-  return `${getPagarBaseUrl()}?${params.toString()}`;
+  return `${buildMenuBaseUrl()}&${params.toString()}`;
+}
+
+function clearSplitJoinParamsFromUrl() {
+  const url = new URL(window.location.href);
+  let changed = false;
+
+  ['unirse', 'monto'].forEach((key) => {
+    if (url.searchParams.has(key)) {
+      url.searchParams.delete(key);
+      changed = true;
+    }
+  });
+
+  if (changed) {
+    window.history.replaceState({}, '', url.pathname + url.search + url.hash);
+  }
+}
+
+async function tryJoinFromSplitQrParams() {
+  const params = new URLSearchParams(window.location.search);
+  const sesionId = params.get('unirse')?.trim();
+  const montoRaw = params.get('monto');
+
+  if (!sesionId || montoRaw == null) return null;
+
+  const monto = Number(montoRaw);
+  if (!Number.isFinite(monto) || monto <= 0) {
+    throw new Error('El monto del enlace no es válido.');
+  }
+
+  const session = await joinSessionById(state.mesaId, sesionId);
+  state.splitJoinAmount = Math.round(monto);
+  clearSplitJoinParamsFromUrl();
+  return session;
 }
 
 function clearSplitQrCanvas() {
@@ -901,7 +937,8 @@ function updatePaymentExtrasUI(deliveredTotal) {
 
   if (!section) return;
 
-  const showExtras = deliveredTotal > 0 && !state.paymentPendingConfirmation;
+  const showExtras =
+    deliveredTotal > 0 && !state.paymentPendingConfirmation && !state.splitJoinAmount;
   section.hidden = !showExtras;
 
   const accountTotal = document.getElementById('accountTotal');
@@ -981,6 +1018,29 @@ function refreshPaymentUi() {
   const deliveredTotal = getAccountDeliveredTotal();
   updatePaymentExtrasUI(deliveredTotal);
   updateSplitBillUI(deliveredTotal);
+  updateSplitJoinUI();
+}
+
+function updateSplitJoinUI() {
+  const section = document.getElementById('splitJoinSection');
+  const amountEl = document.getElementById('splitJoinAmount');
+  const btn = document.getElementById('splitJoinPayBtn');
+  const amount = state.splitJoinAmount;
+
+  if (!section) return;
+
+  const show = amount > 0 && !state.paymentPendingConfirmation;
+  section.hidden = !show;
+
+  if (!show) return;
+
+  if (amountEl) amountEl.textContent = `Tu parte: ${formatCOP(amount)}`;
+  if (btn) {
+    btn.textContent = usesRestaurantQrPayment()
+      ? `Pagar ${formatCOP(amount)}`
+      : `Pagar ${formatCOP(amount)} con Wompi`;
+    btn.disabled = state.paymentSubmitting;
+  }
 }
 
 function hideRestaurantSplitPaymentExtras() {
@@ -1113,7 +1173,10 @@ function updateSplitBillUI(deliveredTotal) {
   if (!splitSection) return;
 
   const showSplit =
-    state.sessionTipo === 'grupal' && deliveredTotal > 0 && !state.paymentPendingConfirmation;
+    state.sessionTipo === 'grupal' &&
+    deliveredTotal > 0 &&
+    !state.paymentPendingConfirmation &&
+    !state.splitJoinAmount;
   splitSection.hidden = !showSplit;
 
   if (!showSplit) {
@@ -1678,14 +1741,15 @@ function renderAccount() {
   const inProgressCount = inProgress.reduce((sum, item) => sum + item.qty, 0);
 
   if (items.length === 0) {
-    empty.style.display = 'block';
+    empty.style.display = state.splitJoinAmount ? 'none' : 'block';
     inProgressSection.hidden = true;
     deliveredSection.hidden = true;
     badge.hidden = true;
     if (wompiPayBtn) wompiPayBtn.hidden = true;
-    if (paymentWaiting) paymentWaiting.hidden = true;
+    if (paymentWaiting) paymentWaiting.hidden = !state.paymentPendingConfirmation;
     updatePaymentExtrasUI(0);
     updateSplitBillUI(0);
+    updateSplitJoinUI();
     return;
   }
 
@@ -1738,12 +1802,14 @@ function renderAccount() {
     if (paymentWaiting) paymentWaiting.hidden = !state.paymentPendingConfirmation;
     updatePaymentExtrasUI(deliveredTotal);
     updateSplitBillUI(deliveredTotal);
+    updateSplitJoinUI();
   } else {
     deliveredSection.hidden = true;
     if (wompiPayBtn) wompiPayBtn.hidden = true;
     if (paymentWaiting) paymentWaiting.hidden = !state.paymentPendingConfirmation;
     updatePaymentExtrasUI(0);
     updateSplitBillUI(0);
+    updateSplitJoinUI();
   }
 
   badge.hidden = inProgressCount === 0;
@@ -1845,6 +1911,8 @@ async function handleApprovedWompiPayment(monto, referenciaWompi, extras = {}) {
 
     await loadGroupPayments();
 
+    state.splitJoinAmount = null;
+
     if (breakdown.total > 0 && paidTotal >= breakdown.total) {
       await markPaymentPendingConfirmation(
         extras.manualConfirmation ? PAYMENT_PENDING_MESSAGE : null,
@@ -1899,6 +1967,7 @@ async function markPaymentPendingConfirmation(successMessage, options = {}) {
     if (error) throw error;
 
     state.paymentPendingConfirmation = true;
+    state.splitJoinAmount = null;
     renderAccount();
     if (!skipToast) {
       showToast(successMessage || PAYMENT_PENDING_MESSAGE, 'success', 5000);
@@ -2108,6 +2177,15 @@ function initWompiPayment() {
     });
   });
 
+  document.getElementById('splitJoinPayBtn')?.addEventListener('click', () => {
+    const amount = state.splitJoinAmount;
+    if (!amount || state.paymentSubmitting || state.paymentPendingConfirmation) return;
+
+    startPaymentFlow(amount, {
+      hint: 'Pagá tu parte de la cuenta.',
+    });
+  });
+
   document.getElementById('restaurantQrPayLinkBtn')?.addEventListener('click', openRestaurantPaymentLink);
   document.getElementById('splitPaymentLinkBtn')?.addEventListener('click', openRestaurantPaymentLink);
 
@@ -2301,7 +2379,17 @@ async function init() {
   try {
     await loadMesa();
 
-    const session = await startSessionFlow(state.mesaId, state.mesaNumero);
+    let session = null;
+    try {
+      session = await tryJoinFromSplitQrParams();
+    } catch (joinError) {
+      console.error(joinError);
+      showToast(joinError.message || 'No se pudo unir a la cuenta.', 'error');
+    }
+
+    if (!session) {
+      session = await startSessionFlow(state.mesaId, state.mesaNumero);
+    }
     if (!session) return;
 
     applySession(session);
@@ -2337,6 +2425,11 @@ async function init() {
 
     await loadAccountItems();
     await handleWompiRedirectReturn();
+
+    if (state.splitJoinAmount) {
+      switchTab('cuenta');
+      updateSplitJoinUI();
+    }
   } catch (error) {
     console.error('Error inicializando Supabase:', error);
     showToast(error.message || 'Error conectando con Supabase.', 'error');

@@ -91,6 +91,19 @@ function buildPagarUrl(monto, sesionId, cargoServicio = 0, parte = null) {
   return `${getPagarBaseUrl()}?${params.toString()}`;
 }
 
+function buildSplitJoinUrl(mesaNumero, sesionId, monto) {
+  const slug = RESTAURANTE_SLUG || '';
+  const mesa = encodeURIComponent(String(mesaNumero));
+  const params = new URLSearchParams({
+    unirse: sesionId,
+    monto: String(monto),
+  });
+  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+    return `${window.location.origin}/index.html?slug=${encodeURIComponent(slug)}&mesa=${mesa}&${params.toString()}`;
+  }
+  return `https://listoapp.com.co/${encodeURIComponent(slug)}?mesa=${mesa}&${params.toString()}`;
+}
+
 function getPanelSplitShare(subtotal, splitCount, serviceEnabled = true) {
   const breakdown = getPanelPaymentBreakdown(subtotal, serviceEnabled);
   const count = Math.max(2, Number(splitCount) || 2);
@@ -1787,11 +1800,10 @@ function renderSplitPaymentQr(share, partNumber) {
   box.hidden = false;
   canvas.innerHTML = '';
   new QRCode(canvas, {
-    text: buildPagarUrl(
-      share.shareTotal,
+    text: buildSplitJoinUrl(
+      splitPaymentState.mesaNum,
       splitPaymentState.sesionId,
-      share.shareServicio,
-      partNumber
+      share.shareTotal
     ),
     width: 220,
     height: 220,
