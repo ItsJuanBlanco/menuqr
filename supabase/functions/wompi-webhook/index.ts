@@ -5,26 +5,37 @@ type SupabaseClient = ReturnType<typeof createClient>;
 
 function parseSesionId(reference: string | undefined): string | null {
   if (!reference?.startsWith("listo-")) return null;
-  return reference.split("-").slice(1, 6).join("-") || null;
+  const match = reference.match(/^listo-(.+)-(\d+)$/);
+  return match ? match[1] : null;
 }
 
 function parsePaymentAmount(transaction: Record<string, unknown>): number {
   const amountInCents = transaction.amount_in_cents ?? transaction.amountInCents;
-
   const cents = Number(amountInCents);
-  if (!Number.isFinite(cents) || cents <= 0) return 0;
 
+  if (!Number.isFinite(cents) || cents <= 0) return 0;
   return Math.round(cents / 100);
 }
 
-async function getSessionDeliveredTotal(supabase: SupabaseClient, sesionId: string): Promise<number> {
+function getItemSubtotal(item: {
+  subtotal?: number | null;
+  precio_unitario?: number | null;
+  cantidad?: number | null;
+}): number {
+  return Number(item.subtotal ?? Number(item.precio_unitario) * Number(item.cantidad)) || 0;
+}
+
+async function getSessionDeliveredTotal(
+  supabase: SupabaseClient,
+  sesionId: string
+): Promise<number> {
   const { data: items, error } = await supabase
     .from("pedido_items")
     .select(`
       subtotal,
       precio_unitario,
       cantidad,
-      pedidos!inner ( sesion_id, archivado )
+      pedidos!inner ( sesion_id, archivado, restaurante_id )
     `)
     .eq("pedidos.sesion_id", sesionId)
     .eq("pedidos.archivado", false)
@@ -32,25 +43,24 @@ async function getSessionDeliveredTotal(supabase: SupabaseClient, sesionId: stri
 
   if (error) throw error;
 
-  return (items || []).reduce((sum, item) => {
-    const row = item as {
+  return (items || []).reduce(
+    (sum, item) => sum + getItemSubtotal(item as {
       subtotal?: number | null;
       precio_unitario?: number | null;
       cantidad?: number | null;
-    };
-    return sum + Number(row.subtotal ?? Number(row.precio_unitario) * Number(row.cantidad));
-  }, 0);
+    }),
+    0
+  );
 }
 
-async function getSessionApprovedPaymentsTotal(
+async function getSessionPaymentsTotal(
   supabase: SupabaseClient,
   sesionId: string
 ): Promise<number> {
   const { data, error } = await supabase
     .from("pagos_grupo")
     .select("monto")
-    .eq("sesion_id", sesionId)
-    .eq("estado", "aprobado");
+    .eq("sesion_id", sesionId);
 
   if (error) throw error;
 
@@ -60,7 +70,6 @@ async function getSessionApprovedPaymentsTotal(
 serve(async (req) => {
   try {
     const body = await req.json();
-
     const event = body.event;
     const transaction = body.data?.transaction as Record<string, unknown> | undefined;
 
@@ -108,25 +117,26 @@ serve(async (req) => {
     }
 
     const [paidTotal, sessionTotal] = await Promise.all([
-      getSessionApprovedPaymentsTotal(supabase, sesionId),
+      getSessionPaymentsTotal(supabase, sesionId),
       getSessionDeliveredTotal(supabase, sesionId),
     ]);
 
-    const updatePayload: Record<string, unknown> = {
-      pago_en_proceso: false,
-      referencia_wompi: referenciaWompi,
-    };
-
-    if (sessionTotal > 0 && paidTotal >= sessionTotal) {
-      updatePayload.pago_pendiente_confirmacion = true;
-    }
+    const isFullyPaid = sessionTotal > 0 && paidTotal >= sessionTotal;
 
     const { error: sesionError } = await supabase
       .from("sesiones")
-      .update(updatePayload)
+      .update({
+        pago_en_proceso: false,
+        pago_pendiente_confirmacion: isFullyPaid,
+        referencia_wompi: referenciaWompi,
+      })
       .eq("id", sesionId);
 
     if (sesionError) throw sesionError;
+
+    console.info(
+      `Wompi webhook sesion=${sesionId} paid=${paidTotal} total=${sessionTotal} complete=${isFullyPaid}`
+    );
 
     return new Response("OK", { status: 200 });
   } catch (error) {
