@@ -171,6 +171,11 @@ function slugifyCategory(name) {
 
 const VALID_TABS = new Set(['carta', 'cuenta', 'mesero']);
 const ACTIVE_TAB_KEY = 'activeTab';
+const ACCOUNT_CODE_HINT_SEEN_PREFIX = 'menuqr:accountCodeHintSeen';
+const ACCOUNT_CODE_HINT_DURATION_MS = 5000;
+
+let accountCodeHintTimer = null;
+let accountCodeHintHideTimer = null;
 
 function saveActiveTab(tabId) {
   if (VALID_TABS.has(tabId)) {
@@ -1060,6 +1065,72 @@ async function sendOrder() {
 }
 
 /* ── Mi cuenta ── */
+function getAccountCodeHintStorageKey() {
+  return `${ACCOUNT_CODE_HINT_SEEN_PREFIX}:${RESTAURANTE_ID}:${state.mesaId || 'mesa'}`;
+}
+
+function hasSeenAccountCodeHint() {
+  try {
+    return sessionStorage.getItem(getAccountCodeHintStorageKey()) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function markAccountCodeHintSeen() {
+  try {
+    sessionStorage.setItem(getAccountCodeHintStorageKey(), '1');
+  } catch {
+    /* ignore */
+  }
+}
+
+function hideAccountCodeHint() {
+  const el = document.getElementById('accountCodeHint');
+  if (!el) return;
+
+  el.classList.remove('account__code-hint--visible');
+  clearTimeout(accountCodeHintTimer);
+  clearTimeout(accountCodeHintHideTimer);
+  accountCodeHintTimer = null;
+
+  accountCodeHintHideTimer = setTimeout(() => {
+    el.hidden = true;
+    accountCodeHintHideTimer = null;
+  }, 350);
+}
+
+function maybeShowAccountCodeHint() {
+  const el = document.getElementById('accountCodeHint');
+  if (!el || state.sessionNumero == null || state.sessionNumero === '') return;
+  if (hasSeenAccountCodeHint()) return;
+  if (accountCodeHintTimer || el.classList.contains('account__code-hint--visible')) return;
+
+  const code = `#${formatSessionCode(state.sessionNumero)}`;
+  el.textContent = `Tu código es ${code} — compartilo para unir cuentas`;
+  el.hidden = false;
+
+  requestAnimationFrame(() => {
+    el.classList.add('account__code-hint--visible');
+  });
+
+  accountCodeHintTimer = setTimeout(() => {
+    accountCodeHintTimer = null;
+    markAccountCodeHintSeen();
+    hideAccountCodeHint();
+  }, ACCOUNT_CODE_HINT_DURATION_MS);
+}
+
+function showAccountCodeHintOnTabEnter() {
+  if (hasSeenAccountCodeHint()) {
+    const el = document.getElementById('accountCodeHint');
+    if (el) el.hidden = true;
+    return;
+  }
+
+  maybeShowAccountCodeHint();
+}
+
 function renderAccount() {
   const empty = document.getElementById('accountEmpty');
   const inProgressSection = document.getElementById('inProgressSection');
@@ -1534,7 +1605,10 @@ function switchTab(tabId) {
     panel.hidden = !isActive;
   });
 
-  if (tabId === 'cuenta') renderAccount();
+  if (tabId === 'cuenta') {
+    renderAccount();
+    showAccountCodeHintOnTabEnter();
+  }
 
   updateCartBarVisibility();
 }
