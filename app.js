@@ -838,26 +838,6 @@ function getRestaurantPaymentLink() {
   return RESTAURANTE?.link_pago?.trim() || '';
 }
 
-function getRestaurantBancolombiaLink() {
-  return RESTAURANTE?.link_bancolombia?.trim() || '';
-}
-
-function getRestaurantBancolombiaUrl() {
-  const link = getRestaurantBancolombiaLink();
-  if (!link) return '';
-  if (/^https?:\/\//i.test(link)) return link;
-  if (/^\d+$/.test(link)) {
-    return `https://link.bancolombia.com/transfer?account=${encodeURIComponent(link)}`;
-  }
-  return link;
-}
-
-function openRestaurantBancolombiaLink() {
-  const url = getRestaurantBancolombiaUrl();
-  if (!url) return;
-  window.open(url, '_blank', 'noopener,noreferrer');
-}
-
 function getRestaurantPaymentQrUrl() {
   return RESTAURANTE?.qr_pago_url?.trim() || '';
 }
@@ -1056,8 +1036,6 @@ function refreshPaymentUi() {
 function initSplitJoinPayButtons() {
   const wompiIcon = document.querySelector('#splitJoinPayBtn .split-join-card__pay-icon');
   const wompiLogo = wompiIcon?.querySelector('.split-join-card__pay-logo');
-  const bancolombiaBtn = document.getElementById('splitJoinBancolombiaBtn');
-  const bancoLogo = bancolombiaBtn?.querySelector('.split-join-card__pay-logo');
 
   if (wompiLogo && wompiIcon) {
     wompiLogo.addEventListener('error', () => {
@@ -1065,15 +1043,6 @@ function initSplitJoinPayButtons() {
     });
     if (wompiLogo.complete && wompiLogo.naturalWidth === 0) {
       wompiIcon.classList.add('split-join-card__pay-icon--fallback');
-    }
-  }
-
-  if (bancoLogo && bancolombiaBtn) {
-    bancoLogo.addEventListener('error', () => {
-      bancolombiaBtn.classList.add('split-join-card__pay--logo-fallback');
-    });
-    if (bancoLogo.complete && bancoLogo.naturalWidth === 0) {
-      bancolombiaBtn.classList.add('split-join-card__pay--logo-fallback');
     }
   }
 }
@@ -1084,10 +1053,7 @@ function updateSplitJoinUI() {
   const metaEl = document.getElementById('splitJoinMeta');
   const labelEl = document.getElementById('splitJoinPayLabel');
   const btn = document.getElementById('splitJoinPayBtn');
-  const bancolombiaBtn = document.getElementById('splitJoinBancolombiaBtn');
-  const bancolombiaAltLabel = document.getElementById('splitJoinBancolombiaAltLabel');
   const amount = state.splitJoinAmount;
-  const bancolombiaLink = getRestaurantBancolombiaLink();
 
   if (!section) return;
 
@@ -1104,17 +1070,10 @@ function updateSplitJoinUI() {
   }
 
   if (labelEl) {
-    labelEl.textContent = usesRestaurantQrPayment()
-      ? `Pagar ${formatCOP(amount)}`
-      : `Pagar ${formatCOP(amount)} con Wompi`;
+    labelEl.textContent = `Pagar ${formatCOP(amount)} con Wompi`;
   }
 
   if (btn) btn.disabled = state.paymentSubmitting;
-  if (bancolombiaBtn) {
-    bancolombiaBtn.hidden = !bancolombiaLink;
-    bancolombiaBtn.disabled = state.paymentSubmitting;
-  }
-  if (bancolombiaAltLabel) bancolombiaAltLabel.hidden = !bancolombiaLink;
 }
 
 function hideRestaurantSplitPaymentExtras() {
@@ -2322,10 +2281,6 @@ function initWompiPayment() {
     startPaymentFlow(amount, {
       hint: 'Pagá tu parte de la cuenta.',
     });
-  });
-
-  document.getElementById('splitJoinBancolombiaBtn')?.addEventListener('click', () => {
-    openRestaurantBancolombiaLink();
   });
 
   document.getElementById('restaurantQrPayLinkBtn')?.addEventListener('click', openRestaurantPaymentLink);
