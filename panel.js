@@ -19,7 +19,7 @@ let mesaQrAddOpen = false;
 
 const PANEL_SERVICE_PERCENT = 10;
 
-const VALID_PANEL_TABS = new Set(['pedidos', 'mesas', 'menu', 'resumen', 'qr', 'ajustes']);
+const VALID_PANEL_TABS = new Set(['pedidos', 'mesas', 'historial', 'menu', 'resumen', 'qr', 'ajustes']);
 const ACTIVE_PANEL_TAB_KEY = 'activePanelTab';
 
 function saveActivePanelTab(panelId) {
@@ -321,6 +321,10 @@ function updateHeaderCount() {
     el.textContent = `${mesas.length} QR${mesas.length !== 1 ? 's' : ''} de mesa`;
   } else if (activePanel === 'ajustes') {
     el.textContent = 'Ajustes del restaurante';
+  } else if (activePanel === 'historial') {
+    el.textContent = 'Historial de pagos';
+  } else if (activePanel === 'resumen') {
+    el.textContent = 'Resumen del día';
   } else {
     el.textContent = `${orders.length} pedido${orders.length !== 1 ? 's' : ''}`;
   }
@@ -353,6 +357,7 @@ function switchPanel(panelId) {
   if (panelId === 'mesas') renderMesas();
   if (panelId === 'menu' && typeof fetchMenuProducts === 'function') fetchMenuProducts();
   if (panelId === 'resumen' && typeof fetchDailySummary === 'function') fetchDailySummary();
+  if (panelId === 'historial' && typeof fetchPaymentHistory === 'function') fetchPaymentHistory(true);
   if (panelId === 'qr') renderMesaQrs();
   if (panelId === 'ajustes' && typeof loadRestaurantSettings === 'function') loadRestaurantSettings();
 }

@@ -40,8 +40,10 @@ function buildPanelUrl(slug) {
 }
 
 function getAllowedPanelTabs(role) {
-  if (role === 'admin') return new Set(['pedidos', 'mesas', 'menu', 'resumen', 'qr', 'ajustes']);
-  return new Set(['pedidos', 'mesas']);
+  if (role === 'admin') {
+    return new Set(['pedidos', 'mesas', 'historial', 'menu', 'resumen', 'qr', 'ajustes']);
+  }
+  return new Set(['pedidos', 'mesas', 'historial']);
 }
 
 function redirectToLogin(slug) {

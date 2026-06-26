@@ -38,6 +38,7 @@
     <nav class="panel-tabs" role="tablist" aria-label="Secciones del panel">
       <button type="button" class="panel-tabs__btn panel-tabs__btn--active" id="tabPedidos" role="tab" aria-selected="true" data-panel="pedidos">Pedidos</button>
       <button type="button" class="panel-tabs__btn" id="tabMesas" role="tab" aria-selected="false" data-panel="mesas">Mesas</button>
+      <button type="button" class="panel-tabs__btn" id="tabHistorial" role="tab" aria-selected="false" data-panel="historial">Pagos</button>
       <button type="button" class="panel-tabs__btn" id="tabMenu" role="tab" aria-selected="false" data-panel="menu">Menú</button>
       <button type="button" class="panel-tabs__btn" id="tabResumen" role="tab" aria-selected="false" data-panel="resumen">Resumen</button>
       <button type="button" class="panel-tabs__btn" id="tabQr" role="tab" aria-selected="false" data-panel="qr">QR</button>
@@ -85,6 +86,30 @@
           <div class="daily-summary__loading" id="dailySummaryLoading" hidden>Cargando resumen…</div>
           <p class="daily-summary__error" id="dailySummaryError" hidden role="alert"></p>
           <div class="daily-summary__content" id="dailySummaryContent" hidden></div>
+        </div>
+      </section>
+
+      <!-- Historial de pagos -->
+      <section class="panel-view" id="viewHistorial" role="tabpanel" aria-labelledby="tabHistorial" hidden>
+        <div class="payment-history">
+          <div class="payment-history__head">
+            <div>
+              <h2 class="payment-history__title">Historial de pagos</h2>
+              <p class="payment-history__hint" id="paymentHistoryDateHint">Pagos de hoy · hora Colombia</p>
+            </div>
+            <label class="payment-history__date-filter" for="paymentHistoryDate">
+              <span class="payment-history__date-label">Fecha</span>
+              <input type="date" class="payment-history__date-input" id="paymentHistoryDate">
+            </label>
+          </div>
+          <div class="payment-history__loading" id="paymentHistoryLoading" hidden>Cargando pagos…</div>
+          <p class="payment-history__error" id="paymentHistoryError" hidden role="alert"></p>
+          <p class="payment-history__empty" id="paymentHistoryEmpty" hidden>Sin pagos registrados en esta fecha.</p>
+          <ul class="payment-history__list" id="paymentHistoryList" aria-label="Pagos registrados"></ul>
+          <footer class="payment-history__footer" id="paymentHistoryFooter" hidden>
+            <span class="payment-history__footer-label" id="paymentHistoryTotalLabel">Total cobrado hoy:</span>
+            <strong class="payment-history__footer-value" id="paymentHistoryTotal">$0</strong>
+          </footer>
         </div>
       </section>
 
@@ -619,6 +644,7 @@
   <script src="/category-order.js"></script>
   <script src="/panel-menu.js"></script>
   <script src="/panel-summary.js"></script>
+  <script src="/panel-payments.js"></script>
   <script src="/panel-settings.js"></script>
 </body>
 </html>
