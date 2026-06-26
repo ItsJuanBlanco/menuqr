@@ -145,17 +145,110 @@ const state = {
 
 const PAYMENT_PENDING_MESSAGE = 'Pago recibido ✓ El mesero lo confirmará en un momento';
 
+let paymentSuccessReviewTimer = null;
+let sessionClosedLocally = false;
+
+function getGoogleReviewUrl() {
+  const url = RESTAURANTE?.google_review_url;
+  return url && String(url).trim() ? String(url).trim() : null;
+}
+
+function bindPaymentSuccessStars() {
+  const stars = document.getElementById('paymentSuccessStars');
+  if (!stars || stars.dataset.bound) return;
+
+  stars.dataset.bound = 'true';
+  stars.addEventListener('click', (event) => {
+    const star = event.target.closest('[data-star]');
+    if (!star) return;
+
+    const reviewUrl = getGoogleReviewUrl();
+    if (reviewUrl) {
+      window.open(reviewUrl, '_blank', 'noopener,noreferrer');
+    }
+  });
+}
+
+function clearClientSessionState() {
+  const mesaId = state.mesaId;
+  if (mesaId) clearStoredSession(mesaId);
+
+  state.sesionId = null;
+  state.sessionToken = null;
+  state.sessionTipo = null;
+  state.sessionNumero = null;
+  state.paymentPendingConfirmation = false;
+  state.accountItems = [];
+  state.groupPayments = [];
+  state.lastSplitQrUrl = '';
+
+  const badge = document.getElementById('sessionBadge');
+  if (badge) badge.hidden = true;
+}
+
 function showPaymentSuccessScreen(totalPaid) {
   const screen = document.getElementById('paymentSuccessScreen');
   const amountEl = document.getElementById('paymentSuccessAmount');
+  const subtitle = document.getElementById('paymentSuccessSubtitle');
+  const review = document.getElementById('paymentSuccessReview');
+
+  if (paymentSuccessReviewTimer) {
+    clearTimeout(paymentSuccessReviewTimer);
+    paymentSuccessReviewTimer = null;
+  }
 
   if (amountEl) amountEl.textContent = formatCOP(totalPaid);
+  if (subtitle) {
+    subtitle.hidden = false;
+    subtitle.textContent = 'Gracias por tu visita.';
+  }
+  if (review) review.hidden = true;
+
   if (screen) {
     screen.hidden = false;
     screen.setAttribute('aria-hidden', 'false');
   }
 
   document.getElementById('mainApp')?.setAttribute('hidden', '');
+  bindPaymentSuccessStars();
+
+  paymentSuccessReviewTimer = setTimeout(() => {
+    if (subtitle) subtitle.hidden = true;
+    if (review) review.hidden = false;
+    paymentSuccessReviewTimer = null;
+  }, 2000);
+}
+
+async function resolveSessionPaidTotal(sesionId) {
+  const breakdown = getPaymentBreakdown();
+  if (breakdown.total > 0) return breakdown.total;
+
+  try {
+    const approvedTotal = await getSessionApprovedPaymentsTotal(sesionId);
+    if (approvedTotal > 0) return approvedTotal;
+  } catch (error) {
+    console.error(error);
+  }
+
+  return getAccountDeliveredTotal();
+}
+
+async function handleSessionDeactivated(payload) {
+  const oldRow = payload.old;
+  const newRow = payload.new;
+
+  if (!newRow || newRow.activa !== false) return;
+  if (oldRow?.activa === false) return;
+  if (!state.sesionId || newRow.id !== state.sesionId) return;
+
+  if (sessionClosedLocally) {
+    sessionClosedLocally = false;
+    return;
+  }
+
+  const totalPaid = await resolveSessionPaidTotal(state.sesionId);
+  clearClientSessionState();
+  showPaymentSuccessScreen(totalPaid);
 }
 
 async function closeSessionAfterWompiPayment(referenciaWompi, totalPaid) {
@@ -204,20 +297,8 @@ async function closeSessionAfterWompiPayment(referenciaWompi, totalPaid) {
     if (mesaError) throw mesaError;
   }
 
-  clearStoredSession(mesaId);
-
-  state.sesionId = null;
-  state.sessionToken = null;
-  state.sessionTipo = null;
-  state.sessionNumero = null;
-  state.paymentPendingConfirmation = false;
-  state.accountItems = [];
-  state.groupPayments = [];
-  state.lastSplitQrUrl = '';
-
-  const badge = document.getElementById('sessionBadge');
-  if (badge) badge.hidden = true;
-
+  sessionClosedLocally = true;
+  clearClientSessionState();
   showPaymentSuccessScreen(totalPaid);
 }
 
@@ -1196,8 +1277,12 @@ function subscribeToRealtime() {
     channel.on(
       'postgres_changes',
       { event: 'UPDATE', schema: 'public', table: 'sesiones', filter: `id=eq.${state.sesionId}` },
-      () => {
-        loadSessionPaymentStatus().then(() => renderAccount());
+      (payload) => {
+        handleSessionDeactivated(payload).then(() => {
+          if (state.sesionId) {
+            loadSessionPaymentStatus().then(() => renderAccount());
+          }
+        });
       }
     );
     channel.on(

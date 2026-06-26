@@ -538,6 +538,25 @@ button {
   border-bottom: 1px solid var(--border);
 }
 
+.mesa-card__head-badges {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.mesa-card__paying-badge {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #92400e;
+  background: #fef3c7;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid #fcd34d;
+  white-space: nowrap;
+}
+
 .mesa-card__title {
   display: flex;
   align-items: center;

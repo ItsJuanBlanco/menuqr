@@ -1033,12 +1033,18 @@ function handleSesionWompiPaymentClosed(payload) {
   if (oldRow?.activa === false) return;
 
   const referencia = newRow.referencia_wompi;
-  if (!referencia || String(referencia).startsWith('qr-propio')) return;
+  const hadPaymentActivity =
+    Boolean(referencia) ||
+    oldRow?.pago_en_proceso === true ||
+    oldRow?.pago_pendiente_confirmacion === true;
+
+  if (!hadPaymentActivity) return;
+  if (referencia && String(referencia).startsWith('qr-propio')) return;
 
   const mesa = mesas.find((entry) => entry.id === newRow.mesa_id);
   const mesaNum = mesa?.numero ?? '?';
   const code = formatSessionCode(newRow.numero);
-  showToast(`💳 Mesa ${mesaNum} — Cuenta #${code} pagada`, 'success');
+  showToast(`✅ Mesa ${mesaNum} — Cuenta #${code} pagada automáticamente`, 'success');
 }
 
 function onSesionesRealtimeUpdate(payload) {
@@ -1063,6 +1069,9 @@ function renderMesas() {
         ? sessions.reduce((sum, session) => sum + session.total, 0)
         : grouped.reduce((sum, g) => sum + g.subtotal, 0);
       const estado = mesa.estado || 'libre';
+      const isMesaPaying = sessions.some(
+        (session) => session.pago_en_proceso === true && session.pago_pendiente_confirmacion !== true
+      );
       const sessionsHtml =
         sessions.length === 0
           ? '<p class="mesa-card__sessions-empty">Sin cuentas activas</p>'
@@ -1108,7 +1117,10 @@ function renderMesas() {
         <article class="mesa-card${mesa.mesero_requerido ? ' mesa-card--calling' : ''}">
           <header class="mesa-card__head">
             <span class="mesa-card__num">Mesa ${mesa.numero}</span>
-            <span class="mesa-card__status mesa-card__status--${estado}">${formatMesaEstado(estado)}</span>
+            <div class="mesa-card__head-badges">
+              ${isMesaPaying ? '<span class="mesa-card__paying-badge">💳 Pagando...</span>' : ''}
+              <span class="mesa-card__status mesa-card__status--${estado}">${formatMesaEstado(estado)}</span>
+            </div>
           </header>
           ${waiterAlert}
           <div class="mesa-card__body">${sessionsHtml}</div>
@@ -3064,6 +3076,7 @@ function subscribeToRealtime() {
 
   const tables = ['pedidos', 'pedido_items', 'mesas', 'productos', 'pagos_grupo'];
   realtimeChannel = supabaseClient.channel('panel-live-sync');
+  const sesionesFilter = `restaurante_id=eq.${RESTAURANTE_ID}`;
 
   tables.forEach((table) => {
     realtimeChannel
@@ -3072,14 +3085,22 @@ function subscribeToRealtime() {
       .on('postgres_changes', { event: 'DELETE', schema: 'public', table }, scheduleRealtimeRefresh);
   });
 
-  realtimeChannel.on(
-    'postgres_changes',
-    { event: 'UPDATE', schema: 'public', table: 'sesiones' },
-    onSesionesRealtimeUpdate
-  );
   realtimeChannel
-    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'sesiones' }, scheduleRealtimeRefresh)
-    .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'sesiones' }, scheduleRealtimeRefresh);
+    .on(
+      'postgres_changes',
+      { event: 'UPDATE', schema: 'public', table: 'sesiones', filter: sesionesFilter },
+      onSesionesRealtimeUpdate
+    )
+    .on(
+      'postgres_changes',
+      { event: 'INSERT', schema: 'public', table: 'sesiones', filter: sesionesFilter },
+      onSesionesRealtimeUpdate
+    )
+    .on(
+      'postgres_changes',
+      { event: 'DELETE', schema: 'public', table: 'sesiones', filter: sesionesFilter },
+      onSesionesRealtimeUpdate
+    );
 
   realtimeChannel.subscribe((status, err) => {
     const live = document.getElementById('liveIndicator');
