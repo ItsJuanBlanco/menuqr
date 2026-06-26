@@ -3271,7 +3271,7 @@ body.mesa-qr-printing .mesa-qr-print {
   }
 
   .order-card {
-    padding: 10px 10px 10px 8px;
+    padding: 14px;
     border-radius: 10px;
     box-shadow: none;
     border-color: color-mix(in srgb, var(--border) 80%, transparent);
@@ -3325,9 +3325,9 @@ body.mesa-qr-printing .mesa-qr-print {
 
   .order-card__bulk-btn {
     width: 100%;
-    padding: 5px 8px;
+    padding: 10px;
     border-radius: 6px;
-    font-size: 0.6875rem;
+    font-size: 13px;
     font-weight: 600;
     color: var(--text-muted);
     background: transparent;
@@ -3347,27 +3347,30 @@ body.mesa-qr-printing .mesa-qr-print {
 
   .order-card__items {
     padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
   }
 
   .order-card__items .item-row {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto auto;
     gap: 6px;
-    padding: 4px 0;
+    padding: 0;
     border-bottom: none;
   }
 
   .order-card__items .item-row + .item-row {
-    border-top: 1px solid color-mix(in srgb, var(--border) 65%, transparent);
+    border-top: none;
   }
 
   .order-card__items .item-row__name {
-    font-size: 0.8125rem;
+    font-size: 15px;
     font-weight: 600;
   }
 
   .order-card__items .item-row__qty {
-    font-size: 0.6875rem;
+    font-size: 13px;
     color: var(--text-dim);
   }
 
@@ -3380,9 +3383,14 @@ body.mesa-qr-printing .mesa-qr-print {
   }
 
   .order-card__items .item-row__btn {
-    padding: 4px 8px;
-    font-size: 11px;
+    padding: 10px 16px;
+    font-size: 13px;
     font-weight: 600;
+    min-height: 44px;
+    box-sizing: border-box;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     border-radius: 6px;
     white-space: nowrap;
   }
