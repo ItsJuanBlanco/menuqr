@@ -1554,6 +1554,123 @@ function onSesionesRealtimeUpdate(payload) {
   scheduleRealtimeRefresh();
 }
 
+function sortMesasByNumero(a, b) {
+  const numA = Number(a.numero);
+  const numB = Number(b.numero);
+  if (!Number.isNaN(numA) && !Number.isNaN(numB) && numA !== numB) return numA - numB;
+  return String(a.numero ?? '').localeCompare(String(b.numero ?? ''), undefined, { numeric: true });
+}
+
+function renderOcupadaMesaCard(mesa) {
+  const accountItems = mesaAccounts[mesa.id] || [];
+  const sessions = mesaSessionBreakdown[mesa.id] || [];
+  const grouped = groupDeliveredItems(accountItems);
+  const total = sessions.length
+    ? sessions.reduce((sum, session) => sum + session.total, 0)
+    : grouped.reduce((sum, g) => sum + g.subtotal, 0);
+  const estado = mesa.estado || 'libre';
+  const isMesaPaying = sessions.some(
+    (session) => session.pago_en_proceso === true && session.pago_pendiente_confirmacion !== true
+  );
+
+  const waiterAlert = mesa.mesero_requerido
+    ? `<div class="mesa-card__alert">
+        <span class="mesa-card__alert-icon" aria-hidden="true">🔔</span>
+        Mesero requerido
+        <button type="button" class="mesa-card__alert-btn" data-action="atender-mesero" data-mesa-id="${mesa.id}">Atendido</button>
+      </div>`
+    : '';
+
+  const sessionsHtml =
+    sessions.length === 0
+      ? '<p class="mesa-card__sessions-empty">Sin cuentas activas</p>'
+      : `<ul class="mesa-card__session-lines">${sessions
+          .map((session) => {
+            const paidTotal = session.paidTotal || 0;
+            const sessionTotal = session.total || 0;
+            const isComplete = session.pago_pendiente_confirmacion === true;
+            const isPaying = session.pago_en_proceso === true && !isComplete;
+
+            let paymentInfo = '';
+            if (isComplete) {
+              paymentInfo = `<div class="mesa-card__payment-alert">
+                  <span class="mesa-card__payment-badge mesa-card__payment-badge--complete">✅ Pago recibido</span>
+                  <button type="button" class="mesa-card__payment-btn" data-action="confirmar-pago" data-sesion-id="${session.id}" data-mesa-id="${mesa.id}" data-mesa-num="${mesa.numero}">Cerrar mesa</button>
+                </div>`;
+            } else if (isPaying) {
+              paymentInfo = `<span class="mesa-card__payment-badge mesa-card__payment-badge--paying mesa-card__payment-badge--pulse">💳 Pagando...</span>`;
+            } else if (
+              paidTotal > 0 &&
+              sessionTotal > 0 &&
+              paidTotal < sessionTotal
+            ) {
+              paymentInfo = `<p class="mesa-card__payment-progress">💳 ${formatCOP(paidTotal)} / ${formatCOP(sessionTotal)} pagados</p>`;
+            }
+
+            return `
+              <li class="mesa-card__session-block${isComplete || isPaying ? ' mesa-card__session-block--payment' : ''}">
+                <div class="mesa-card__session-line">
+                  <span class="mesa-card__session-label">${escapeHtml(session.label)}</span>
+                  <span class="mesa-card__session-amount">${formatCOP(session.total)}</span>
+                </div>
+                ${paymentInfo}
+              </li>
+            `;
+          })
+          .join('')}</ul>`;
+
+  const cardClasses = ['mesa-card', 'mesa-card--ocupada', mesa.mesero_requerido ? 'mesa-card--calling' : '']
+    .filter(Boolean)
+    .join(' ');
+
+  return `
+    <article class="${cardClasses}" data-mesa-id="${mesa.id}">
+      <header class="mesa-card__head">
+        <span class="mesa-card__num">Mesa ${mesa.numero}</span>
+        <div class="mesa-card__head-badges">
+          ${isMesaPaying ? '<span class="mesa-card__paying-badge mesa-card__paying-badge--pulse">💳 Pagando...</span>' : ''}
+          <span class="mesa-card__status mesa-card__status--${estado}">${formatMesaEstado(estado)}</span>
+        </div>
+      </header>
+      <div class="mesa-card__details">
+        ${waiterAlert}
+        <div class="mesa-card__body">${sessionsHtml}</div>
+        <div class="mesa-card__total">
+          <span class="mesa-card__total-label">Total acumulado</span>
+          <strong class="mesa-card__total-amount">${formatCOP(total)}</strong>
+        </div>
+        <div class="mesa-card__actions">
+          <button type="button" class="mesa-card__btn mesa-card__btn--new" data-action="nueva-orden" data-mesa-id="${mesa.id}" data-mesa-num="${mesa.numero}">Nueva orden</button>
+          <button type="button" class="mesa-card__btn mesa-card__btn--view" data-action="ver-cuenta" data-mesa-id="${mesa.id}" data-mesa-num="${mesa.numero}" ${sessions.length === 0 ? 'disabled' : ''}>Ver cuenta</button>
+          <button type="button" class="mesa-card__btn mesa-card__btn--split" data-action="dividir-pago-mesa" data-mesa-id="${mesa.id}" data-mesa-num="${mesa.numero}" ${getChargeableAccountSessions(mesa.id).length === 0 ? 'disabled' : ''}>Dividir pago</button>
+          <button type="button" class="mesa-card__btn mesa-card__btn--close" data-action="cerrar-mesa" data-mesa-id="${mesa.id}" data-mesa-num="${mesa.numero}">Cerrar mesa</button>
+        </div>
+      </div>
+    </article>
+  `;
+}
+
+function renderLibreMesaCard(mesa) {
+  return `
+    <article
+      class="mesa-card mesa-card--libre${mesa.mesero_requerido ? ' mesa-card--calling' : ''}"
+      data-mesa-id="${mesa.id}"
+      data-action="nueva-orden"
+      data-mesa-num="${mesa.numero}"
+      role="button"
+      tabindex="0"
+      aria-label="Mesa ${mesa.numero}, Libre — Nueva orden"
+    >
+      <header class="mesa-card__head">
+        <span class="mesa-card__num">Mesa ${mesa.numero}</span>
+        <div class="mesa-card__head-badges">
+          <span class="mesa-card__status mesa-card__status--libre">${formatMesaEstado('libre')}</span>
+        </div>
+      </header>
+    </article>
+  `;
+}
+
 function renderMesas() {
   const list = document.getElementById('mesasList');
 
@@ -1562,113 +1679,24 @@ function renderMesas() {
     return;
   }
 
-  list.innerHTML = mesas
-    .map((mesa) => {
-      const accountItems = mesaAccounts[mesa.id] || [];
-      const sessions = mesaSessionBreakdown[mesa.id] || [];
-      const grouped = groupDeliveredItems(accountItems);
-      const total = sessions.length
-        ? sessions.reduce((sum, session) => sum + session.total, 0)
-        : grouped.reduce((sum, g) => sum + g.subtotal, 0);
-      const estado = mesa.estado || 'libre';
-      const isLibre = estado === 'libre';
-      const isMesaPaying = sessions.some(
-        (session) => session.pago_en_proceso === true && session.pago_pendiente_confirmacion !== true
-      );
+  const ocupadas = mesas.filter((mesa) => (mesa.estado || 'libre') !== 'libre').sort(sortMesasByNumero);
+  const libres = mesas.filter((mesa) => (mesa.estado || 'libre') === 'libre').sort(sortMesasByNumero);
 
-      const waiterAlert = mesa.mesero_requerido
-        ? `<div class="mesa-card__alert">
-            <span class="mesa-card__alert-icon" aria-hidden="true">🔔</span>
-            Mesero requerido
-            <button type="button" class="mesa-card__alert-btn" data-action="atender-mesero" data-mesa-id="${mesa.id}">Atendido</button>
-          </div>`
-        : '';
+  const parts = [];
 
-      let detailsHtml = '';
+  if (ocupadas.length > 0) {
+    parts.push(`<div class="panel-mesas__occupied">${ocupadas.map(renderOcupadaMesaCard).join('')}</div>`);
+  }
 
-      if (!isLibre) {
-        const sessionsHtml =
-          sessions.length === 0
-            ? '<p class="mesa-card__sessions-empty">Sin cuentas activas</p>'
-            : `<ul class="mesa-card__session-lines">${sessions
-                .map((session) => {
-                  const paidTotal = session.paidTotal || 0;
-                  const sessionTotal = session.total || 0;
-                  const isComplete = session.pago_pendiente_confirmacion === true;
-                  const isPaying = session.pago_en_proceso === true && !isComplete;
+  if (libres.length > 0 && ocupadas.length > 0) {
+    parts.push('<div class="panel-mesas__divider" role="separator">Mesas libres</div>');
+  }
 
-                  let paymentInfo = '';
-                  if (isComplete) {
-                    paymentInfo = `<div class="mesa-card__payment-alert">
-                        <span class="mesa-card__payment-badge mesa-card__payment-badge--complete">✅ Pago recibido</span>
-                        <button type="button" class="mesa-card__payment-btn" data-action="confirmar-pago" data-sesion-id="${session.id}" data-mesa-id="${mesa.id}" data-mesa-num="${mesa.numero}">Cerrar mesa</button>
-                      </div>`;
-                  } else if (isPaying) {
-                    paymentInfo = `<span class="mesa-card__payment-badge mesa-card__payment-badge--paying mesa-card__payment-badge--pulse">💳 Pagando...</span>`;
-                  } else if (
-                    paidTotal > 0 &&
-                    sessionTotal > 0 &&
-                    paidTotal < sessionTotal
-                  ) {
-                    paymentInfo = `<p class="mesa-card__payment-progress">💳 ${formatCOP(paidTotal)} / ${formatCOP(sessionTotal)} pagados</p>`;
-                  }
+  if (libres.length > 0) {
+    parts.push(`<div class="panel-mesas__free">${libres.map(renderLibreMesaCard).join('')}</div>`);
+  }
 
-                  return `
-                    <li class="mesa-card__session-block${isComplete || isPaying ? ' mesa-card__session-block--payment' : ''}">
-                      <div class="mesa-card__session-line">
-                        <span class="mesa-card__session-label">${escapeHtml(session.label)}</span>
-                        <span class="mesa-card__session-amount">${formatCOP(session.total)}</span>
-                      </div>
-                      ${paymentInfo}
-                    </li>
-                  `;
-                })
-                .join('')}</ul>`;
-
-        detailsHtml = `
-          <div class="mesa-card__details">
-            ${waiterAlert}
-            <div class="mesa-card__body">${sessionsHtml}</div>
-            <div class="mesa-card__total">
-              <span class="mesa-card__total-label">Total acumulado</span>
-              <strong class="mesa-card__total-amount">${formatCOP(total)}</strong>
-            </div>
-            <div class="mesa-card__actions">
-              <button type="button" class="mesa-card__btn mesa-card__btn--new" data-action="nueva-orden" data-mesa-id="${mesa.id}" data-mesa-num="${mesa.numero}">Nueva orden</button>
-              <button type="button" class="mesa-card__btn mesa-card__btn--view" data-action="ver-cuenta" data-mesa-id="${mesa.id}" data-mesa-num="${mesa.numero}" ${sessions.length === 0 ? 'disabled' : ''}>Ver cuenta</button>
-              <button type="button" class="mesa-card__btn mesa-card__btn--split" data-action="dividir-pago-mesa" data-mesa-id="${mesa.id}" data-mesa-num="${mesa.numero}" ${getChargeableAccountSessions(mesa.id).length === 0 ? 'disabled' : ''}>Dividir pago</button>
-              <button type="button" class="mesa-card__btn mesa-card__btn--close" data-action="cerrar-mesa" data-mesa-id="${mesa.id}" data-mesa-num="${mesa.numero}">Cerrar mesa</button>
-            </div>
-          </div>
-        `;
-      }
-
-      const cardClasses = [
-        'mesa-card',
-        mesa.mesero_requerido ? 'mesa-card--calling' : '',
-        isLibre ? 'mesa-card--libre' : 'mesa-card--ocupada',
-      ]
-        .filter(Boolean)
-        .join(' ');
-
-      const cardClickAttrs = isLibre
-        ? ` data-action="nueva-orden" data-mesa-id="${mesa.id}" data-mesa-num="${mesa.numero}" role="button" tabindex="0" aria-label="Mesa ${mesa.numero}, ${formatMesaEstado(estado)} — Nueva orden"`
-        : '';
-
-      return `
-        <article class="${cardClasses}" data-mesa-id="${mesa.id}"${cardClickAttrs}>
-          <header class="mesa-card__head">
-            <span class="mesa-card__num">Mesa ${mesa.numero}</span>
-            <div class="mesa-card__head-badges">
-              ${isMesaPaying ? '<span class="mesa-card__paying-badge mesa-card__paying-badge--pulse">💳 Pagando...</span>' : ''}
-              <span class="mesa-card__status mesa-card__status--${estado}">${formatMesaEstado(estado)}</span>
-            </div>
-          </header>
-          ${detailsHtml}
-        </article>
-      `;
-    })
-    .join('');
+  list.innerHTML = parts.join('');
 }
 
 function bindMesasActions() {

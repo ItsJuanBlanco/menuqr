@@ -306,9 +306,41 @@ button {
 }
 
 .panel-mesas {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.panel-mesas__occupied {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
   gap: 16px;
+}
+
+.panel-mesas__divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 4px 0;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.panel-mesas__divider::before,
+.panel-mesas__divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: color-mix(in srgb, var(--border) 85%, transparent);
+}
+
+.panel-mesas__free {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .mesas-toolbar {
@@ -3034,6 +3066,48 @@ body.mesa-qr-printing .mesa-qr-print {
   box-shadow: var(--shadow-sm);
 }
 
+.payment-history__row-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.payment-history__type {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.payment-history__method {
+  flex-shrink: 0;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.payment-history__method--wompi {
+  background: #eff6ff;
+  color: #2563eb;
+}
+
+.payment-history__method--mesero {
+  background: #ecfdf5;
+  color: #16a34a;
+}
+
+.payment-history__row--mesero {
+  border-left: 3px solid #16a34a;
+}
+
+.payment-history__row--wompi {
+  border-left: 3px solid #2563eb;
+}
+
 .payment-history__row-top {
   display: flex;
   align-items: baseline;
@@ -3112,6 +3186,11 @@ body.mesa-qr-printing .mesa-qr-print {
 .payment-history__status--rechazado {
   background: #fee2e2;
   color: #991b1b;
+}
+
+.payment-history__status--confirmado {
+  background: #dcfce7;
+  color: #166534;
 }
 
 .payment-history__footer {
@@ -3337,11 +3416,19 @@ body.mesa-qr-printing .mesa-qr-print {
   }
 
   .panel-orders,
-  .panel-mesas {
+  .panel-mesas__occupied {
     grid-template-columns: 1fr;
   }
 
   .panel-mesas {
+    gap: 12px;
+  }
+
+  .panel-mesas__occupied {
+    gap: 12px;
+  }
+
+  .panel-mesas__free {
     gap: 4px;
   }
 

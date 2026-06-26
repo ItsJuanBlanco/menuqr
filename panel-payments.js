@@ -41,29 +41,56 @@ function formatPagoEstado(estado) {
   if (estado === 'aprobado') return 'Aprobado';
   if (estado === 'pendiente') return 'Pendiente';
   if (estado === 'rechazado') return 'Rechazado';
+  if (estado === 'confirmado') return 'Confirmado';
   return estado || '—';
 }
 
-function normalizePaymentHistoryRow(row) {
+function getPaymentItemSubtotal(item) {
+  if (typeof getItemSubtotal === 'function') return getItemSubtotal(item);
+  return Number(item.subtotal ?? Number(item.precio_unitario) * Number(item.cantidad)) || 0;
+}
+
+function normalizeWompiPaymentRow(row) {
   const sesion = row.sesiones;
   const mesa = sesion?.mesas;
 
   return {
-    id: row.id,
+    id: `wompi-${row.id}`,
+    kind: 'wompi',
+    metodo: 'Wompi',
+    tipoLabel: '💳 Pago Wompi',
     created_at: row.created_at,
     monto: Number(row.monto) || 0,
     referencia_wompi: row.referencia_wompi || '',
     estado: row.estado || '',
     sesion_numero: sesion?.numero,
     mesa_numero: mesa?.numero,
+    countsTowardTotal: row.estado === 'aprobado',
   };
 }
 
-async function fetchPaymentHistoryRows(bounds) {
+function normalizeMeseroPaymentRow(session, monto) {
+  return {
+    id: `mesero-${session.id}`,
+    kind: 'mesero',
+    metodo: 'Mesero',
+    tipoLabel: '✅ Confirmado por mesero',
+    created_at: session.updated_at,
+    monto,
+    referencia_wompi: '',
+    estado: 'confirmado',
+    sesion_numero: session.numero,
+    mesa_numero: session.mesas?.numero,
+    countsTowardTotal: true,
+  };
+}
+
+async function fetchWompiPaymentHistoryRows(bounds) {
   const { data, error } = await supabaseClient
     .from('pagos_grupo')
     .select(`
       id,
+      sesion_id,
       monto,
       referencia_wompi,
       estado,
@@ -80,12 +107,88 @@ async function fetchPaymentHistoryRows(bounds) {
     .order('created_at', { ascending: false });
 
   if (error) throw error;
-  return (data || []).map(normalizePaymentHistoryRow);
+  return (data || []).map(normalizeWompiPaymentRow);
+}
+
+async function fetchMeseroManualPaymentHistoryRows(bounds) {
+  const { data: sessions, error: sessionsError } = await supabaseClient
+    .from('sesiones')
+    .select(`
+      id,
+      numero,
+      updated_at,
+      cargo_servicio,
+      propina,
+      mesas ( numero )
+    `)
+    .eq('restaurante_id', RESTAURANTE_ID)
+    .eq('activa', false)
+    .eq('pago_pendiente_confirmacion', false)
+    .eq('pago_en_proceso', false)
+    .gte('updated_at', bounds.start)
+    .lte('updated_at', bounds.end);
+
+  if (sessionsError) throw sessionsError;
+
+  const closedSessions = sessions || [];
+  if (closedSessions.length === 0) return [];
+
+  const sessionIds = closedSessions.map((session) => session.id);
+
+  const [{ data: pagosGrupo, error: pagosError }, { data: items, error: itemsError }] = await Promise.all([
+    supabaseClient.from('pagos_grupo').select('sesion_id').in('sesion_id', sessionIds),
+    supabaseClient
+      .from('pedido_items')
+      .select(`
+        subtotal,
+        precio_unitario,
+        cantidad,
+        pedidos!inner ( sesion_id, restaurante_id )
+      `)
+      .eq('confirmado_por_mesero', true)
+      .eq('pedidos.restaurante_id', RESTAURANTE_ID)
+      .in('pedidos.sesion_id', sessionIds),
+  ]);
+
+  if (pagosError) throw pagosError;
+  if (itemsError) throw itemsError;
+
+  const sessionsWithPagosGrupo = new Set((pagosGrupo || []).map((pago) => pago.sesion_id));
+  const manualSessions = closedSessions.filter((session) => !sessionsWithPagosGrupo.has(session.id));
+
+  if (manualSessions.length === 0) return [];
+
+  const itemsBySession = new Map();
+  (items || []).forEach((item) => {
+    const sesionId = item.pedidos?.sesion_id;
+    if (!sesionId) return;
+    itemsBySession.set(sesionId, (itemsBySession.get(sesionId) || 0) + getPaymentItemSubtotal(item));
+  });
+
+  return manualSessions
+    .map((session) => {
+      const itemsTotal = itemsBySession.get(session.id) || 0;
+      const extras = (Number(session.cargo_servicio) || 0) + (Number(session.propina) || 0);
+      const monto = itemsTotal + extras;
+      return normalizeMeseroPaymentRow(session, monto);
+    })
+    .filter((row) => row.monto > 0);
+}
+
+async function fetchPaymentHistoryRows(bounds) {
+  const [wompiRows, meseroRows] = await Promise.all([
+    fetchWompiPaymentHistoryRows(bounds),
+    fetchMeseroManualPaymentHistoryRows(bounds),
+  ]);
+
+  return [...wompiRows, ...meseroRows].sort(
+    (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+  );
 }
 
 function sumApprovedPayments(rows) {
   return rows.reduce((sum, row) => {
-    if (row.estado !== 'aprobado') return sum;
+    if (!row.countsTowardTotal) return sum;
     return sum + row.monto;
   }, 0);
 }
@@ -98,10 +201,20 @@ function renderPaymentHistoryRow(row) {
   const mesaLabel =
     row.mesa_numero != null && row.mesa_numero !== '' ? `Mesa ${escapeHtml(row.mesa_numero)}` : 'Mesa —';
   const referencia = row.referencia_wompi ? escapeHtml(row.referencia_wompi) : '—';
+  const isMesero = row.kind === 'mesero';
+  const rowKindClass = isMesero ? ' payment-history__row--mesero' : ' payment-history__row--wompi';
+  const methodClass = isMesero ? ' payment-history__method--mesero' : ' payment-history__method--wompi';
   const estadoClass = row.estado ? ` payment-history__status--${row.estado}` : '';
+  const detailText = isMesero
+    ? 'Cierre confirmado en panel'
+    : `Ref. Wompi: ${referencia}`;
 
   return `
-    <li class="payment-history__row">
+    <li class="payment-history__row${rowKindClass}">
+      <div class="payment-history__row-header">
+        <span class="payment-history__type">${escapeHtml(row.tipoLabel)}</span>
+        <span class="payment-history__method${methodClass}">${escapeHtml(row.metodo)}</span>
+      </div>
       <div class="payment-history__row-top">
         <time class="payment-history__datetime" datetime="${escapeHtml(row.created_at || '')}">
           ${escapeHtml(formatPaymentDateTime(row.created_at))}
@@ -114,7 +227,7 @@ function renderPaymentHistoryRow(row) {
         <span>Cuenta ${sessionCode}</span>
       </div>
       <div class="payment-history__row-detail">
-        <span class="payment-history__ref">Ref. Wompi: ${referencia}</span>
+        <span class="payment-history__ref">${detailText}</span>
         <span class="payment-history__status${estadoClass}">${escapeHtml(formatPagoEstado(row.estado))}</span>
       </div>
     </li>
