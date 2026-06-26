@@ -119,7 +119,16 @@
       <div class="modal__backdrop" data-close-modal></div>
       <div class="modal__box modal__box--account" role="dialog" aria-labelledby="modalTitle">
         <header class="modal__head modal__head--account">
-          <h2 class="modal__title" id="modalTitle">Cuenta Mesa 1</h2>
+          <div class="modal__head-main">
+            <h2 class="modal__title" id="modalTitle">Cuenta Mesa 1</h2>
+            <button
+              type="button"
+              class="modal__split-link"
+              id="modalSplitAccountBtn"
+              data-action="separar-cuenta"
+              hidden
+            >Separar cuenta</button>
+          </div>
           <button type="button" class="modal__close" data-close-modal aria-label="Cerrar">×</button>
         </header>
         <div class="modal__account-scroll">
@@ -150,6 +159,27 @@
             </div>
           </div>
         </footer>
+      </div>
+    </div>
+
+    <!-- Modal separar cuenta -->
+    <div class="modal" id="splitAccountModal" hidden aria-hidden="true">
+      <div class="modal__backdrop" data-close-split-account></div>
+      <div class="modal__box modal__box--split" role="dialog" aria-labelledby="splitAccountTitle">
+        <header class="modal__head">
+          <h2 class="modal__title" id="splitAccountTitle">Separar cuenta</h2>
+          <button type="button" class="modal__close" data-close-split-account aria-label="Cerrar">×</button>
+        </header>
+        <p class="split-account__hint" id="splitAccountHint">Elegí los productos para mover a una cuenta nueva.</p>
+        <label class="split-account__field" id="splitAccountSessionField" hidden>
+          <span class="split-account__label">Cuenta origen</span>
+          <select class="split-account__select" id="splitAccountSessionSelect"></select>
+        </label>
+        <div class="split-account__list" id="splitAccountList"></div>
+        <p class="split-account__summary" id="splitAccountSummary">0 productos · $0</p>
+        <button type="button" class="split-account__confirm" id="splitAccountConfirmBtn" disabled>
+          Mover a cuenta nueva
+        </button>
       </div>
     </div>
 

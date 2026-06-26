@@ -974,6 +974,7 @@ function renderMesas() {
           <div class="mesa-card__actions">
             <button type="button" class="mesa-card__btn mesa-card__btn--new" data-action="nueva-orden" data-mesa-id="${mesa.id}" data-mesa-num="${mesa.numero}">Nueva orden</button>
             <button type="button" class="mesa-card__btn mesa-card__btn--view" data-action="ver-cuenta" data-mesa-id="${mesa.id}" data-mesa-num="${mesa.numero}" ${sessions.length === 0 ? 'disabled' : ''}>Ver cuenta</button>
+            <button type="button" class="mesa-card__btn mesa-card__btn--split" data-action="separar-cuenta-mesa" data-mesa-id="${mesa.id}" data-mesa-num="${mesa.numero}" ${getSplittableSessions(mesa.id).length === 0 ? 'disabled' : ''}>Separar</button>
             <button type="button" class="mesa-card__btn mesa-card__btn--close" data-action="cerrar-mesa" data-mesa-id="${mesa.id}" data-mesa-num="${mesa.numero}">Cerrar mesa</button>
           </div>
         </article>
@@ -992,6 +993,7 @@ function bindMesasActions() {
     const { action, mesaId, mesaNum } = btn.dataset;
 
     if (action === 'ver-cuenta') openAccountModal(mesaId, mesaNum);
+    else if (action === 'separar-cuenta-mesa') openSplitAccountModal(mesaId, mesaNum);
     else if (action === 'nueva-orden') openNewOrderModal(mesaId, mesaNum);
     else if (action === 'cerrar-mesa') closeMesa(mesaId, mesaNum);
     else if (action === 'atender-mesero') markWaiterAttended(mesaId);
@@ -1015,10 +1017,32 @@ function getChargeableAccountSessions(mesaId) {
   return (mesaSessionBreakdown[mesaId] || []).filter((session) => session.total > 0);
 }
 
+function getPedidoItemSubtotal(item) {
+  return Number(item.subtotal ?? Number(item.precio_unitario) * Number(item.cantidad)) || 0;
+}
+
+function canSplitSession(session, items = []) {
+  if (!session || session.total <= 0) return false;
+  if (session.pago_pendiente_confirmacion || session.pago_en_proceso) return false;
+
+  const grouped = groupDeliveredItems(items);
+  const totalQty = grouped.reduce((sum, group) => sum + group.qty, 0);
+
+  return grouped.length >= 2 || totalQty >= 2;
+}
+
+function getSplittableSessions(mesaId) {
+  const sessions = mesaSessionBreakdown[mesaId] || [];
+  const sessionItems = mesaSessionItems[mesaId] || {};
+
+  return sessions.filter((session) => canSplitSession(session, sessionItems[session.sesionId] || []));
+}
+
 function renderAccountSessionCard(session, items, mesaId, mesaNum, showSessionActions) {
   const grouped = groupDeliveredItems(items);
   const heading = formatAccountSessionHeading(session);
   const hasTotal = session.total > 0;
+  const splittable = canSplitSession(session, items);
 
   const itemsHtml =
     grouped.length === 0
@@ -1065,7 +1089,19 @@ function renderAccountSessionCard(session, items, mesaId, mesaNum, showSessionAc
   return `
     <li class="modal__invoice-group">
       <div class="modal__invoice-group-head modal__invoice-group-head--title">
-        <strong>${escapeHtml(heading)}</strong>
+        <div class="modal__invoice-group-title">
+          <strong>${escapeHtml(heading)}</strong>
+          ${
+            splittable
+              ? `<button
+                  type="button"
+                  class="modal__split-link"
+                  data-action="separar-cuenta"
+                  data-sesion-id="${session.id}"
+                >Separar</button>`
+              : ''
+          }
+        </div>
         <span class="modal__session-amount">${formatCOP(session.total)}</span>
       </div>
       <ul class="modal__invoice-sublist">${itemsHtml}</ul>
@@ -1139,6 +1175,11 @@ function openAccountModal(mesaId, mesaNum) {
 
   renderAccountModalFooter(sessions, mesaId, mesaNum, total);
 
+  const splitBtn = document.getElementById('modalSplitAccountBtn');
+  if (splitBtn) {
+    splitBtn.hidden = getSplittableSessions(mesaId).length === 0;
+  }
+
   const list = document.getElementById('modalInvoice');
   list.innerHTML =
     sessions.length === 0
@@ -1165,6 +1206,331 @@ function closeAccountModal() {
   modal.hidden = true;
   modal.setAttribute('aria-hidden', 'true');
   accountModalState = null;
+}
+
+let splitAccountState = {
+  mesaId: null,
+  mesaNum: null,
+  sesionId: null,
+  items: [],
+  selected: new Set(),
+  submitting: false,
+};
+
+async function fetchDeliveredPedidoItems(mesaId, sesionId) {
+  const { data, error } = await supabaseClient
+    .from('pedido_items')
+    .select(`
+      id,
+      cantidad,
+      precio_unitario,
+      subtotal,
+      estado,
+      confirmado_por_mesero,
+      producto_id,
+      pedido_id,
+      productos ( nombre ),
+      pedidos!inner ( id, mesa_id, sesion_id, estado, archivado, restaurante_id )
+    `)
+    .eq('pedidos.mesa_id', mesaId)
+    .eq('pedidos.sesion_id', sesionId)
+    .eq('pedidos.restaurante_id', RESTAURANTE_ID)
+    .eq('pedidos.archivado', false)
+    .eq('confirmado_por_mesero', true)
+    .order('id', { ascending: true });
+
+  if (error) throw error;
+  return data || [];
+}
+
+async function recalculatePedidoTotal(pedidoId) {
+  const { data: items, error } = await supabaseClient
+    .from('pedido_items')
+    .select('subtotal, precio_unitario, cantidad')
+    .eq('pedido_id', pedidoId);
+
+  if (error) throw error;
+
+  const total = (items || []).reduce((sum, item) => sum + getPedidoItemSubtotal(item), 0);
+  const { error: updateError } = await supabaseClient.from('pedidos').update({ total }).eq('id', pedidoId);
+
+  if (updateError) throw updateError;
+}
+
+async function movePedidoItemsToNewSession(mesaId, pedidoItemIds) {
+  const newSession = await createPanelIndividualSession(mesaId);
+
+  const { data: items, error } = await supabaseClient
+    .from('pedido_items')
+    .select('id, pedido_id, cantidad, precio_unitario, subtotal, estado, confirmado_por_mesero, producto_id')
+    .in('id', pedidoItemIds);
+
+  if (error) throw error;
+  if (!items?.length) throw new Error('No hay productos seleccionados.');
+
+  const byPedido = new Map();
+  items.forEach((item) => {
+    if (!byPedido.has(item.pedido_id)) byPedido.set(item.pedido_id, []);
+    byPedido.get(item.pedido_id).push(item);
+  });
+
+  const pedidosToSync = new Set();
+
+  for (const [pedidoId, movingItems] of byPedido.entries()) {
+    const { data: pedidoItems, error: pedidoItemsError } = await supabaseClient
+      .from('pedido_items')
+      .select('id')
+      .eq('pedido_id', pedidoId);
+
+    if (pedidoItemsError) throw pedidoItemsError;
+
+    if (pedidoItems.length === movingItems.length) {
+      const { error: movePedidoError } = await supabaseClient
+        .from('pedidos')
+        .update({ sesion_id: newSession.id })
+        .eq('id', pedidoId);
+
+      if (movePedidoError) throw movePedidoError;
+      pedidosToSync.add(pedidoId);
+      continue;
+    }
+
+    const { data: sourcePedido, error: sourcePedidoError } = await supabaseClient
+      .from('pedidos')
+      .select('estado, mesa_id, restaurante_id, archivado')
+      .eq('id', pedidoId)
+      .single();
+
+    if (sourcePedidoError) throw sourcePedidoError;
+
+    const movedTotal = movingItems.reduce((sum, item) => sum + getPedidoItemSubtotal(item), 0);
+
+    const { data: newPedido, error: newPedidoError } = await supabaseClient
+      .from('pedidos')
+      .insert({
+        mesa_id: sourcePedido.mesa_id,
+        sesion_id: newSession.id,
+        restaurante_id: sourcePedido.restaurante_id,
+        estado: sourcePedido.estado || 'pendiente',
+        total: movedTotal,
+        archivado: false,
+      })
+      .select('id')
+      .single();
+
+    if (newPedidoError) throw newPedidoError;
+
+    const { error: updateItemsError } = await supabaseClient
+      .from('pedido_items')
+      .update({ pedido_id: newPedido.id })
+      .in(
+        'id',
+        movingItems.map((item) => item.id)
+      );
+
+    if (updateItemsError) throw updateItemsError;
+
+    await recalculatePedidoTotal(pedidoId);
+    pedidosToSync.add(pedidoId);
+    pedidosToSync.add(newPedido.id);
+  }
+
+  for (const pedidoId of pedidosToSync) {
+    await syncPedidoEstado(pedidoId);
+  }
+
+  await supabaseClient.from('mesas').update({ estado: 'ocupada' }).eq('id', mesaId);
+
+  return newSession;
+}
+
+function updateSplitAccountSummary() {
+  const summaryEl = document.getElementById('splitAccountSummary');
+  const confirmBtn = document.getElementById('splitAccountConfirmBtn');
+  if (!summaryEl || !confirmBtn) return;
+
+  const selectedItems = splitAccountState.items.filter((item) => splitAccountState.selected.has(item.id));
+  const selectedTotal = selectedItems.reduce((sum, item) => sum + getPedidoItemSubtotal(item), 0);
+  const totalItems = splitAccountState.items.length;
+
+  summaryEl.textContent = `${selectedItems.length} producto${selectedItems.length !== 1 ? 's' : ''} · ${formatCOP(selectedTotal)}`;
+
+  const validSelection =
+    selectedItems.length > 0 && selectedItems.length < totalItems && !splitAccountState.submitting;
+
+  confirmBtn.disabled = !validSelection;
+}
+
+function renderSplitAccountList() {
+  const list = document.getElementById('splitAccountList');
+  if (!list) return;
+
+  if (splitAccountState.items.length === 0) {
+    list.innerHTML = '<p class="split-account__empty">No hay productos entregados en esta cuenta.</p>';
+    updateSplitAccountSummary();
+    return;
+  }
+
+  list.innerHTML = splitAccountState.items
+    .map((item) => {
+      const name = item.productos?.nombre || 'Producto';
+      const subtotal = getPedidoItemSubtotal(item);
+      const checked = splitAccountState.selected.has(item.id) ? 'checked' : '';
+
+      return `
+        <label class="split-account__item">
+          <input type="checkbox" value="${item.id}" ${checked}>
+          <span>
+            <span class="split-account__item-name">×${item.cantidad} ${escapeHtml(name)}</span>
+            <span class="split-account__item-meta">Producto entregado</span>
+          </span>
+          <span class="split-account__item-price">${formatCOP(subtotal)}</span>
+        </label>
+      `;
+    })
+    .join('');
+
+  list.querySelectorAll('input[type="checkbox"]').forEach((input) => {
+    input.addEventListener('change', () => {
+      if (input.checked) splitAccountState.selected.add(input.value);
+      else splitAccountState.selected.delete(input.value);
+      updateSplitAccountSummary();
+    });
+  });
+
+  updateSplitAccountSummary();
+}
+
+function populateSplitAccountSessionSelect(mesaId, preferredSesionId = null) {
+  const field = document.getElementById('splitAccountSessionField');
+  const select = document.getElementById('splitAccountSessionSelect');
+  if (!field || !select) return;
+
+  const splittable = getSplittableSessions(mesaId);
+  field.hidden = splittable.length <= 1;
+
+  select.innerHTML = splittable
+    .map((session) => {
+      const heading = formatAccountSessionHeading(session);
+      return `<option value="${session.id}">${escapeHtml(heading)} · ${formatCOP(session.total)}</option>`;
+    })
+    .join('');
+
+  const defaultSession =
+    splittable.find((session) => session.id === preferredSesionId)?.id || splittable[0]?.id || null;
+
+  if (defaultSession) select.value = defaultSession;
+}
+
+async function loadSplitAccountItems() {
+  const list = document.getElementById('splitAccountList');
+  if (list) list.innerHTML = '<p class="split-account__empty">Cargando productos…</p>';
+
+  const sesionId =
+    document.getElementById('splitAccountSessionSelect')?.value || splitAccountState.sesionId;
+
+  if (!sesionId) {
+    splitAccountState.items = [];
+    splitAccountState.selected = new Set();
+    renderSplitAccountList();
+    return;
+  }
+
+  splitAccountState.sesionId = sesionId;
+  splitAccountState.selected = new Set();
+
+  try {
+    splitAccountState.items = await fetchDeliveredPedidoItems(splitAccountState.mesaId, sesionId);
+    renderSplitAccountList();
+  } catch (error) {
+    console.error(error);
+    if (list) {
+      list.innerHTML = `<p class="split-account__empty">${escapeHtml(error.message || 'No se pudieron cargar los productos.')}</p>`;
+    }
+    updateSplitAccountSummary();
+  }
+}
+
+function closeSplitAccountModal() {
+  const modal = document.getElementById('splitAccountModal');
+  modal.hidden = true;
+  modal.setAttribute('aria-hidden', 'true');
+  splitAccountState = {
+    mesaId: null,
+    mesaNum: null,
+    sesionId: null,
+    items: [],
+    selected: new Set(),
+    submitting: false,
+  };
+}
+
+async function openSplitAccountModal(mesaId, mesaNum, preferredSesionId = null) {
+  const splittable = getSplittableSessions(mesaId);
+  if (splittable.length === 0) {
+    showToast('No hay cuentas que se puedan separar en esta mesa.', 'error');
+    return;
+  }
+
+  closeAccountModal();
+
+  splitAccountState = {
+    mesaId,
+    mesaNum,
+    sesionId: preferredSesionId || splittable[0].id,
+    items: [],
+    selected: new Set(),
+    submitting: false,
+  };
+
+  document.getElementById('splitAccountTitle').textContent = `Separar cuenta · Mesa ${mesaNum}`;
+  document.getElementById('splitAccountHint').textContent =
+    'Elegí los productos para mover a una cuenta nueva. Debe quedar al menos uno en la cuenta original.';
+
+  populateSplitAccountSessionSelect(mesaId, preferredSesionId);
+  await loadSplitAccountItems();
+
+  const modal = document.getElementById('splitAccountModal');
+  modal.hidden = false;
+  modal.setAttribute('aria-hidden', 'false');
+}
+
+async function confirmSplitAccount() {
+  if (splitAccountState.submitting) return;
+
+  const selectedIds = [...splitAccountState.selected];
+  if (selectedIds.length === 0) {
+    showToast('Seleccioná productos para mover.', 'error');
+    return;
+  }
+
+  if (selectedIds.length >= splitAccountState.items.length) {
+    showToast('Dejá al menos un producto en la cuenta original.', 'error');
+    return;
+  }
+
+  const confirmBtn = document.getElementById('splitAccountConfirmBtn');
+  splitAccountState.submitting = true;
+  if (confirmBtn) {
+    confirmBtn.disabled = true;
+    confirmBtn.textContent = 'Separando…';
+  }
+
+  try {
+    const newSession = await movePedidoItemsToNewSession(splitAccountState.mesaId, selectedIds);
+    closeSplitAccountModal();
+    await refreshPanelData();
+    showToast(`Cuenta separada · #${formatSessionCode(newSession.numero)}`, 'success');
+  } catch (error) {
+    console.error(error);
+    showToast(error.message || 'No se pudo separar la cuenta.', 'error');
+  } finally {
+    splitAccountState.submitting = false;
+    if (confirmBtn) {
+      confirmBtn.textContent = 'Mover a cuenta nueva';
+      updateSplitAccountSummary();
+    }
+  }
 }
 
 function openDataphoneModalBulk() {
@@ -1331,6 +1697,11 @@ function handleAccountModalAction(event) {
     openDataphoneModalBulk();
   } else if (action === 'enviar-qr-todo') {
     openPaymentQrModalBulk();
+  } else if (action === 'separar-cuenta') {
+    const sesionId = btn.dataset.sesionId || null;
+    if (accountModalState) {
+      openSplitAccountModal(accountModalState.mesaId, accountModalState.mesaNum, sesionId);
+    }
   }
 }
 
@@ -1348,6 +1719,16 @@ function initModal() {
   });
 
   document.getElementById('accountModal')?.addEventListener('click', handleAccountModalAction);
+
+  document.getElementById('splitAccountModal')?.querySelectorAll('[data-close-split-account]').forEach((el) => {
+    el.addEventListener('click', closeSplitAccountModal);
+  });
+
+  document.getElementById('splitAccountSessionSelect')?.addEventListener('change', () => {
+    loadSplitAccountItems();
+  });
+
+  document.getElementById('splitAccountConfirmBtn')?.addEventListener('click', confirmSplitAccount);
 
   document.getElementById('dataphoneConfirmBtn')?.addEventListener('click', async () => {
     if (!dataphoneModalState) return;

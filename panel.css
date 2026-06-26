@@ -731,6 +731,12 @@ button {
   border: 1px solid #bfdbfe;
 }
 
+.mesa-card__btn--split {
+  color: var(--text);
+  background: #fff;
+  border: 1px solid var(--border);
+}
+
 .mesa-card__btn--close {
   color: #fff;
   background: var(--text);
@@ -1020,6 +1026,167 @@ button {
   margin-bottom: 0;
   padding: 18px 20px 14px;
   border-bottom: 1px solid var(--border);
+}
+
+.modal__head-main {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  min-width: 0;
+}
+
+.modal__split-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: var(--prep);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.modal__split-link:hover {
+  color: #1d4ed8;
+}
+
+.modal__split-link[hidden] {
+  display: none !important;
+}
+
+.modal__invoice-group-head--title {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.modal__invoice-group-title {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  min-width: 0;
+}
+
+.modal__box--split {
+  max-width: 420px;
+  padding: 20px;
+}
+
+.split-account__hint {
+  margin: 0 0 14px;
+  font-size: 0.875rem;
+  color: var(--text-muted);
+  line-height: 1.45;
+}
+
+.split-account__field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+.split-account__field[hidden] {
+  display: none !important;
+}
+
+.split-account__label {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.split-account__select {
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-family: inherit;
+  font-size: 0.9375rem;
+  background: #fff;
+}
+
+.split-account__list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: min(42vh, 320px);
+  overflow-y: auto;
+  margin-bottom: 14px;
+}
+
+.split-account__item {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: #fff;
+  cursor: pointer;
+}
+
+.split-account__item:has(input:checked) {
+  border-color: #bfdbfe;
+  background: var(--prep-soft);
+}
+
+.split-account__item input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--prep);
+}
+
+.split-account__item-name {
+  font-size: 0.9375rem;
+  font-weight: 600;
+}
+
+.split-account__item-meta {
+  display: block;
+  margin-top: 2px;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.split-account__item-price {
+  font-size: 0.875rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.split-account__empty {
+  margin: 0;
+  padding: 20px 12px;
+  text-align: center;
+  font-size: 0.9375rem;
+  color: var(--text-muted);
+}
+
+.split-account__summary {
+  margin: 0 0 14px;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.split-account__confirm {
+  width: 100%;
+  padding: 13px 16px;
+  border-radius: var(--radius-sm);
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: #fff;
+  background: var(--accent);
+}
+
+.split-account__confirm:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .modal__account-scroll {
