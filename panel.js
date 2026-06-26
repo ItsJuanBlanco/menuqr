@@ -16,7 +16,11 @@ let paymentQrModalState = null;
 let accountModalState = null;
 let openMesaQrNumero = null;
 let mesaQrAddOpen = false;
+let panelPollTimer = null;
+let panelAlertsInitialized = false;
+let panelAudioContext = null;
 
+const PANEL_POLL_INTERVAL_MS = 5000;
 const PANEL_SERVICE_PERCENT = 10;
 
 const VALID_PANEL_TABS = new Set(['pedidos', 'mesas', 'historial', 'menu', 'resumen', 'qr', 'ajustes']);
@@ -173,10 +177,167 @@ function escapeHtml(text) {
 
 function showToast(message, type = '') {
   const toast = document.getElementById('toast');
+  if (!toast) return;
+
   toast.textContent = message;
   toast.className = 'panel-toast panel-toast--visible' + (type ? ` panel-toast--${type}` : '');
   clearTimeout(showToast._timer);
   showToast._timer = setTimeout(() => toast.classList.remove('panel-toast--visible'), 2800);
+}
+
+function showNewOrderToast(mesaNum) {
+  const toast = document.getElementById('toast');
+  if (!toast) return;
+
+  clearTimeout(showToast._timer);
+  toast.className = 'panel-toast panel-toast--visible panel-toast--action';
+  toast.innerHTML = `
+    <span class="panel-toast__message">🔔 Nueva orden — Mesa ${escapeHtml(String(mesaNum))}</span>
+    <button type="button" class="panel-toast__action">Ver pedidos</button>
+  `;
+
+  toast.querySelector('.panel-toast__action')?.addEventListener(
+    'click',
+    () => {
+      toast.classList.remove('panel-toast--visible');
+      switchPanel('pedidos');
+    },
+    { once: true }
+  );
+
+  showToast._timer = setTimeout(() => toast.classList.remove('panel-toast--visible'), 7000);
+}
+
+function updatePedidosTabBadge() {
+  const tab = document.getElementById('tabPedidos');
+  if (!tab) return;
+
+  const count = orders.length;
+  let badge = tab.querySelector('.panel-tabs__badge');
+
+  if (count <= 0) {
+    badge?.remove();
+    return;
+  }
+
+  if (!badge) {
+    badge = document.createElement('span');
+    badge.className = 'panel-tabs__badge';
+    tab.appendChild(badge);
+  }
+
+  badge.textContent = count > 99 ? '99+' : String(count);
+  badge.setAttribute('aria-label', `${count} pedido${count !== 1 ? 's' : ''} pendiente${count !== 1 ? 's' : ''}`);
+}
+
+function getPanelAudioContext() {
+  if (!panelAudioContext) {
+    panelAudioContext = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  return panelAudioContext;
+}
+
+function resumePanelAudioContext() {
+  const ctx = getPanelAudioContext();
+  if (ctx.state === 'suspended') return ctx.resume();
+  return Promise.resolve();
+}
+
+function playTone({ frequency, type = 'sine', startAt = 0, duration = 0.18, volume = 0.22 }) {
+  const ctx = getPanelAudioContext();
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  const start = ctx.currentTime + startAt;
+
+  osc.type = type;
+  osc.frequency.setValueAtTime(frequency, start);
+  gain.gain.setValueAtTime(0.0001, start);
+  gain.gain.exponentialRampToValueAtTime(volume, start + 0.02);
+  gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
+
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+  osc.start(start);
+  osc.stop(start + duration + 0.02);
+}
+
+function playNewOrderSound() {
+  void resumePanelAudioContext().then(() => {
+    playTone({ frequency: 880, type: 'sine', startAt: 0, duration: 0.16, volume: 0.2 });
+    playTone({ frequency: 1175, type: 'sine', startAt: 0.12, duration: 0.2, volume: 0.24 });
+  });
+}
+
+function playWaiterCallSound() {
+  void resumePanelAudioContext().then(() => {
+    playTone({ frequency: 180, type: 'square', startAt: 0, duration: 0.12, volume: 0.12 });
+    playTone({ frequency: 160, type: 'square', startAt: 0.22, duration: 0.12, volume: 0.12 });
+  });
+}
+
+function bindPanelAudioUnlock() {
+  if (document.body.dataset.panelAudioBound) return;
+  document.body.dataset.panelAudioBound = 'true';
+
+  const unlock = () => {
+    void resumePanelAudioContext();
+  };
+
+  document.addEventListener('pointerdown', unlock, { once: true });
+  document.addEventListener('keydown', unlock, { once: true });
+}
+
+function stopPanelPolling() {
+  if (panelPollTimer) {
+    clearInterval(panelPollTimer);
+    panelPollTimer = null;
+  }
+}
+
+async function runPanelPoll() {
+  try {
+    if (activePanel === 'pedidos') {
+      await fetchOrders();
+      await fetchMesas({ skipRender: true });
+    } else if (activePanel === 'mesas') {
+      await Promise.all([fetchMesas(), fetchOrders()]);
+    }
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+function startPanelPolling() {
+  stopPanelPolling();
+  panelPollTimer = setInterval(() => {
+    void runPanelPoll();
+  }, PANEL_POLL_INTERVAL_MS);
+}
+
+function handleNewOrdersDetected(previousCount, previousOrderIds) {
+  if (orders.length <= previousCount) return;
+
+  playNewOrderSound();
+  updatePedidosTabBadge();
+
+  if (activePanel !== 'mesas') return;
+
+  const newOrders = orders.filter((order) => !previousOrderIds.has(order.id));
+  if (newOrders.length === 0) return;
+
+  const latestOrder = newOrders[newOrders.length - 1];
+  const mesaNum = latestOrder.mesas?.numero ?? '?';
+  showNewOrderToast(mesaNum);
+}
+
+function handleWaiterCallsDetected(previousWaiterMesaIds) {
+  const newCalls = mesas.filter(
+    (mesa) => mesa.mesero_requerido && !previousWaiterMesaIds.has(mesa.id)
+  );
+
+  if (newCalls.length > 0) {
+    playWaiterCallSound();
+  }
 }
 
 function formatTime(isoString) {
@@ -670,6 +831,9 @@ function initTabs() {
 
 /* ── Pedidos ── */
 async function fetchOrders() {
+  const previousCount = orders.length;
+  const previousOrderIds = new Set(orders.map((order) => order.id));
+
   const { data, error } = await supabaseClient
     .from('pedidos')
     .select(`
@@ -697,8 +861,14 @@ async function fetchOrders() {
 
   const rowsWithSessions = await attachSessionDataToOrders(data);
   orders = rowsWithSessions.filter(orderHasPendingItems);
+
+  if (panelAlertsInitialized) {
+    handleNewOrdersDetected(previousCount, previousOrderIds);
+  }
+
   renderOrders();
   updateHeaderCount();
+  updatePedidosTabBadge();
 }
 
 function renderOrders() {
@@ -879,7 +1049,12 @@ async function fetchAllRestaurantMesas() {
   return allMesas.sort((a, b) => compareMesaNumeros(a.numero, b.numero));
 }
 
-async function fetchMesas() {
+async function fetchMesas(options = {}) {
+  const { skipRender = false } = options;
+  const previousWaiterMesaIds = new Set(
+    mesas.filter((mesa) => mesa.mesero_requerido).map((mesa) => mesa.id)
+  );
+
   const [mesasData, itemsResult] = await Promise.all([
     fetchAllRestaurantMesas(),
     supabaseClient.rpc('get_mesa_items', { p_restaurante_id: RESTAURANTE_ID }),
@@ -1002,9 +1177,15 @@ async function fetchMesas() {
     mesaSessionBreakdown[mesa.id] = sortMesaSessions([...byId.values()]);
   });
 
-  renderMesas();
-  if (activePanel === 'qr') renderMesaQrs();
-  updateHeaderCount();
+  if (panelAlertsInitialized) {
+    handleWaiterCallsDetected(previousWaiterMesaIds);
+  }
+
+  if (!skipRender) {
+    renderMesas();
+    if (activePanel === 'qr') renderMesaQrs();
+    updateHeaderCount();
+  }
 }
 
 async function refreshPanelData() {
@@ -3151,6 +3332,7 @@ async function init() {
 
   applyPanelRoleAccess(session.role);
   bindPanelSessionActions(slug);
+  bindPanelAudioUnlock();
   initTabs();
   initMesaQrSection();
   initModal();
@@ -3166,6 +3348,8 @@ async function init() {
     ]);
     restoreActivePanelTab();
     subscribeToRealtime();
+    panelAlertsInitialized = true;
+    startPanelPolling();
   } catch (error) {
     console.error('Error inicializando panel:', error);
     showToast(error.message || 'Error conectando con Supabase.', 'error');

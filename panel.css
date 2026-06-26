@@ -209,6 +209,7 @@ button {
 }
 
 .panel-tabs__btn {
+  position: relative;
   flex-shrink: 0;
   white-space: nowrap;
   padding: 10px 20px;
@@ -230,6 +231,24 @@ button {
 
 .panel-tabs__btn[hidden] {
   display: none !important;
+}
+
+.panel-tabs__badge {
+  position: absolute;
+  top: 4px;
+  right: 6px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: #dc2626;
+  color: #fff;
+  font-size: 0.6875rem;
+  font-weight: 800;
+  line-height: 18px;
+  text-align: center;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.95);
+  pointer-events: none;
 }
 
 .panel-view[hidden] {
@@ -513,6 +532,36 @@ button {
 
 .panel-toast--success {
   background: var(--ready);
+}
+
+.panel-toast--action {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  pointer-events: auto;
+  padding-right: 12px;
+}
+
+.panel-toast__message {
+  flex: 1;
+  min-width: 0;
+}
+
+.panel-toast__action {
+  flex-shrink: 0;
+  padding: 8px 12px;
+  border-radius: 999px;
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: var(--text);
+  background: #fff;
+  border: none;
+  cursor: pointer;
+}
+
+.panel-toast__action:hover {
+  background: #f4f4f5;
 }
 
 /* Mesa cards */
