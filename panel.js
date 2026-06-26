@@ -230,22 +230,38 @@ function updatePedidosTabBadge() {
   badge.setAttribute('aria-label', `${count} pedido${count !== 1 ? 's' : ''} pendiente${count !== 1 ? 's' : ''}`);
 }
 
-function getPanelAudioContext() {
-  if (!panelAudioContext) {
-    panelAudioContext = new (window.AudioContext || window.webkitAudioContext)();
+function initAudioContext() {
+  if (panelAudioContext) {
+    if (panelAudioContext.state === 'suspended') {
+      void panelAudioContext.resume();
+    }
+    return;
   }
-  return panelAudioContext;
+
+  panelAudioContext = new (window.AudioContext || window.webkitAudioContext)();
 }
 
-function resumePanelAudioContext() {
-  const ctx = getPanelAudioContext();
-  if (ctx.state === 'suspended') return ctx.resume();
-  return Promise.resolve();
+function bindPanelAudioInit() {
+  if (document.body.dataset.panelAudioInitBound) return;
+  document.body.dataset.panelAudioInitBound = 'true';
+  document.addEventListener('click', initAudioContext, { once: true });
+}
+
+function withPanelAudioContext(run) {
+  const ctx = panelAudioContext;
+  if (!ctx) return;
+
+  if (ctx.state === 'suspended') {
+    void ctx.resume().then(run);
+    return;
+  }
+
+  run();
 }
 
 function playNewOrderSound() {
-  void resumePanelAudioContext().then(() => {
-    const ctx = getPanelAudioContext();
+  withPanelAudioContext(() => {
+    const ctx = panelAudioContext;
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
     osc.connect(gain);
@@ -260,8 +276,8 @@ function playNewOrderSound() {
 }
 
 function playWaiterCallSound() {
-  void resumePanelAudioContext().then(() => {
-    const ctx = getPanelAudioContext();
+  withPanelAudioContext(() => {
+    const ctx = panelAudioContext;
     [0, 0.2, 0.4].forEach((delay) => {
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
@@ -277,8 +293,8 @@ function playWaiterCallSound() {
 }
 
 function playPaymentStartSound() {
-  void resumePanelAudioContext().then(() => {
-    const ctx = getPanelAudioContext();
+  withPanelAudioContext(() => {
+    const ctx = panelAudioContext;
     [0, 0.25].forEach((delay, i) => {
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
@@ -293,18 +309,6 @@ function playPaymentStartSound() {
   });
 }
 
-function bindPanelAudioUnlock() {
-  if (document.body.dataset.panelAudioBound) return;
-  document.body.dataset.panelAudioBound = 'true';
-
-  const unlock = () => {
-    void resumePanelAudioContext();
-  };
-
-  document.addEventListener('pointerdown', unlock, { once: true });
-  document.addEventListener('keydown', unlock, { once: true });
-}
-
 function stopPanelPolling() {
   if (panelPollTimer) {
     clearInterval(panelPollTimer);
@@ -315,7 +319,7 @@ function stopPanelPolling() {
 async function runPanelPoll() {
   try {
     if (activePanel === 'pedidos') {
-      await Promise.all([fetchOrders(), pollSessionPaymentFlags()]);
+      await fetchOrders();
       await fetchMesas({ skipRender: true });
     } else if (activePanel === 'mesas') {
       await Promise.all([fetchMesas(), fetchOrders()]);
@@ -358,27 +362,39 @@ function handleWaiterCallsDetected(previousWaiterMesaIds) {
   }
 }
 
-function collectPayingSessionIds() {
-  const ids = new Set();
+function snapshotSessionPaymentFlags(breakdown = mesaSessionBreakdown) {
+  const snapshot = new Map();
 
-  Object.values(mesaSessionBreakdown).forEach((sessions) => {
+  Object.values(breakdown).forEach((sessions) => {
     sessions.forEach((session) => {
-      if (session.pago_en_proceso === true && session.pago_pendiente_confirmacion !== true) {
-        ids.add(session.id);
+      snapshot.set(session.id, {
+        pago_en_proceso: session.pago_en_proceso === true,
+        pago_pendiente_confirmacion: session.pago_pendiente_confirmacion === true,
+      });
+    });
+  });
+
+  return snapshot;
+}
+
+function detectPaymentStartFromSnapshot(previousSnapshot, breakdown = mesaSessionBreakdown) {
+  let paymentStarted = false;
+
+  Object.values(breakdown).forEach((sessions) => {
+    sessions.forEach((session) => {
+      const previous = previousSnapshot.get(session.id);
+      const isPayingNow =
+        session.pago_en_proceso === true && session.pago_pendiente_confirmacion !== true;
+      const wasPayingBefore =
+        previous?.pago_en_proceso === true && previous?.pago_pendiente_confirmacion !== true;
+
+      if (isPayingNow && !wasPayingBefore) {
+        paymentStarted = true;
       }
     });
   });
 
-  return ids;
-}
-
-function handlePaymentStartDetected(previousPayingSessionIds) {
-  const currentPayingSessionIds = collectPayingSessionIds();
-  const newlyPaying = [...currentPayingSessionIds].filter(
-    (sessionId) => !previousPayingSessionIds.has(sessionId)
-  );
-
-  if (panelAlertsInitialized && newlyPaying.length > 0) {
+  if (panelAlertsInitialized && paymentStarted) {
     playPaymentStartSound();
   }
 }
@@ -411,28 +427,6 @@ function applySessionPaymentFlags(sesion) {
     pago_en_proceso: sesion.pago_en_proceso === true,
     paidTotal: 0,
   });
-}
-
-async function pollSessionPaymentFlags() {
-  const previousPayingSessionIds = collectPayingSessionIds();
-
-  const { data, error } = await supabaseClient
-    .from('sesiones')
-    .select('id, mesa_id, numero, tipo, pago_pendiente_confirmacion, pago_en_proceso')
-    .eq('restaurante_id', RESTAURANTE_ID)
-    .eq('activa', true);
-
-  if (error) throw error;
-
-  (data || []).forEach((sesion) => applySessionPaymentFlags(sesion));
-
-  if (panelAlertsInitialized) {
-    handlePaymentStartDetected(previousPayingSessionIds);
-  }
-
-  if (activePanel === 'mesas') {
-    renderMesas();
-  }
 }
 
 function formatTime(isoString) {
@@ -1149,7 +1143,7 @@ async function fetchMesas(options = {}) {
   const previousWaiterMesaIds = new Set(
     mesas.filter((mesa) => mesa.mesero_requerido).map((mesa) => mesa.id)
   );
-  const previousPayingSessionIds = collectPayingSessionIds();
+  const previousPaymentSnapshot = snapshotSessionPaymentFlags();
 
   const [mesasData, itemsResult] = await Promise.all([
     fetchAllRestaurantMesas(),
@@ -1275,9 +1269,7 @@ async function fetchMesas(options = {}) {
 
   if (panelAlertsInitialized) {
     handleWaiterCallsDetected(previousWaiterMesaIds);
-    if (!skipRender) {
-      handlePaymentStartDetected(previousPayingSessionIds);
-    }
+    detectPaymentStartFromSnapshot(previousPaymentSnapshot);
   }
 
   if (!skipRender) {
@@ -3447,7 +3439,7 @@ async function init() {
 
   applyPanelRoleAccess(session.role);
   bindPanelSessionActions(slug);
-  bindPanelAudioUnlock();
+  bindPanelAudioInit();
   initTabs();
   initMesaQrSection();
   initModal();

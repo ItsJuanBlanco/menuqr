@@ -150,10 +150,9 @@ const PAYMENT_PENDING_MESSAGE = 'Pago recibido ✓ El mesero lo confirmará en u
 
 let paymentSuccessReviewTimer = null;
 let paymentSuccessShown = false;
-let mesaRealtimeChannel = null;
 let sessionPolling = null;
 
-const SESSION_POLL_INTERVAL_MS = 3000;
+const SESSION_POLL_INTERVAL_MS = 5000;
 
 function stopSessionPolling() {
   if (sessionPolling) {
@@ -167,8 +166,14 @@ function startSessionPolling() {
 
   if (!state.sesionId || paymentSuccessShown) return;
 
-  void checkSessionStatus();
-  sessionPolling = setInterval(checkSessionStatus, SESSION_POLL_INTERVAL_MS);
+  const pollSession = () => {
+    if (!state.sesionId) return;
+    void loadAccountItems();
+    void checkSessionStatus();
+  };
+
+  pollSession();
+  sessionPolling = setInterval(pollSession, SESSION_POLL_INTERVAL_MS);
 }
 
 function getGoogleReviewUrl() {
@@ -193,6 +198,8 @@ function bindPaymentSuccessStars() {
 }
 
 function clearClientSessionState() {
+  stopSessionPolling();
+
   const mesaId = state.mesaId;
   if (mesaId) clearStoredSession(mesaId);
 
@@ -1478,79 +1485,6 @@ async function callWaiter() {
   return true;
 }
 
-function subscribeToRealtime() {
-  if (!state.mesaId || !supabaseClient) return;
-
-  if (mesaRealtimeChannel) {
-    supabaseClient.removeChannel(mesaRealtimeChannel);
-    mesaRealtimeChannel = null;
-  }
-
-  mesaRealtimeChannel = supabaseClient.channel(`mesa-${state.mesaId}-${state.sesionId || 'guest'}`);
-
-  const refreshAccountFromRealtime = () => {
-    void loadAccountItems();
-  };
-
-  mesaRealtimeChannel
-    .on(
-      'postgres_changes',
-      { event: 'INSERT', schema: 'public', table: 'pedidos', filter: `mesa_id=eq.${state.mesaId}` },
-      refreshAccountFromRealtime
-    )
-    .on(
-      'postgres_changes',
-      { event: 'UPDATE', schema: 'public', table: 'pedidos', filter: `mesa_id=eq.${state.mesaId}` },
-      refreshAccountFromRealtime
-    )
-    .on(
-      'postgres_changes',
-      { event: 'DELETE', schema: 'public', table: 'pedidos', filter: `mesa_id=eq.${state.mesaId}` },
-      refreshAccountFromRealtime
-    )
-    .on(
-      'postgres_changes',
-      { event: 'INSERT', schema: 'public', table: 'pedido_items' },
-      refreshAccountFromRealtime
-    )
-    .on(
-      'postgres_changes',
-      { event: 'UPDATE', schema: 'public', table: 'pedido_items' },
-      refreshAccountFromRealtime
-    )
-    .on(
-      'postgres_changes',
-      { event: 'DELETE', schema: 'public', table: 'pedido_items' },
-      refreshAccountFromRealtime
-    );
-
-  if (state.sesionId) {
-    mesaRealtimeChannel.on(
-      'postgres_changes',
-      { event: 'INSERT', schema: 'public', table: 'pagos_grupo', filter: `sesion_id=eq.${state.sesionId}` },
-      () => {
-        void loadGroupPayments().then(() => renderAccount());
-      }
-    );
-    mesaRealtimeChannel.on(
-      'postgres_changes',
-      { event: 'UPDATE', schema: 'public', table: 'pagos_grupo', filter: `sesion_id=eq.${state.sesionId}` },
-      () => {
-        void loadGroupPayments().then(() => renderAccount());
-      }
-    );
-    mesaRealtimeChannel.on(
-      'postgres_changes',
-      { event: 'DELETE', schema: 'public', table: 'pagos_grupo', filter: `sesion_id=eq.${state.sesionId}` },
-      () => {
-        void loadGroupPayments().then(() => renderAccount());
-      }
-    );
-  }
-
-  mesaRealtimeChannel.subscribe();
-}
-
 /* ── Render: categorías ── */
 function renderCategories() {
   const container = document.getElementById('categories');
@@ -2513,7 +2447,6 @@ function applySession(session) {
   paymentSuccessShown = false;
   clearSplitQrCanvas();
   updateSessionBadge(session);
-  subscribeToRealtime();
   startSessionPolling();
 }
 
