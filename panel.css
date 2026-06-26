@@ -977,17 +977,18 @@ button {
   background: var(--accent);
 }
 
-/* Mesas libres — acordeón en todas las pantallas */
+/* Mesas libres — compactas; clic abre nueva orden */
 .mesa-card--libre {
   box-shadow: none;
   border-radius: 6px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .mesa-card--libre .mesa-card__head {
   padding: 8px 16px;
   border-bottom: none;
-  cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
+  pointer-events: none;
 }
 
 .mesa-card--libre .mesa-card__num {
@@ -1006,38 +1007,52 @@ button {
   letter-spacing: 0.03em;
 }
 
-.mesa-card--libre:not(.mesa-card--expanded) .mesa-card__details {
-  display: none;
-}
-
-.mesa-card--libre.mesa-card--expanded .mesa-card__head {
-  border-bottom: 1px solid color-mix(in srgb, var(--border) 75%, transparent);
-}
-
-.mesa-card--libre.mesa-card--expanded .mesa-card__body,
-.mesa-card--libre.mesa-card--expanded .mesa-card__total,
-.mesa-card--libre.mesa-card--expanded .mesa-card__alert {
-  display: none;
-}
-
-.mesa-card--libre.mesa-card--expanded .mesa-card__actions {
-  display: flex;
-  flex-wrap: nowrap;
-  padding: 8px 16px 10px;
-}
-
-.mesa-card--libre.mesa-card--expanded .mesa-card__btn:not(.mesa-card__btn--new) {
-  display: none;
-}
-
-.mesa-card--libre.mesa-card--expanded .mesa-card__btn--new {
-  width: 100%;
-  flex: 1 1 auto;
-}
-
-/* Mesas ocupadas — siempre expandidas, sin colapsar */
+/* Mesas ocupadas — contenido completo permanente, layout compacto */
 .mesa-card--ocupada .mesa-card__details {
   display: block;
+}
+
+.mesa-card--ocupada .mesa-card__head {
+  padding: 12px;
+}
+
+.mesa-card--ocupada .mesa-card__alert {
+  padding: 8px 12px;
+}
+
+.mesa-card--ocupada .mesa-card__body {
+  padding: 0 12px;
+}
+
+.mesa-card--ocupada .mesa-card__sessions-empty {
+  padding: 0 0 8px;
+}
+
+.mesa-card--ocupada .mesa-card__session-lines {
+  gap: 8px;
+  padding: 0 0 4px;
+}
+
+.mesa-card--ocupada .mesa-card__session-block--payment {
+  padding: 8px;
+}
+
+.mesa-card--ocupada .mesa-card__total {
+  gap: 8px;
+  padding: 8px 12px;
+}
+
+.mesa-card--ocupada .mesa-card__total-label {
+  font-size: 10px;
+}
+
+.mesa-card--ocupada .mesa-card__actions {
+  gap: 8px;
+  padding: 8px 12px 12px;
+}
+
+.mesa-card--ocupada .mesa-card__btn {
+  padding: 10px 12px;
 }
 
 /* Nueva orden modal */

@@ -9,7 +9,6 @@ let activePanel = 'pedidos';
 let updating = new Set();
 let listClickBound = false;
 let mesasClickBound = false;
-let expandedLibreMesas = new Set();
 let realtimeChannel = null;
 let realtimeRefreshTimer = null;
 let dataphoneModalState = null;
@@ -1563,13 +1562,6 @@ function renderMesas() {
     return;
   }
 
-  for (const mesaId of expandedLibreMesas) {
-    const mesa = mesas.find((row) => row.id === mesaId);
-    if (!mesa || (mesa.estado || 'libre') !== 'libre') {
-      expandedLibreMesas.delete(mesaId);
-    }
-  }
-
   list.innerHTML = mesas
     .map((mesa) => {
       const accountItems = mesaAccounts[mesa.id] || [];
@@ -1580,7 +1572,6 @@ function renderMesas() {
         : grouped.reduce((sum, g) => sum + g.subtotal, 0);
       const estado = mesa.estado || 'libre';
       const isLibre = estado === 'libre';
-      const isExpanded = isLibre && expandedLibreMesas.has(mesa.id);
       const isMesaPaying = sessions.some(
         (session) => session.pago_en_proceso === true && session.pago_pendiente_confirmacion !== true
       );
@@ -1595,17 +1586,7 @@ function renderMesas() {
 
       let detailsHtml = '';
 
-      if (isLibre) {
-        if (isExpanded) {
-          detailsHtml = `
-            <div class="mesa-card__details">
-              <div class="mesa-card__actions">
-                <button type="button" class="mesa-card__btn mesa-card__btn--new" data-action="nueva-orden" data-mesa-id="${mesa.id}" data-mesa-num="${mesa.numero}">Nueva orden</button>
-              </div>
-            </div>
-          `;
-        }
-      } else {
+      if (!isLibre) {
         const sessionsHtml =
           sessions.length === 0
             ? '<p class="mesa-card__sessions-empty">Sin cuentas activas</p>'
@@ -1666,18 +1647,17 @@ function renderMesas() {
         'mesa-card',
         mesa.mesero_requerido ? 'mesa-card--calling' : '',
         isLibre ? 'mesa-card--libre' : 'mesa-card--ocupada',
-        isExpanded ? 'mesa-card--expanded' : '',
       ]
         .filter(Boolean)
         .join(' ');
 
-      const headToggleAttrs = isLibre
-        ? ` data-action="toggle-libre-mesa" data-mesa-id="${mesa.id}" role="button" tabindex="0" aria-expanded="${isExpanded ? 'true' : 'false'}" aria-label="Mesa ${mesa.numero}, ${formatMesaEstado(estado)}"`
+      const cardClickAttrs = isLibre
+        ? ` data-action="nueva-orden" data-mesa-id="${mesa.id}" data-mesa-num="${mesa.numero}" role="button" tabindex="0" aria-label="Mesa ${mesa.numero}, ${formatMesaEstado(estado)} — Nueva orden"`
         : '';
 
       return `
-        <article class="${cardClasses}" data-mesa-id="${mesa.id}">
-          <header class="mesa-card__head"${headToggleAttrs}>
+        <article class="${cardClasses}" data-mesa-id="${mesa.id}"${cardClickAttrs}>
+          <header class="mesa-card__head">
             <span class="mesa-card__num">Mesa ${mesa.numero}</span>
             <div class="mesa-card__head-badges">
               ${isMesaPaying ? '<span class="mesa-card__paying-badge mesa-card__paying-badge--pulse">💳 Pagando...</span>' : ''}
@@ -1691,15 +1671,6 @@ function renderMesas() {
     .join('');
 }
 
-function toggleLibreMesaExpanded(mesaId) {
-  if (expandedLibreMesas.has(mesaId)) {
-    expandedLibreMesas.delete(mesaId);
-  } else {
-    expandedLibreMesas.add(mesaId);
-  }
-  renderMesas();
-}
-
 function bindMesasActions() {
   if (mesasClickBound) return;
 
@@ -1708,11 +1679,6 @@ function bindMesasActions() {
     if (!btn || btn.disabled) return;
 
     const { action, mesaId, mesaNum } = btn.dataset;
-
-    if (action === 'toggle-libre-mesa') {
-      toggleLibreMesaExpanded(mesaId);
-      return;
-    }
 
     if (action === 'ver-cuenta') openAccountModal(mesaId, mesaNum);
     else if (action === 'dividir-pago-mesa') openSplitPaymentModal(mesaId, mesaNum);
