@@ -302,13 +302,17 @@ async function openWompiCheckout({ monto, sesionId, parte, publicKey, restaurant
       reference
     );
 
+    const currentUrl = new URL(window.location.href);
+    currentUrl.searchParams.set('sesion', sesionId);
+    currentUrl.searchParams.set('monto', String(monto));
+
     const checkout = new WidgetCheckout({
       currency: 'COP',
       amountInCents,
       reference,
       publicKey: signedPublicKey || publicKey,
       signature: { integrity: signature },
-      redirectUrl: window.location.href,
+      redirectUrl: currentUrl.toString(),
     });
 
     checkout.open(async (result) => {
