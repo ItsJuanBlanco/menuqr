@@ -1,6 +1,13 @@
 let menuProducts = [];
 let menuSaving = false;
 let menuReloading = false;
+const NEW_CATEGORY_VALUE = '__new__';
+const PRODUCT_IMAGE_BUCKET = 'productos';
+const ALLOWED_PRODUCT_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
+
+let pendingProductImageFile = null;
+let pendingProductImagePreviewUrl = null;
+let currentProductImageUrl = null;
 
 function groupProductsByCategory(products) {
   const groups = new Map();
@@ -106,6 +113,197 @@ async function refreshMenuAfterChange(successMessage) {
   if (successMessage) showToast(successMessage, 'success');
 }
 
+function getProductCategories() {
+  const categories = new Set();
+  menuProducts.forEach((product) => {
+    const category = product.categoria?.trim();
+    if (category) categories.add(category);
+  });
+  return [...categories].sort((a, b) => a.localeCompare(b, 'es'));
+}
+
+function populateProductCategorySelect(selectedCategory = '') {
+  const select = document.getElementById('productCategoriaSelect');
+  const customField = document.getElementById('productCategoriaCustomField');
+  const customInput = document.getElementById('productCategoriaCustom');
+  if (!select) return;
+
+  const categories = getProductCategories();
+  const categoryOptions = categories
+    .map((category) => `<option value="${escapeHtml(category)}">${escapeHtml(category)}</option>`)
+    .join('');
+
+  select.innerHTML = `
+    <option value="" disabled>Elegí una categoría</option>
+    ${categoryOptions}
+    <option value="${NEW_CATEGORY_VALUE}">+ Añadir otra categoría</option>
+  `;
+
+  const normalized = selectedCategory?.trim() || '';
+
+  if (normalized && categories.includes(normalized)) {
+    select.value = normalized;
+    if (customField) customField.hidden = true;
+    if (customInput) {
+      customInput.value = '';
+      customInput.required = false;
+    }
+    return;
+  }
+
+  if (normalized) {
+    select.value = NEW_CATEGORY_VALUE;
+    if (customField) customField.hidden = false;
+    if (customInput) {
+      customInput.value = normalized;
+      customInput.required = true;
+    }
+    return;
+  }
+
+  select.value = categories.length ? categories[0] : NEW_CATEGORY_VALUE;
+  if (select.value === NEW_CATEGORY_VALUE) {
+    if (customField) customField.hidden = false;
+    if (customInput) {
+      customInput.value = '';
+      customInput.required = true;
+    }
+  } else {
+    if (customField) customField.hidden = true;
+    if (customInput) {
+      customInput.value = '';
+      customInput.required = false;
+    }
+  }
+}
+
+function getProductCategoryValue() {
+  const select = document.getElementById('productCategoriaSelect');
+  if (select?.value === NEW_CATEGORY_VALUE) {
+    return document.getElementById('productCategoriaCustom')?.value.trim() || '';
+  }
+  return select?.value?.trim() || '';
+}
+
+function bindProductCategorySelect() {
+  const select = document.getElementById('productCategoriaSelect');
+  if (!select || select.dataset.bound) return;
+  select.dataset.bound = 'true';
+
+  select.addEventListener('change', () => {
+    const customField = document.getElementById('productCategoriaCustomField');
+    const customInput = document.getElementById('productCategoriaCustom');
+    const isNew = select.value === NEW_CATEGORY_VALUE;
+
+    if (customField) customField.hidden = !isNew;
+    if (customInput) {
+      customInput.required = isNew;
+      if (!isNew) customInput.value = '';
+      else customInput.focus();
+    }
+  });
+}
+
+function getProductImageStoragePath(productId) {
+  return `${RESTAURANTE_ID}/${productId}.jpg`;
+}
+
+function getProductImagePublicUrl(productId) {
+  return `${SUPABASE_URL}/storage/v1/object/public/${PRODUCT_IMAGE_BUCKET}/${getProductImageStoragePath(productId)}`;
+}
+
+function revokePendingProductImagePreview() {
+  if (pendingProductImagePreviewUrl) {
+    URL.revokeObjectURL(pendingProductImagePreviewUrl);
+    pendingProductImagePreviewUrl = null;
+  }
+}
+
+function setProductImagePreview(src, hint = '') {
+  const preview = document.getElementById('productImagePreview');
+  const img = document.getElementById('productImagePreviewImg');
+  const hintEl = document.getElementById('productImageHint');
+
+  if (img) img.src = src || '';
+  if (preview) preview.hidden = !src;
+  if (hintEl && hint) hintEl.textContent = hint;
+}
+
+function resetProductImageField(existingUrl = '') {
+  const fileInput = document.getElementById('productImagen');
+  pendingProductImageFile = null;
+  currentProductImageUrl = existingUrl || null;
+  revokePendingProductImagePreview();
+  if (fileInput) fileInput.value = '';
+
+  if (existingUrl) {
+    setProductImagePreview(
+      existingUrl,
+      'Imagen actual. Seleccioná otra para reemplazarla.'
+    );
+    return;
+  }
+
+  setProductImagePreview('', '');
+  const hintEl = document.getElementById('productImageHint');
+  if (hintEl) hintEl.textContent = 'JPG, PNG o WEBP';
+}
+
+function validateProductImageFile(file) {
+  if (!file) return null;
+  if (!ALLOWED_PRODUCT_IMAGE_TYPES.has(file.type)) {
+    throw new Error('Solo se permiten imágenes JPG, PNG o WEBP.');
+  }
+  return file;
+}
+
+async function uploadProductImage(productId, file) {
+  const path = getProductImageStoragePath(productId);
+  const contentType =
+    file.type === 'image/png' ? 'image/png' : file.type === 'image/webp' ? 'image/webp' : 'image/jpeg';
+
+  const { error } = await supabaseClient.storage.from(PRODUCT_IMAGE_BUCKET).upload(path, file, {
+    upsert: true,
+    contentType,
+  });
+
+  if (error) throw error;
+  return getProductImagePublicUrl(productId);
+}
+
+function bindProductImageField() {
+  const fileInput = document.getElementById('productImagen');
+  const clearBtn = document.getElementById('productImageClearBtn');
+  if (!fileInput || fileInput.dataset.bound) return;
+  fileInput.dataset.bound = 'true';
+
+  fileInput.addEventListener('change', () => {
+    const file = fileInput.files?.[0];
+    if (!file) {
+      resetProductImageField(currentProductImageUrl || '');
+      return;
+    }
+
+    try {
+      validateProductImageFile(file);
+    } catch (error) {
+      fileInput.value = '';
+      showToast(error.message, 'error');
+      resetProductImageField(currentProductImageUrl || '');
+      return;
+    }
+
+    pendingProductImageFile = file;
+    revokePendingProductImagePreview();
+    pendingProductImagePreviewUrl = URL.createObjectURL(file);
+    setProductImagePreview(pendingProductImagePreviewUrl, 'Vista previa de la imagen seleccionada.');
+  });
+
+  clearBtn?.addEventListener('click', () => {
+    resetProductImageField(currentProductImageUrl || '');
+  });
+}
+
 function openProductModal(product = null) {
   const modal = document.getElementById('productModal');
   const title = document.getElementById('productModalTitle');
@@ -116,8 +314,9 @@ function openProductModal(product = null) {
   document.getElementById('productNombre').value = product?.nombre || '';
   document.getElementById('productDescripcion').value = product?.descripcion || '';
   document.getElementById('productPrecio').value = product?.precio ?? '';
-  document.getElementById('productCategoria').value = product?.categoria || '';
+  populateProductCategorySelect(product?.categoria || '');
   document.getElementById('productDisponible').checked = product ? product.disponible !== false : true;
+  resetProductImageField(product?.imagen_url || '');
 
   title.textContent = product ? 'Editar producto' : 'Agregar producto';
   modal.hidden = false;
@@ -128,6 +327,9 @@ function openProductModal(product = null) {
 function closeProductModal() {
   const modal = document.getElementById('productModal');
   if (!modal) return;
+  revokePendingProductImagePreview();
+  pendingProductImageFile = null;
+  currentProductImageUrl = null;
   modal.hidden = true;
   modal.setAttribute('aria-hidden', 'true');
 }
@@ -145,7 +347,7 @@ function readProductFormPayload() {
     nombre: document.getElementById('productNombre').value.trim(),
     descripcion: document.getElementById('productDescripcion').value.trim() || null,
     precio,
-    categoria: document.getElementById('productCategoria').value.trim(),
+    categoria: getProductCategoryValue(),
     disponible: document.getElementById('productDisponible').checked,
   };
 }
@@ -166,6 +368,9 @@ async function saveProduct(event) {
   document.getElementById('productSaveBtn').disabled = true;
 
   try {
+    let productId = id;
+    const imageFile = pendingProductImageFile;
+
     if (id) {
       const { error } = await supabaseClient
         .from('productos')
@@ -179,15 +384,31 @@ async function saveProduct(event) {
         .eq('id', id);
 
       if (error) throw error;
-      await refreshMenuAfterChange('Producto actualizado');
     } else {
-      const { error } = await supabaseClient.from('productos').insert({
-        ...payload,
-        restaurante_id: RESTAURANTE_ID,
-      });
+      const { data, error } = await supabaseClient
+        .from('productos')
+        .insert({
+          ...payload,
+          restaurante_id: RESTAURANTE_ID,
+        })
+        .select('id')
+        .single();
+
       if (error) throw error;
-      await refreshMenuAfterChange('Producto agregado');
+      productId = data.id;
     }
+
+    if (imageFile) {
+      const imagen_url = await uploadProductImage(productId, imageFile);
+      const { error: imageError } = await supabaseClient
+        .from('productos')
+        .update({ imagen_url })
+        .eq('id', productId);
+
+      if (imageError) throw imageError;
+    }
+
+    await refreshMenuAfterChange(id ? 'Producto actualizado' : 'Producto agregado');
   } catch (error) {
     console.error(error);
     showToast(error.message || 'No se pudo guardar el producto.', 'error');
@@ -269,6 +490,8 @@ function bindMenuActions() {
 }
 
 function initMenuPanel() {
+  bindProductCategorySelect();
+  bindProductImageField();
   bindMenuActions();
 }
 

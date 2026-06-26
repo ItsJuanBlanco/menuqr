@@ -192,8 +192,29 @@
             </label>
             <label class="product-form__field">
               <span>Categoría</span>
-              <input type="text" id="productCategoria" required maxlength="60" placeholder="Ej: Entradas">
+              <select id="productCategoriaSelect" class="product-form__select" required></select>
             </label>
+          </div>
+          <label class="product-form__field" id="productCategoriaCustomField" hidden>
+            <span>Nueva categoría</span>
+            <input type="text" id="productCategoriaCustom" maxlength="60" placeholder="Ej: Postres">
+          </label>
+          <div class="product-form__image">
+            <label class="product-form__field">
+              <span>Imagen</span>
+              <input
+                type="file"
+                id="productImagen"
+                accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
+              >
+            </label>
+            <p class="product-form__image-hint" id="productImageHint">JPG, PNG o WEBP</p>
+            <div class="product-form__image-preview" id="productImagePreview" hidden>
+              <img id="productImagePreviewImg" alt="Vista previa del producto">
+              <button type="button" class="product-form__image-clear" id="productImageClearBtn">
+                Quitar selección
+              </button>
+            </div>
           </div>
           <label class="product-form__toggle">
             <input type="checkbox" id="productDisponible" checked>

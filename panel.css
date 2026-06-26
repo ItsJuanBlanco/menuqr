@@ -1624,16 +1624,21 @@ body.mesa-qr-printing .mesa-qr-print {
 }
 
 .product-form__field input,
-.product-form__field textarea {
+.product-form__field textarea,
+.product-form__field select,
+.product-form__select {
   padding: 10px 12px;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   font-family: inherit;
   font-size: 0.9375rem;
+  background: #fff;
 }
 
 .product-form__field input:focus,
-.product-form__field textarea:focus {
+.product-form__field textarea:focus,
+.product-form__field select:focus,
+.product-form__select:focus {
   outline: none;
   border-color: var(--accent);
 }
@@ -1642,6 +1647,44 @@ body.mesa-qr-printing .mesa-qr-print {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 12px;
+}
+
+.product-form__image {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.product-form__image-hint {
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+}
+
+.product-form__image-preview {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.product-form__image-preview img {
+  width: 100%;
+  max-width: 220px;
+  aspect-ratio: 1;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: #fff;
+}
+
+.product-form__image-clear {
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  border: 1px solid var(--border);
+  background: #fff;
+  color: var(--text-muted);
 }
 
 .product-form__toggle {
