@@ -163,6 +163,28 @@ ul {
   animation: fadeIn 0.25s ease;
 }
 
+.app-powered {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 24px 16px 4px;
+  color: rgba(161, 161, 170, 0.42);
+  font-size: 0.625rem;
+  font-weight: 500;
+  letter-spacing: 0.03em;
+  user-select: none;
+}
+
+.app-powered__logo {
+  display: block;
+  height: 12px;
+  width: auto;
+  max-width: 40px;
+  object-fit: contain;
+  opacity: 0.55;
+}
+
 .panel[hidden] {
   display: none !important;
 }
