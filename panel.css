@@ -3217,6 +3217,82 @@ body.mesa-qr-printing .mesa-qr-print {
     grid-template-columns: 1fr;
   }
 
+  .panel-orders {
+    gap: 12px;
+  }
+
+  .order-card {
+    padding: 12px;
+  }
+
+  .order-card__head {
+    padding: 0 0 10px;
+    gap: 8px;
+    margin-bottom: 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .order-card__mesa,
+  .order-card__time {
+    font-size: 13px;
+  }
+
+  .order-card__mesa {
+    letter-spacing: -0.01em;
+  }
+
+  .order-card__status {
+    margin-top: 2px;
+    padding: 2px 8px;
+    font-size: 0.625rem;
+  }
+
+  .order-card__actions {
+    padding: 8px 0;
+    margin-top: 8px;
+    border-bottom: none;
+  }
+
+  .order-card__bulk-btn {
+    padding: 8px;
+    font-size: 0.75rem;
+  }
+
+  .order-card__items {
+    padding: 6px 0 0;
+  }
+
+  .item-row {
+    padding: 6px 0;
+    gap: 8px;
+  }
+
+  .item-row__name {
+    font-size: 0.8125rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .item-row__qty {
+    margin-top: 0;
+    font-size: 0.6875rem;
+  }
+
+  .item-row__actions {
+    gap: 4px;
+  }
+
+  .item-row__btn {
+    padding: 6px 12px;
+    font-size: 12px;
+  }
+
+  .item-row__badge {
+    padding: 3px 8px;
+    font-size: 0.625rem;
+  }
+
   .menu-product {
     flex-direction: column;
   }
