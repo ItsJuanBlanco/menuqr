@@ -811,21 +811,41 @@ function bindListActions() {
 }
 
 /* ── Mesas ── */
-async function fetchMesas() {
-  const [{ data: mesasData, error: mesasError }, { data: itemsData, error: itemsError }] =
-    await Promise.all([
-      supabaseClient
-        .from('mesas')
-        .select('id, numero, estado, mesero_requerido')
-        .eq('restaurante_id', RESTAURANTE_ID)
-        .order('numero'),
-      supabaseClient.rpc('get_mesa_items', { p_restaurante_id: RESTAURANTE_ID }),
-    ]);
+async function fetchAllRestaurantMesas() {
+  const pageSize = 100;
+  let from = 0;
+  const allMesas = [];
 
-  if (mesasError) throw mesasError;
+  while (true) {
+    const { data, error } = await supabaseClient
+      .from('mesas')
+      .select('id, numero, estado, mesero_requerido')
+      .eq('restaurante_id', RESTAURANTE_ID)
+      .order('numero', { ascending: true })
+      .range(from, from + pageSize - 1);
+
+    if (error) throw error;
+
+    const batch = data || [];
+    allMesas.push(...batch);
+
+    if (batch.length < pageSize) break;
+    from += pageSize;
+  }
+
+  return allMesas.sort((a, b) => a.numero - b.numero);
+}
+
+async function fetchMesas() {
+  const [mesasData, itemsResult] = await Promise.all([
+    fetchAllRestaurantMesas(),
+    supabaseClient.rpc('get_mesa_items', { p_restaurante_id: RESTAURANTE_ID }),
+  ]);
+
+  const { data: itemsData, error: itemsError } = itemsResult;
   if (itemsError) throw itemsError;
 
-  mesas = mesasData || [];
+  mesas = mesasData;
   mesaAccounts = {};
   mesaSessionBreakdown = {};
   mesaSessionItems = {};
