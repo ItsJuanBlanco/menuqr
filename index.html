@@ -225,70 +225,6 @@
               </div>
             </section>
 
-            <section class="account__split" id="splitBillSection" hidden>
-              <h3 class="account__section-title">Dividir y pagar</h3>
-              <div class="account__split-row">
-                <span class="account__split-label">¿Cuántos van a pagar?</span>
-                <div class="account__split-stepper">
-                  <button type="button" class="account__split-stepper-btn" id="splitCountMinus" aria-label="Menos personas">−</button>
-                  <input
-                    type="number"
-                    class="account__split-input"
-                    id="splitCountInput"
-                    value="2"
-                    min="2"
-                    max="20"
-                    inputmode="numeric"
-                    aria-label="Número de personas"
-                    readonly
-                  >
-                  <button type="button" class="account__split-stepper-btn" id="splitCountPlus" aria-label="Más personas">+</button>
-                </div>
-              </div>
-              <button type="button" class="account__split-create-btn" id="createSplitGroupBtn">
-                Crear grupo de pago
-              </button>
-              <p class="account__split-progress" id="splitPaymentProgress" hidden></p>
-
-              <div class="account__split-qr" id="splitQrBox" hidden>
-                <p class="account__split-share" id="splitShareAmount">Cada uno paga: $0</p>
-                <div class="account__split-qr-canvas account__split-qr-canvas--large" id="splitQrCanvas"></div>
-                <p class="account__split-qr-hint" id="splitQrHint"></p>
-                <p class="account__split-restaurant-qr-amount" id="splitRestaurantQrAmount" hidden></p>
-                <button type="button" class="wompi-pay-btn account__split-link-btn" id="splitPaymentLinkBtn" hidden>
-                  Abrir link de pago
-                </button>
-                <p class="account__split-payment-divider" id="splitPaymentDivider" hidden>o escaneá el QR</p>
-                <button type="button" class="wompi-pay-btn account__split-pay-btn" id="splitPayBtn">
-                  Pagar mi parte
-                </button>
-              </div>
-            </section>
-
-            <section class="account__split-join" id="splitJoinSection" hidden>
-              <div class="split-join-card">
-                <p class="split-join-card__label">Tu parte a pagar</p>
-                <p class="split-join-card__amount" id="splitJoinAmount">$0</p>
-                <p class="split-join-card__meta" id="splitJoinMeta">Cuenta grupal · Mesa 1</p>
-                <div class="split-join-card__actions">
-                  <button type="button" class="split-join-card__pay split-join-card__pay--wompi" id="splitJoinPayBtn">
-                    <span class="split-join-card__pay-icon" aria-hidden="true">
-                      <img
-                        src="https://cdn.wompi.co/static/images/wompi-logo-white.svg"
-                        alt=""
-                        class="split-join-card__pay-logo"
-                        width="72"
-                        height="22"
-                        decoding="async"
-                      >
-                      <span class="split-join-card__pay-icon-fallback">W</span>
-                    </span>
-                    <span class="split-join-card__pay-label" id="splitJoinPayLabel">Pagar con Wompi</span>
-                  </button>
-                </div>
-              </div>
-            </section>
-
             <button type="button" class="wompi-pay-btn" id="wompiPayBtn" hidden>
               Pagar con Wompi
             </button>
@@ -297,9 +233,73 @@
             </p>
           </section>
 
-          <section class="account__switch" id="accountSwitchSection">
-            <h3 class="account__section-title">Cambiar a otra cuenta</h3>
-            <p class="account__switch-hint">Ingresá el código de 4 dígitos para unirte a otra cuenta. Tus pedidos activos se moverán a esa cuenta.</p>
+          <section class="account__split" id="splitBillSection" hidden>
+            <h3 class="account__section-title">Dividir y pagar</h3>
+            <div class="account__split-row">
+              <span class="account__split-label">¿Cuántos van a pagar?</span>
+              <div class="account__split-stepper">
+                <button type="button" class="account__split-stepper-btn" id="splitCountMinus" aria-label="Menos personas">−</button>
+                <input
+                  type="number"
+                  class="account__split-input"
+                  id="splitCountInput"
+                  value="2"
+                  min="2"
+                  max="20"
+                  inputmode="numeric"
+                  aria-label="Número de personas"
+                  readonly
+                >
+                <button type="button" class="account__split-stepper-btn" id="splitCountPlus" aria-label="Más personas">+</button>
+              </div>
+            </div>
+            <button type="button" class="account__split-create-btn" id="createSplitGroupBtn">
+              Crear grupo de pago
+            </button>
+            <p class="account__split-progress" id="splitPaymentProgress" hidden></p>
+
+            <div class="account__split-qr" id="splitQrBox" hidden>
+              <p class="account__split-share" id="splitShareAmount">Cada uno paga: $0</p>
+              <div class="account__split-qr-canvas account__split-qr-canvas--large" id="splitQrCanvas"></div>
+              <p class="account__split-qr-hint" id="splitQrHint"></p>
+              <p class="account__split-restaurant-qr-amount" id="splitRestaurantQrAmount" hidden></p>
+              <button type="button" class="wompi-pay-btn account__split-link-btn" id="splitPaymentLinkBtn" hidden>
+                Abrir link de pago
+              </button>
+              <p class="account__split-payment-divider" id="splitPaymentDivider" hidden>o escaneá el QR</p>
+              <button type="button" class="wompi-pay-btn account__split-pay-btn" id="splitPayBtn">
+                Pagar mi parte
+              </button>
+            </div>
+          </section>
+
+          <section class="account__split-join" id="splitJoinSection" hidden>
+            <div class="split-join-card">
+              <p class="split-join-card__label">Tu parte a pagar</p>
+              <p class="split-join-card__amount" id="splitJoinAmount">$0</p>
+              <p class="split-join-card__meta" id="splitJoinMeta">Cuenta grupal · Mesa 1</p>
+              <div class="split-join-card__actions">
+                <button type="button" class="split-join-card__pay split-join-card__pay--wompi" id="splitJoinPayBtn">
+                  <span class="split-join-card__pay-icon" aria-hidden="true">
+                    <img
+                      src="https://cdn.wompi.co/static/images/wompi-logo-white.svg"
+                      alt=""
+                      class="split-join-card__pay-logo"
+                      width="72"
+                      height="22"
+                      decoding="async"
+                    >
+                    <span class="split-join-card__pay-icon-fallback">W</span>
+                  </span>
+                  <span class="split-join-card__pay-label" id="splitJoinPayLabel">Pagar con Wompi</span>
+                </button>
+              </div>
+            </div>
+          </section>
+
+          <section class="account__switch account__switch--subtle" id="accountSwitchSection">
+            <p class="account__switch-title">Cambiar a otra cuenta</p>
+            <p class="account__switch-hint">Código de 4 dígitos para unirte a otra cuenta.</p>
             <form class="account__switch-form" id="accountSwitchForm">
               <input
                 type="text"

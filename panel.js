@@ -210,11 +210,10 @@ function showNewOrderToast(mesaNum) {
   showToast._timer = setTimeout(() => toast.classList.remove('panel-toast--visible'), 7000);
 }
 
-function updatePedidosTabBadge() {
-  const tab = document.getElementById('tabPedidos');
+function updatePanelTabBadge(tabId, count, ariaLabel = '') {
+  const tab = document.getElementById(tabId);
   if (!tab) return;
 
-  const count = orders.length;
   let badge = tab.querySelector('.panel-tabs__badge');
 
   if (count <= 0) {
@@ -229,7 +228,55 @@ function updatePedidosTabBadge() {
   }
 
   badge.textContent = count > 99 ? '99+' : String(count);
-  badge.setAttribute('aria-label', `${count} pedido${count !== 1 ? 's' : ''} pendiente${count !== 1 ? 's' : ''}`);
+  if (ariaLabel) badge.setAttribute('aria-label', ariaLabel);
+  else badge.removeAttribute('aria-label');
+}
+
+function updatePedidosTabBadge() {
+  const count = orders.length;
+  updatePanelTabBadge(
+    'tabPedidos',
+    count,
+    `${count} pedido${count !== 1 ? 's' : ''} pendiente${count !== 1 ? 's' : ''}`
+  );
+}
+
+function countPendingPaymentSessions() {
+  const sessionIds = new Set();
+
+  Object.values(mesaSessionBreakdown).forEach((sessions) => {
+    (sessions || []).forEach((session) => {
+      if (session.pago_pendiente_confirmacion === true && session.id) {
+        sessionIds.add(session.id);
+      }
+    });
+  });
+
+  return sessionIds.size;
+}
+
+function countWaiterRequiredMesas() {
+  return mesas.filter((mesa) => mesa.mesero_requerido === true).length;
+}
+
+function getMesasTabBadgeCount() {
+  return countPendingPaymentSessions() + countWaiterRequiredMesas();
+}
+
+function updateMesasTabBadge() {
+  const pendingPayments = countPendingPaymentSessions();
+  const waiterCalls = countWaiterRequiredMesas();
+  const count = getMesasTabBadgeCount();
+
+  const parts = [];
+  if (pendingPayments > 0) {
+    parts.push(`${pendingPayments} pago${pendingPayments !== 1 ? 's' : ''} por confirmar`);
+  }
+  if (waiterCalls > 0) {
+    parts.push(`${waiterCalls} llamada${waiterCalls !== 1 ? 's' : ''} al mesero`);
+  }
+
+  updatePanelTabBadge('tabMesas', count, parts.join(', '));
 }
 
 function loadPanelSoundsPreference() {
@@ -1323,6 +1370,8 @@ async function fetchMesas(options = {}) {
     if (activePanel === 'qr') renderMesaQrs();
     updateHeaderCount();
   }
+
+  updateMesasTabBadge();
 }
 
 async function refreshPanelData() {

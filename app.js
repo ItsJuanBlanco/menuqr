@@ -1725,6 +1725,27 @@ function bindProductsInput() {
   productsInputBound = true;
 }
 
+const PRODUCT_PLACEHOLDER_PNG = '/placeholder-producto.png';
+const PRODUCT_PLACEHOLDER_SVG = '/placeholder-producto.svg';
+
+function handleProductImageError(img) {
+  if (!img) return;
+
+  const stage = img.dataset.fallbackStage || '';
+  if (stage !== 'png') {
+    img.dataset.fallbackStage = 'png';
+    img.src = PRODUCT_PLACEHOLDER_PNG;
+    return;
+  }
+
+  img.onerror = null;
+  img.dataset.fallbackStage = 'svg';
+  img.src = PRODUCT_PLACEHOLDER_SVG;
+  img.classList.add('product-card__image--placeholder');
+}
+
+window.handleProductImageError = handleProductImageError;
+
 function renderProducts() {
   const container = document.getElementById('products');
   const filtered = MENU.products.filter((p) => p.category === state.activeCategory);
@@ -1756,10 +1777,20 @@ function renderProducts() {
             </label>`
           : '';
 
+      const imageSrc = product.image || PRODUCT_PLACEHOLDER_SVG;
+
       return `
         <article class="product-card">
           <div class="product-card__image-wrap">
-            <img class="product-card__image" src="${product.image}" alt="${product.name}" loading="lazy" width="96" height="96">
+            <img
+              class="product-card__image${!product.image ? ' product-card__image--placeholder' : ''}"
+              src="${imageSrc}"
+              alt="${escapeHtml(product.name)}"
+              loading="lazy"
+              width="96"
+              height="96"
+              onerror="handleProductImageError(this)"
+            >
           </div>
           <div class="product-card__body">
             <h3 class="product-card__name">${product.name}</h3>
