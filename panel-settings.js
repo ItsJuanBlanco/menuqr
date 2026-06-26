@@ -2,6 +2,7 @@ const SETTINGS_ASSETS_BUCKET = 'restaurantes';
 const ALLOWED_SETTINGS_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 const DEFAULT_COLOR_PRIMARY = '#FF6B00';
 const DEFAULT_COLOR_BG = '#0a0a0c';
+const DEFAULT_COVER_POSITION = '50%';
 
 let settingsSaving = false;
 let pendingLogoFile = null;
@@ -15,6 +16,106 @@ function normalizeHexColor(value, fallback) {
   const raw = String(value || '').trim();
   if (/^#[0-9A-Fa-f]{6}$/.test(raw)) return raw.toLowerCase();
   return fallback;
+}
+
+function normalizeCoverPosition(value) {
+  const raw = String(value || '').trim();
+  const match = raw.match(/^(\d{1,3})%?$/);
+  if (match) {
+    const num = Math.min(100, Math.max(0, parseInt(match[1], 10)));
+    return `${num}%`;
+  }
+  return DEFAULT_COVER_POSITION;
+}
+
+function coverPositionToPercent(value) {
+  return parseInt(normalizeCoverPosition(value), 10);
+}
+
+function applyCoverPositionPreview(percent) {
+  const img = document.getElementById('settingsCoverPreviewImg');
+  const valueLabel = document.getElementById('settingsCoverPositionValue');
+  const slider = document.getElementById('settingsCoverPosition');
+  const safePercent = Math.min(100, Math.max(0, Number(percent) || 50));
+
+  if (slider) slider.value = String(safePercent);
+  if (valueLabel) valueLabel.textContent = `${safePercent}%`;
+  if (img?.src) img.style.objectPosition = `center ${safePercent}%`;
+}
+
+function updateLogoRemoveButton(hasImage) {
+  const btn = document.getElementById('settingsLogoRemoveBtn');
+  if (btn) btn.hidden = !hasImage;
+}
+
+function updateCoverExtraControls(hasImage, position = DEFAULT_COVER_POSITION) {
+  const removeBtn = document.getElementById('settingsCoverRemoveBtn');
+  const positionWrap = document.getElementById('settingsCoverPositionWrap');
+
+  if (removeBtn) removeBtn.hidden = !hasImage;
+  if (positionWrap) positionWrap.hidden = !hasImage;
+
+  if (hasImage) applyCoverPositionPreview(coverPositionToPercent(position));
+}
+
+async function syncRestaurantSettings(data) {
+  setRestaurantGlobals({ restaurant: data });
+  applyRestaurantBranding(data);
+  applyRestaurantTheme(data);
+  applyRestaurantCover(data);
+  populateSettingsForm(data);
+}
+
+async function updateRestaurantSettingsFields(fields, successMessage) {
+  if (settingsSaving) return;
+
+  settingsSaving = true;
+  const saveBtn = document.getElementById('settingsSaveBtn');
+  const errorEl = document.getElementById('settingsFormError');
+
+  if (saveBtn) saveBtn.disabled = true;
+  if (errorEl) errorEl.hidden = true;
+
+  try {
+    const { data, error } = await supabaseClient
+      .from('restaurantes')
+      .update(fields)
+      .eq('id', RESTAURANTE_ID)
+      .select(
+        'id, slug, nombre, ciudad, logo_url, foto_portada, foto_portada_posicion, color_primario, color_fondo, wompi_public_key'
+      )
+      .single();
+
+    if (error) throw error;
+
+    await syncRestaurantSettings(data);
+    pendingLogoFile = null;
+    pendingCoverFile = null;
+    showToast(successMessage, 'success');
+  } catch (error) {
+    console.error(error);
+    showToast(error.message || 'No se pudieron guardar los ajustes.', 'error');
+  } finally {
+    settingsSaving = false;
+    if (saveBtn) saveBtn.disabled = false;
+  }
+}
+
+async function removeRestaurantLogo() {
+  if (!currentLogoUrl && !pendingLogoFile) return;
+  if (!window.confirm('¿Quitar el logo del restaurante?')) return;
+
+  await updateRestaurantSettingsFields({ logo_url: null }, 'Logo quitado');
+}
+
+async function removeRestaurantCover() {
+  if (!currentCoverUrl && !pendingCoverFile) return;
+  if (!window.confirm('¿Quitar la foto de portada?')) return;
+
+  await updateRestaurantSettingsFields(
+    { foto_portada: null, foto_portada_posicion: DEFAULT_COVER_POSITION },
+    'Portada quitada'
+  );
 }
 
 function getSettingsAssetPath(filename) {
@@ -103,6 +204,7 @@ function resetLogoField(url = '') {
       hint: 'Logo actual. Elegí otra imagen para reemplazarlo.',
       btnText: 'Cambiar logo',
     });
+    updateLogoRemoveButton(true);
     return;
   }
 
@@ -114,9 +216,10 @@ function resetLogoField(url = '') {
     hint: 'JPG, PNG o WEBP',
     btnText: 'Subir logo',
   });
+  updateLogoRemoveButton(false);
 }
 
-function resetCoverField(url = '') {
+function resetCoverField(url = '', position = DEFAULT_COVER_POSITION) {
   const input = document.getElementById('settingsCoverInput');
   pendingCoverFile = null;
   currentCoverUrl = url || null;
@@ -133,6 +236,7 @@ function resetCoverField(url = '') {
       hint: 'Portada actual. Elegí otra imagen para reemplazarla.',
       btnText: 'Cambiar portada',
     });
+    updateCoverExtraControls(true, position);
     return;
   }
 
@@ -144,6 +248,7 @@ function resetCoverField(url = '') {
     hint: 'JPG, PNG o WEBP · banner en la carta',
     btnText: 'Subir portada',
   });
+  updateCoverExtraControls(false);
 }
 
 function populateSettingsForm(restaurant) {
@@ -157,13 +262,13 @@ function populateSettingsForm(restaurant) {
   if (bgInput) bgInput.value = bg;
 
   resetLogoField(restaurant?.logo_url || '');
-  resetCoverField(restaurant?.foto_portada || '');
+  resetCoverField(restaurant?.foto_portada || '', restaurant?.foto_portada_posicion || DEFAULT_COVER_POSITION);
 }
 
 async function fetchRestaurantSettings() {
   const { data, error } = await supabaseClient
     .from('restaurantes')
-    .select('id, slug, nombre, ciudad, logo_url, foto_portada, color_primario, color_fondo')
+    .select('id, slug, nombre, ciudad, logo_url, foto_portada, foto_portada_posicion, color_primario, color_fondo')
     .eq('id', RESTAURANTE_ID)
     .single();
 
@@ -188,14 +293,17 @@ async function saveRestaurantSettings(event) {
 
   const primaryInput = document.getElementById('settingsColorPrimary');
   const bgInput = document.getElementById('settingsColorBg');
+  const coverPositionInput = document.getElementById('settingsCoverPosition');
   const saveBtn = document.getElementById('settingsSaveBtn');
   const errorEl = document.getElementById('settingsFormError');
 
   const color_primario = normalizeHexColor(primaryInput?.value, DEFAULT_COLOR_PRIMARY);
   const color_fondo = normalizeHexColor(bgInput?.value, DEFAULT_COLOR_BG);
+  const foto_portada_posicion = normalizeCoverPosition(coverPositionInput?.value);
 
   if (primaryInput) primaryInput.value = color_primario;
   if (bgInput) bgInput.value = color_fondo;
+  applyCoverPositionPreview(coverPositionToPercent(foto_portada_posicion));
 
   settingsSaving = true;
   if (saveBtn) saveBtn.disabled = true;
@@ -223,18 +331,17 @@ async function saveRestaurantSettings(event) {
         color_fondo,
         logo_url,
         foto_portada,
+        foto_portada_posicion,
       })
       .eq('id', RESTAURANTE_ID)
-      .select('id, slug, nombre, ciudad, logo_url, foto_portada, color_primario, color_fondo, wompi_public_key')
+      .select(
+        'id, slug, nombre, ciudad, logo_url, foto_portada, foto_portada_posicion, color_primario, color_fondo, wompi_public_key'
+      )
       .single();
 
     if (error) throw error;
 
-    setRestaurantGlobals({ restaurant: data });
-    applyRestaurantBranding(data);
-    applyRestaurantTheme(data);
-    applyRestaurantCover(data);
-    populateSettingsForm(data);
+    await syncRestaurantSettings(data);
     pendingLogoFile = null;
     pendingCoverFile = null;
 
@@ -294,6 +401,7 @@ function bindSettingsForm() {
         hint: file.name,
         btnText: 'Cambiar logo',
       });
+      updateLogoRemoveButton(true);
     },
     onReset: () => resetLogoField(currentLogoUrl || ''),
   });
@@ -303,6 +411,7 @@ function bindSettingsForm() {
       pendingCoverFile = file;
       revokePendingCoverPreview();
       pendingCoverPreviewUrl = URL.createObjectURL(file);
+      const position = document.getElementById('settingsCoverPosition')?.value || '50';
       updateSettingsImageUI({
         previewId: 'settingsCoverPreview',
         imgId: 'settingsCoverPreviewImg',
@@ -312,8 +421,22 @@ function bindSettingsForm() {
         hint: file.name,
         btnText: 'Cambiar portada',
       });
+      updateCoverExtraControls(true, `${position}%`);
     },
-    onReset: () => resetCoverField(currentCoverUrl || ''),
+    onReset: () =>
+      resetCoverField(
+        currentCoverUrl || '',
+        document.getElementById('settingsCoverPosition')?.value
+          ? `${document.getElementById('settingsCoverPosition').value}%`
+          : DEFAULT_COVER_POSITION
+      ),
+  });
+
+  document.getElementById('settingsLogoRemoveBtn')?.addEventListener('click', removeRestaurantLogo);
+  document.getElementById('settingsCoverRemoveBtn')?.addEventListener('click', removeRestaurantCover);
+
+  document.getElementById('settingsCoverPosition')?.addEventListener('input', (event) => {
+    applyCoverPositionPreview(event.target.value);
   });
 }
 

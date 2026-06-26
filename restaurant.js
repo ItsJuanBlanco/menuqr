@@ -162,20 +162,37 @@ function applyRestaurantTheme(restaurant) {
   document.documentElement.style.setProperty('--color-bg', bg);
 }
 
+function normalizeCoverPosition(value) {
+  const raw = String(value || '').trim();
+  const match = raw.match(/^(\d{1,3})%?$/);
+  if (match) {
+    const num = Math.min(100, Math.max(0, parseInt(match[1], 10)));
+    return `${num}%`;
+  }
+  return '50%';
+}
+
+function coverPositionToPercent(value) {
+  return parseInt(normalizeCoverPosition(value), 10);
+}
+
 function applyRestaurantCover(restaurant) {
   const cover = document.getElementById('cartaCover');
   const img = document.getElementById('cartaCoverImg');
   const url = restaurant?.foto_portada?.trim();
+  const position = normalizeCoverPosition(restaurant?.foto_portada_posicion);
 
   if (!cover || !img) return;
 
   if (url) {
     img.src = url;
     img.alt = restaurant?.nombre ? `Portada de ${restaurant.nombre}` : 'Portada del restaurante';
+    img.style.objectPosition = `center ${position}`;
     cover.hidden = false;
   } else {
     img.removeAttribute('src');
     img.alt = '';
+    img.style.objectPosition = '';
     cover.hidden = true;
   }
 }
@@ -237,7 +254,7 @@ async function initRestaurant() {
 
   const { data, error } = await supabaseClient
     .from('restaurantes')
-    .select('id, slug, nombre, ciudad, logo_url, foto_portada, color_primario, color_fondo, wompi_public_key')
+    .select('id, slug, nombre, ciudad, logo_url, foto_portada, foto_portada_posicion, color_primario, color_fondo, wompi_public_key')
     .eq('slug', slug)
     .maybeSingle();
 

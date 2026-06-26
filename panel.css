@@ -2726,6 +2726,31 @@ body.mesa-qr-printing .mesa-qr-print {
   align-self: flex-start;
 }
 
+.settings-form__remove-btn {
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #dc2626;
+  border: 1px solid #fecaca;
+  background: #fef2f2;
+}
+
+.settings-form__cover-position {
+  margin-top: 4px;
+}
+
+.settings-form__range {
+  width: 100%;
+  accent-color: var(--accent);
+}
+
+.settings-form__range-value {
+  float: right;
+  font-weight: 700;
+  color: var(--text);
+}
+
 @media (max-width: 640px) {
   #accountModal.modal {
     align-items: flex-end;

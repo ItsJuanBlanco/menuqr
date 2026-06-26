@@ -152,6 +152,9 @@
                     <span id="settingsLogoBtnText">Subir logo</span>
                   </label>
                   <p class="product-form__image-hint" id="settingsLogoHint">JPG, PNG o WEBP</p>
+                  <button type="button" class="settings-form__remove-btn" id="settingsLogoRemoveBtn" hidden>
+                    Quitar logo
+                  </button>
                 </div>
               </div>
             </div>
@@ -172,7 +175,27 @@
                     <span id="settingsCoverBtnText">Subir portada</span>
                   </label>
                   <p class="product-form__image-hint" id="settingsCoverHint">JPG, PNG o WEBP · banner en la carta</p>
+                  <button type="button" class="settings-form__remove-btn" id="settingsCoverRemoveBtn" hidden>
+                    Quitar portada
+                  </button>
                 </div>
+              </div>
+              <div class="settings-form__cover-position" id="settingsCoverPositionWrap" hidden>
+                <label class="settings-form__field" for="settingsCoverPosition">
+                  <span class="settings-form__label">
+                    Posición vertical
+                    <span class="settings-form__range-value" id="settingsCoverPositionValue">50%</span>
+                  </span>
+                  <input
+                    type="range"
+                    class="settings-form__range"
+                    id="settingsCoverPosition"
+                    min="0"
+                    max="100"
+                    step="1"
+                    value="50"
+                  >
+                </label>
               </div>
             </div>
             <p class="settings-form__error" id="settingsFormError" hidden role="alert"></p>
