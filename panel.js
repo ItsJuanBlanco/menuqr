@@ -276,6 +276,23 @@ function playWaiterCallSound() {
   });
 }
 
+function playPaymentStartSound() {
+  void resumePanelAudioContext().then(() => {
+    const ctx = getPanelAudioContext();
+    [0, 0.25].forEach((delay, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.frequency.setValueAtTime(i === 0 ? 800 : 600, ctx.currentTime + delay);
+      gain.gain.setValueAtTime(0.2, ctx.currentTime + delay);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + delay + 0.2);
+      osc.start(ctx.currentTime + delay);
+      osc.stop(ctx.currentTime + delay + 0.2);
+    });
+  });
+}
+
 function bindPanelAudioUnlock() {
   if (document.body.dataset.panelAudioBound) return;
   document.body.dataset.panelAudioBound = 'true';
@@ -298,7 +315,7 @@ function stopPanelPolling() {
 async function runPanelPoll() {
   try {
     if (activePanel === 'pedidos') {
-      await fetchOrders();
+      await Promise.all([fetchOrders(), pollSessionPaymentFlags()]);
       await fetchMesas({ skipRender: true });
     } else if (activePanel === 'mesas') {
       await Promise.all([fetchMesas(), fetchOrders()]);
@@ -338,6 +355,83 @@ function handleWaiterCallsDetected(previousWaiterMesaIds) {
 
   if (newCalls.length > 0) {
     playWaiterCallSound();
+  }
+}
+
+function collectPayingSessionIds() {
+  const ids = new Set();
+
+  Object.values(mesaSessionBreakdown).forEach((sessions) => {
+    sessions.forEach((session) => {
+      if (session.pago_en_proceso === true && session.pago_pendiente_confirmacion !== true) {
+        ids.add(session.id);
+      }
+    });
+  });
+
+  return ids;
+}
+
+function handlePaymentStartDetected(previousPayingSessionIds) {
+  const currentPayingSessionIds = collectPayingSessionIds();
+  const newlyPaying = [...currentPayingSessionIds].filter(
+    (sessionId) => !previousPayingSessionIds.has(sessionId)
+  );
+
+  if (panelAlertsInitialized && newlyPaying.length > 0) {
+    playPaymentStartSound();
+  }
+}
+
+function applySessionPaymentFlags(sesion) {
+  if (!sesion?.mesa_id) return;
+
+  const mesaId = sesion.mesa_id;
+  if (!mesaSessionBreakdown[mesaId]) {
+    mesaSessionBreakdown[mesaId] = [];
+  }
+
+  const sessions = mesaSessionBreakdown[mesaId];
+  const existing = sessions.find((entry) => entry.id === sesion.id);
+
+  if (existing) {
+    existing.pago_en_proceso = sesion.pago_en_proceso === true;
+    existing.pago_pendiente_confirmacion = sesion.pago_pendiente_confirmacion === true;
+    return;
+  }
+
+  sessions.push({
+    id: sesion.id,
+    sesionId: sesion.id,
+    label: formatSessionLineLabel(sesion),
+    total: 0,
+    numero: sesion.numero,
+    tipo: sesion.tipo || 'individual',
+    pago_pendiente_confirmacion: sesion.pago_pendiente_confirmacion === true,
+    pago_en_proceso: sesion.pago_en_proceso === true,
+    paidTotal: 0,
+  });
+}
+
+async function pollSessionPaymentFlags() {
+  const previousPayingSessionIds = collectPayingSessionIds();
+
+  const { data, error } = await supabaseClient
+    .from('sesiones')
+    .select('id, mesa_id, numero, tipo, pago_pendiente_confirmacion, pago_en_proceso')
+    .eq('restaurante_id', RESTAURANTE_ID)
+    .eq('activa', true);
+
+  if (error) throw error;
+
+  (data || []).forEach((sesion) => applySessionPaymentFlags(sesion));
+
+  if (panelAlertsInitialized) {
+    handlePaymentStartDetected(previousPayingSessionIds);
+  }
+
+  if (activePanel === 'mesas') {
+    renderMesas();
   }
 }
 
@@ -1055,6 +1149,7 @@ async function fetchMesas(options = {}) {
   const previousWaiterMesaIds = new Set(
     mesas.filter((mesa) => mesa.mesero_requerido).map((mesa) => mesa.id)
   );
+  const previousPayingSessionIds = collectPayingSessionIds();
 
   const [mesasData, itemsResult] = await Promise.all([
     fetchAllRestaurantMesas(),
@@ -1180,6 +1275,9 @@ async function fetchMesas(options = {}) {
 
   if (panelAlertsInitialized) {
     handleWaiterCallsDetected(previousWaiterMesaIds);
+    if (!skipRender) {
+      handlePaymentStartDetected(previousPayingSessionIds);
+    }
   }
 
   if (!skipRender) {
@@ -1249,6 +1347,22 @@ function handleSesionWompiPaymentClosed(payload) {
 }
 
 function onSesionesRealtimeUpdate(payload) {
+  const next = payload?.new;
+  const prev = payload?.old;
+
+  if (
+    panelAlertsInitialized &&
+    next?.pago_en_proceso === true &&
+    prev?.pago_en_proceso !== true &&
+    next?.pago_pendiente_confirmacion !== true
+  ) {
+    playPaymentStartSound();
+    applySessionPaymentFlags(next);
+    if (activePanel === 'mesas') {
+      renderMesas();
+    }
+  }
+
   handleSesionWompiPaymentClosed(payload);
   scheduleRealtimeRefresh();
 }
@@ -1290,7 +1404,7 @@ function renderMesas() {
                       <button type="button" class="mesa-card__payment-btn" data-action="confirmar-pago" data-sesion-id="${session.id}" data-mesa-id="${mesa.id}" data-mesa-num="${mesa.numero}">Cerrar mesa</button>
                     </div>`;
                 } else if (isPaying) {
-                  paymentInfo = `<span class="mesa-card__payment-badge mesa-card__payment-badge--paying">💳 Pagando...</span>`;
+                  paymentInfo = `<span class="mesa-card__payment-badge mesa-card__payment-badge--paying mesa-card__payment-badge--pulse">💳 Pagando...</span>`;
                 } else if (
                   paidTotal > 0 &&
                   sessionTotal > 0 &&
@@ -1323,7 +1437,7 @@ function renderMesas() {
           <header class="mesa-card__head">
             <span class="mesa-card__num">Mesa ${mesa.numero}</span>
             <div class="mesa-card__head-badges">
-              ${isMesaPaying ? '<span class="mesa-card__paying-badge">💳 Pagando...</span>' : ''}
+              ${isMesaPaying ? '<span class="mesa-card__paying-badge mesa-card__paying-badge--pulse">💳 Pagando...</span>' : ''}
               <span class="mesa-card__status mesa-card__status--${estado}">${formatMesaEstado(estado)}</span>
             </div>
           </header>
