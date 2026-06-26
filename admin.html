@@ -224,6 +224,18 @@
             </div>
           </div>
         </div>
+        <label class="admin-form__field" id="restaurantMesasField">
+          <span class="admin-form__label">¿Cuántas mesas tiene?</span>
+          <input
+            type="number"
+            class="admin-form__input"
+            id="restaurantMesasCount"
+            value="5"
+            min="1"
+            inputmode="numeric"
+            required
+          >
+        </label>
         <p class="admin-form__note" id="restaurantFormNote">Se crearán automáticamente 5 mesas (Mesa 1–5).</p>
         <p class="admin-form__error" id="restaurantFormError" hidden role="alert"></p>
         <button type="submit" class="dataphone-modal__confirm" id="restaurantSubmitBtn">Guardar restaurante</button>

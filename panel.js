@@ -978,6 +978,27 @@ function scheduleRealtimeRefresh() {
   }, 250);
 }
 
+function handleSesionWompiPaymentClosed(payload) {
+  const oldRow = payload.old;
+  const newRow = payload.new;
+
+  if (!newRow || newRow.activa !== false) return;
+  if (oldRow?.activa === false) return;
+
+  const referencia = newRow.referencia_wompi;
+  if (!referencia || String(referencia).startsWith('qr-propio')) return;
+
+  const mesa = mesas.find((entry) => entry.id === newRow.mesa_id);
+  const mesaNum = mesa?.numero ?? '?';
+  const code = formatSessionCode(newRow.numero);
+  showToast(`💳 Mesa ${mesaNum} — Cuenta #${code} pagada`, 'success');
+}
+
+function onSesionesRealtimeUpdate(payload) {
+  handleSesionWompiPaymentClosed(payload);
+  scheduleRealtimeRefresh();
+}
+
 function renderMesas() {
   const list = document.getElementById('mesasList');
 
@@ -1008,7 +1029,7 @@ function renderMesas() {
                 let paymentInfo = '';
                 if (isComplete) {
                   paymentInfo = `<div class="mesa-card__payment-alert">
-                      <span class="mesa-card__payment-badge mesa-card__payment-badge--complete">✅ Pago completado</span>
+                      <span class="mesa-card__payment-badge mesa-card__payment-badge--complete">✅ Pagado — confirmar</span>
                       <button type="button" class="mesa-card__payment-btn" data-action="confirmar-pago" data-sesion-id="${session.id}" data-mesa-id="${mesa.id}" data-mesa-num="${mesa.numero}">Confirmar</button>
                     </div>`;
                 } else if (isPaying) {
@@ -2994,7 +3015,7 @@ function subscribeToRealtime() {
     realtimeChannel = null;
   }
 
-  const tables = ['pedidos', 'pedido_items', 'mesas', 'productos', 'sesiones', 'pagos_grupo'];
+  const tables = ['pedidos', 'pedido_items', 'mesas', 'productos', 'pagos_grupo'];
   realtimeChannel = supabaseClient.channel('panel-live-sync');
 
   tables.forEach((table) => {
@@ -3003,6 +3024,15 @@ function subscribeToRealtime() {
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table }, scheduleRealtimeRefresh)
       .on('postgres_changes', { event: 'DELETE', schema: 'public', table }, scheduleRealtimeRefresh);
   });
+
+  realtimeChannel.on(
+    'postgres_changes',
+    { event: 'UPDATE', schema: 'public', table: 'sesiones' },
+    onSesionesRealtimeUpdate
+  );
+  realtimeChannel
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'sesiones' }, scheduleRealtimeRefresh)
+    .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'sesiones' }, scheduleRealtimeRefresh);
 
   realtimeChannel.subscribe((status, err) => {
     const live = document.getElementById('liveIndicator');

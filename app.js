@@ -143,6 +143,84 @@ const state = {
   tipCustomAmount: 0,
 };
 
+const PAYMENT_PENDING_MESSAGE = 'Pago recibido ✓ El mesero lo confirmará en un momento';
+
+function showPaymentSuccessScreen(totalPaid) {
+  const screen = document.getElementById('paymentSuccessScreen');
+  const amountEl = document.getElementById('paymentSuccessAmount');
+
+  if (amountEl) amountEl.textContent = formatCOP(totalPaid);
+  if (screen) {
+    screen.hidden = false;
+    screen.setAttribute('aria-hidden', 'false');
+  }
+
+  document.getElementById('mainApp')?.setAttribute('hidden', '');
+}
+
+async function closeSessionAfterWompiPayment(referenciaWompi, totalPaid) {
+  const sesionId = state.sesionId;
+  const mesaId = state.mesaId;
+
+  if (!sesionId || !mesaId) return;
+
+  const { error: pedidosError } = await supabaseClient
+    .from('pedidos')
+    .update({ archivado: true })
+    .eq('sesion_id', sesionId)
+    .eq('restaurante_id', RESTAURANTE_ID)
+    .eq('archivado', false);
+
+  if (pedidosError) throw pedidosError;
+
+  const { error: sesionError } = await supabaseClient
+    .from('sesiones')
+    .update({
+      activa: false,
+      pago_en_proceso: false,
+      pago_pendiente_confirmacion: false,
+      referencia_wompi: referenciaWompi,
+    })
+    .eq('id', sesionId);
+
+  if (sesionError) throw sesionError;
+
+  const { data: activeSessions, error: activeError } = await supabaseClient
+    .from('sesiones')
+    .select('id')
+    .eq('mesa_id', mesaId)
+    .eq('restaurante_id', RESTAURANTE_ID)
+    .eq('activa', true)
+    .limit(1);
+
+  if (activeError) throw activeError;
+
+  if (!activeSessions?.length) {
+    const { error: mesaError } = await supabaseClient
+      .from('mesas')
+      .update({ estado: 'libre', mesero_requerido: false })
+      .eq('id', mesaId);
+
+    if (mesaError) throw mesaError;
+  }
+
+  clearStoredSession(mesaId);
+
+  state.sesionId = null;
+  state.sessionToken = null;
+  state.sessionTipo = null;
+  state.sessionNumero = null;
+  state.paymentPendingConfirmation = false;
+  state.accountItems = [];
+  state.groupPayments = [];
+  state.lastSplitQrUrl = '';
+
+  const badge = document.getElementById('sessionBadge');
+  if (badge) badge.hidden = true;
+
+  showPaymentSuccessScreen(totalPaid);
+}
+
 /* ── Utilidades ── */
 function formatCOP(amount) {
   return new Intl.NumberFormat('es-CO', {
@@ -644,7 +722,10 @@ async function confirmRestaurantQrPayment() {
   if (!amount || state.paymentSubmitting) return;
 
   closeRestaurantQrPayModal();
-  await handleApprovedWompiPayment(amount, `qr-propio-${Date.now()}`, extras);
+  await handleApprovedWompiPayment(amount, `qr-propio-${Date.now()}`, {
+    ...extras,
+    manualConfirmation: true,
+  });
 }
 
 function startPaymentFlow(amount, options = {}) {
@@ -1538,10 +1619,14 @@ async function handleApprovedWompiPayment(monto, referenciaWompi, extras = {}) {
     await loadGroupPayments();
 
     if (breakdown.total > 0 && paidTotal >= breakdown.total) {
-      await markPaymentPendingConfirmation(
-        'Cuenta completa. El mesero confirmará el pago.',
-        { skipSubmittingGuard: true }
-      );
+      if (extras.manualConfirmation) {
+        await markPaymentPendingConfirmation(PAYMENT_PENDING_MESSAGE, {
+          skipSubmittingGuard: true,
+          referenciaWompi: referenciaWompi,
+        });
+      } else {
+        await closeSessionAfterWompiPayment(referenciaWompi, breakdown.total);
+      }
     } else {
       await clearPaymentInProgress();
       showToast('Tu parte fue registrada.', 'success', 4000);
@@ -1553,12 +1638,12 @@ async function handleApprovedWompiPayment(monto, referenciaWompi, extras = {}) {
     await clearPaymentInProgress();
   } finally {
     state.paymentSubmitting = false;
-    renderAccount();
+    if (state.sesionId) renderAccount();
   }
 }
 
 async function markPaymentPendingConfirmation(successMessage, options = {}) {
-  const { skipSubmittingGuard = false } = options;
+  const { skipSubmittingGuard = false, referenciaWompi = null } = options;
 
   if (!state.sesionId) return;
   if (!skipSubmittingGuard && state.paymentSubmitting) return;
@@ -1566,16 +1651,25 @@ async function markPaymentPendingConfirmation(successMessage, options = {}) {
   if (!skipSubmittingGuard) state.paymentSubmitting = true;
 
   try {
+    const updatePayload = {
+      pago_pendiente_confirmacion: true,
+      pago_en_proceso: false,
+    };
+
+    if (referenciaWompi) {
+      updatePayload.referencia_wompi = referenciaWompi;
+    }
+
     const { error } = await supabaseClient
       .from('sesiones')
-      .update({ pago_pendiente_confirmacion: true, pago_en_proceso: false })
+      .update(updatePayload)
       .eq('id', state.sesionId);
 
     if (error) throw error;
 
     state.paymentPendingConfirmation = true;
     renderAccount();
-    showToast(successMessage || 'Pago recibido, el mesero lo confirmará', 'success', 5000);
+    showToast(successMessage || PAYMENT_PENDING_MESSAGE, 'success', 5000);
   } catch (error) {
     console.error(error);
     showToast(error.message || 'No se pudo registrar el pago.', 'error');

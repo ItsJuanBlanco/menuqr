@@ -226,7 +226,7 @@
               Pagar con Wompi
             </button>
             <p class="account__payment-waiting" id="accountPaymentWaiting" hidden>
-              Pago recibido, el mesero lo confirmará
+              Pago recibido ✓ El mesero lo confirmará en un momento
             </p>
           </section>
 
@@ -327,6 +327,15 @@
 
     <!-- Toast -->
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  </div>
+
+  <div class="payment-success" id="paymentSuccessScreen" hidden aria-hidden="true" role="status" aria-live="polite">
+    <div class="payment-success__card">
+      <p class="payment-success__icon" aria-hidden="true">✓</p>
+      <h2 class="payment-success__title">¡Pago exitoso! ✓</h2>
+      <p class="payment-success__subtitle">Gracias por tu visita.</p>
+      <p class="payment-success__amount" id="paymentSuccessAmount">$0</p>
+    </div>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
