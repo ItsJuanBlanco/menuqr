@@ -169,20 +169,24 @@ ul {
   justify-content: center;
   gap: 8px;
   padding: 16px;
-  color: var(--text-muted);
+  user-select: none;
+}
+
+.app-powered__label {
   font-size: 13px;
   font-weight: 500;
   letter-spacing: 0.02em;
-  opacity: 0.6;
-  user-select: none;
+  color: rgba(255, 255, 255, 0.55);
 }
 
 .app-powered__logo {
   display: block;
-  height: 36px;
+  height: 32px;
   width: auto;
-  max-width: 120px;
+  max-width: 107px;
   object-fit: contain;
+  filter: brightness(0) invert(1);
+  opacity: 0.92;
 }
 
 .panel[hidden] {
