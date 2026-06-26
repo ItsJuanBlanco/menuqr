@@ -259,7 +259,7 @@ async function loadMesa() {
   state.mesaId = data.id;
 }
 
-function applyProductsFromDb(rows) {
+function applyProductsFromDb(rows, orderRows = []) {
   const categoriesMap = new Map();
 
   MENU.products = rows.map((row) => {
@@ -280,7 +280,7 @@ function applyProductsFromDb(rows) {
     };
   });
 
-  MENU.categories = [...categoriesMap.values()];
+  MENU.categories = sortCategoryObjects([...categoriesMap.values()], orderRows);
   if (MENU.categories.length === 0) {
     MENU.categories = [{ id: 'otros', name: 'Otros' }];
   }
@@ -291,17 +291,24 @@ function applyProductsFromDb(rows) {
 }
 
 async function loadMenuFromSupabase() {
-  const { data, error } = await supabaseClient
-    .from('productos')
-    .select('id, nombre, descripcion, precio, categoria, imagen_url')
-    .eq('restaurante_id', RESTAURANTE_ID)
-    .eq('disponible', true)
-    .order('nombre');
+  const [orderRows, productsResult] = await Promise.all([
+    fetchCategoryOrder(supabaseClient, RESTAURANTE_ID).catch((error) => {
+      console.warn('No se pudo cargar el orden de categorías:', error);
+      return [];
+    }),
+    supabaseClient
+      .from('productos')
+      .select('id, nombre, descripcion, precio, categoria, imagen_url')
+      .eq('restaurante_id', RESTAURANTE_ID)
+      .eq('disponible', true)
+      .order('nombre'),
+  ]);
 
+  const { data, error } = productsResult;
   if (error) throw error;
   if (!data || data.length === 0) return false;
 
-  applyProductsFromDb(data);
+  applyProductsFromDb(data, orderRows);
   return true;
 }
 

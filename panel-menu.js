@@ -1,6 +1,10 @@
 let menuProducts = [];
+let categoryOrderRows = [];
+let openCategoryName = null;
+let draggingCategoryEl = null;
 let menuSaving = false;
 let menuReloading = false;
+let menuOrderSaving = false;
 const NEW_CATEGORY_VALUE = '__new__';
 const PRODUCT_IMAGE_BUCKET = 'productos';
 const ALLOWED_PRODUCT_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
@@ -18,28 +22,89 @@ function groupProductsByCategory(products) {
     groups.get(category).push(product);
   });
 
-  return [...groups.entries()]
-    .sort(([a], [b]) => a.localeCompare(b, 'es'))
-    .map(([category, items]) => ({
-      category,
-      items: items.sort((a, b) => a.nombre.localeCompare(b.nombre, 'es')),
-    }));
+  const sortedEntries = sortCategoryNames([...groups.keys()], categoryOrderRows);
+
+  return sortedEntries.map((category) => ({
+    category,
+    items: groups
+      .get(category)
+      .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es')),
+  }));
+}
+
+async function loadCategoryOrderRows() {
+  try {
+    categoryOrderRows = await fetchCategoryOrder(supabaseClient, RESTAURANTE_ID);
+  } catch (error) {
+    console.warn('No se pudo cargar categorias_orden:', error);
+    categoryOrderRows = [];
+  }
+}
+
+async function persistCategoryOrderFromDom() {
+  const container = document.getElementById('menuList');
+  if (!container || menuOrderSaving) return;
+
+  const categoryNames = [...container.querySelectorAll('.menu-accordion__item')].map(
+    (item) => item.dataset.category
+  );
+
+  if (!categoryNames.length) return;
+
+  menuOrderSaving = true;
+
+  try {
+    await saveCategoryOrder(supabaseClient, RESTAURANTE_ID, categoryNames);
+    categoryOrderRows = categoryNames.map((categoria, orden) => ({ categoria, orden }));
+  } catch (error) {
+    console.error(error);
+    showToast(error.message || 'No se pudo guardar el orden de categorías.', 'error');
+    await reloadMenuProducts();
+  } finally {
+    menuOrderSaving = false;
+  }
+}
+
+function setOpenCategory(categoryName) {
+  openCategoryName = categoryName;
+
+  document.querySelectorAll('.menu-accordion__item').forEach((item) => {
+    const isOpen = item.dataset.category === categoryName;
+    item.classList.toggle('menu-accordion__item--open', isOpen);
+
+    const body = item.querySelector('.menu-accordion__body');
+    const arrow = item.querySelector('.menu-accordion__arrow');
+    const toggle = item.querySelector('[data-accordion-toggle]');
+
+    if (body) body.hidden = !isOpen;
+    if (arrow) arrow.textContent = isOpen ? '▼' : '▶';
+    if (toggle) toggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+  });
 }
 
 async function reloadMenuProducts() {
   menuReloading = true;
 
   try {
+    await loadCategoryOrderRows();
+
     const { data, error } = await supabaseClient
       .from('productos')
       .select('id, nombre, descripcion, precio, categoria, disponible, imagen_url, restaurante_id')
       .eq('restaurante_id', RESTAURANTE_ID)
-      .order('categoria', { ascending: true })
       .order('nombre', { ascending: true });
 
     if (error) throw error;
 
     menuProducts = structuredClone(data || []);
+
+    if (
+      openCategoryName &&
+      !menuProducts.some((product) => (product.categoria?.trim() || 'Sin categoría') === openCategoryName)
+    ) {
+      openCategoryName = null;
+    }
+
     renderMenuList();
 
     if (typeof updateHeaderCount === 'function') updateHeaderCount();
@@ -69,15 +134,35 @@ function renderMenuList() {
   const fragment = document.createDocumentFragment();
 
   groups.forEach(({ category, items }) => {
-    const section = document.createElement('section');
-    section.className = 'menu-section';
-    section.innerHTML = `
-      <h3 class="menu-section__title">${escapeHtml(category)}</h3>
-      <ul class="menu-section__list">
-        ${items.map((product) => renderMenuProductRow(product)).join('')}
-      </ul>
+    const isOpen = openCategoryName === category;
+    const item = document.createElement('div');
+    item.className = `menu-accordion__item${isOpen ? ' menu-accordion__item--open' : ''}`;
+    item.dataset.category = category;
+    item.draggable = true;
+    item.setAttribute('role', 'listitem');
+
+    item.innerHTML = `
+      <div class="menu-accordion__row">
+        <span class="menu-accordion__drag" aria-hidden="true" title="Arrastrar para reordenar">⠿</span>
+        <button
+          type="button"
+          class="menu-accordion__header"
+          data-accordion-toggle
+          aria-expanded="${isOpen ? 'true' : 'false'}"
+        >
+          <span class="menu-accordion__arrow" aria-hidden="true">${isOpen ? '▼' : '▶'}</span>
+          <span class="menu-accordion__label">${escapeHtml(category)}</span>
+          <span class="menu-accordion__count">(${items.length})</span>
+        </button>
+      </div>
+      <div class="menu-accordion__body"${isOpen ? '' : ' hidden'}>
+        <ul class="menu-section__list">
+          ${items.map((product) => renderMenuProductRow(product)).join('')}
+        </ul>
+      </div>
     `;
-    fragment.appendChild(section);
+
+    fragment.appendChild(item);
   });
 
   container.appendChild(fragment);
@@ -119,7 +204,7 @@ function getProductCategories() {
     const category = product.categoria?.trim();
     if (category) categories.add(category);
   });
-  return [...categories].sort((a, b) => a.localeCompare(b, 'es'));
+  return sortCategoryNames([...categories], categoryOrderRows);
 }
 
 function populateProductCategorySelect(selectedCategory = '') {
@@ -495,6 +580,64 @@ async function deleteProduct(productId) {
   }
 }
 
+function bindMenuAccordion() {
+  const list = document.getElementById('menuList');
+  if (!list || list.dataset.accordionBound) return;
+  list.dataset.accordionBound = 'true';
+
+  list.addEventListener('click', (event) => {
+    const toggle = event.target.closest('[data-accordion-toggle]');
+    if (!toggle) return;
+
+    const item = toggle.closest('.menu-accordion__item');
+    const category = item?.dataset.category;
+    if (!category) return;
+
+    setOpenCategory(openCategoryName === category ? null : category);
+  });
+
+  list.addEventListener('dragstart', (event) => {
+    const item = event.target.closest('.menu-accordion__item');
+    if (!item) return;
+
+    draggingCategoryEl = item;
+    item.classList.add('menu-accordion__item--dragging');
+    event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer.setData('text/plain', item.dataset.category || '');
+  });
+
+  list.addEventListener('dragover', (event) => {
+    if (!draggingCategoryEl) return;
+
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+
+    const target = event.target.closest('.menu-accordion__item');
+    if (!target || target === draggingCategoryEl) return;
+
+    const rect = target.getBoundingClientRect();
+    const insertBefore = event.clientY < rect.top + rect.height / 2;
+
+    if (insertBefore) {
+      list.insertBefore(draggingCategoryEl, target);
+    } else {
+      list.insertBefore(draggingCategoryEl, target.nextSibling);
+    }
+  });
+
+  list.addEventListener('drop', (event) => {
+    event.preventDefault();
+  });
+
+  list.addEventListener('dragend', () => {
+    if (!draggingCategoryEl) return;
+
+    draggingCategoryEl.classList.remove('menu-accordion__item--dragging');
+    draggingCategoryEl = null;
+    persistCategoryOrderFromDom();
+  });
+}
+
 function bindMenuActions() {
   document.getElementById('addProductBtn')?.addEventListener('click', () => openProductModal());
 
@@ -503,6 +646,8 @@ function bindMenuActions() {
   document.querySelectorAll('[data-close-product-modal]').forEach((el) => {
     el.addEventListener('click', closeProductModal);
   });
+
+  bindMenuAccordion();
 
   document.getElementById('menuList')?.addEventListener('click', (event) => {
     const btn = event.target.closest('[data-menu-action]');
