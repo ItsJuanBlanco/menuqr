@@ -80,7 +80,54 @@ button {
 .panel-header__right {
   display: flex;
   align-items: center;
-  gap: 16px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.panel-header__session {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.panel-header__session-btn {
+  padding: 8px 14px;
+  border-radius: 999px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  border: 1px solid var(--border);
+  background: #fff;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.panel-header__session-btn:hover {
+  border-color: var(--text-dim);
+  color: var(--text);
+}
+
+.panel-header__session-btn--admin {
+  color: var(--prep);
+  border-color: #bfdbfe;
+  background: var(--prep-soft);
+}
+
+.panel-header__session-btn--admin:hover {
+  border-color: #93c5fd;
+  color: #1d4ed8;
+}
+
+.panel-session-modal__hint {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--text-muted);
+  line-height: 1.45;
+}
+
+.panel-session-modal__error {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: #dc2626;
 }
 
 .panel-header__live {

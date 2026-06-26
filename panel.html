@@ -23,6 +23,12 @@
           En vivo
         </span>
         <span class="panel-header__count" id="headerCount">0 pedidos</span>
+        <div class="panel-header__session">
+          <button type="button" class="panel-header__session-btn panel-header__session-btn--admin" id="panelAdminLoginBtn" hidden>
+            Acceso admin
+          </button>
+          <button type="button" class="panel-header__session-btn" id="panelLogoutBtn">Salir</button>
+        </div>
       </div>
     </header>
 
@@ -164,6 +170,36 @@
         </dl>
         <div class="payment-qr-modal__canvas" id="paymentQrCanvas"></div>
         <p class="payment-qr-modal__hint">El cliente escanea este QR y paga con Wompi desde su celular.</p>
+      </div>
+    </div>
+
+    <!-- Modal acceso admin -->
+    <div class="modal" id="panelAdminModal" hidden aria-hidden="true">
+      <div class="modal__backdrop" data-close-panel-admin></div>
+      <div class="modal__box modal__box--form" role="dialog" aria-labelledby="panelAdminModalTitle">
+        <header class="modal__head">
+          <h2 class="modal__title" id="panelAdminModalTitle">Acceso administrador</h2>
+          <button type="button" class="modal__close" data-close-panel-admin aria-label="Cerrar">×</button>
+        </header>
+        <form class="product-form" id="panelAdminForm">
+          <p class="panel-session-modal__hint">Ingresá el PIN de administrador para gestionar menú y códigos QR.</p>
+          <label class="product-form__field">
+            <span>PIN admin</span>
+            <input
+              type="password"
+              id="panelAdminPin"
+              inputmode="numeric"
+              autocomplete="off"
+              placeholder="••••"
+              required
+            >
+          </label>
+          <p class="panel-session-modal__error" id="panelAdminError" hidden role="alert"></p>
+          <div class="product-form__actions">
+            <button type="button" class="product-form__btn product-form__btn--ghost" data-close-panel-admin>Cancelar</button>
+            <button type="submit" class="product-form__btn product-form__btn--primary" id="panelAdminSubmitBtn">Ingresar</button>
+          </div>
+        </form>
       </div>
     </div>
 

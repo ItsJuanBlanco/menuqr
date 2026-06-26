@@ -2106,6 +2106,7 @@ async function init() {
   }
 
   applyPanelRoleAccess(session.role);
+  bindPanelSessionActions(slug);
   initTabs();
   initMesaQrSection();
   initModal();
