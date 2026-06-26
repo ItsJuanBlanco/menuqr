@@ -74,10 +74,7 @@ async function saveSessionCargoServicio(sesionId, cargoServicio) {
 }
 
 function getPagarBaseUrl() {
-  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-    return `${window.location.origin}/pagar`;
-  }
-  return 'https://menuqr-virid.vercel.app/pagar';
+  return `${LISTOAPP_BASE_URL}/pagar`;
 }
 
 function buildPagarUrl(monto, sesionId, cargoServicio = 0, parte = null) {
@@ -363,10 +360,7 @@ function switchPanel(panelId) {
 function buildMesaMenuUrl(mesaNumero) {
   const slug = RESTAURANTE_SLUG || '';
   const mesa = encodeURIComponent(String(mesaNumero));
-  if (window.location.hostname === 'localhost') {
-    return `http://localhost:8080/index.html?slug=${encodeURIComponent(slug)}&mesa=${mesa}`;
-  }
-  return `https://listoapp.com.co/${slug}?mesa=${mesa}`;
+  return `${LISTOAPP_BASE_URL}/${encodeURIComponent(slug)}?mesa=${mesa}`;
 }
 
 function normalizeMesaName(value) {

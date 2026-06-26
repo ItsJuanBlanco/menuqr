@@ -29,25 +29,14 @@ function clearPanelSession(slug) {
   if (slug) localStorage.removeItem(getPanelSessionKey(slug));
 }
 
-function isLocalDevHost() {
-  const host = window.location.hostname;
-  return host === 'localhost' || host === '127.0.0.1';
-}
-
 function buildLoginUrl(slug) {
   const safeSlug = encodeURIComponent(slug);
-  if (isLocalDevHost()) {
-    return `${window.location.origin}/login.html?slug=${safeSlug}`;
-  }
-  return `${window.location.origin}/${safeSlug}/login`;
+  return `${LISTOAPP_BASE_URL}/${safeSlug}/login`;
 }
 
 function buildPanelUrl(slug) {
   const safeSlug = encodeURIComponent(slug);
-  if (isLocalDevHost()) {
-    return `${window.location.origin}/panel.html?slug=${safeSlug}`;
-  }
-  return `${window.location.origin}/${safeSlug}/panel`;
+  return `${LISTOAPP_BASE_URL}/${safeSlug}/panel`;
 }
 
 function getAllowedPanelTabs(role) {

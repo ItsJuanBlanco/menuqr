@@ -1,6 +1,7 @@
 const SUPABASE_URL = 'https://fnkustudjcbczmmwhypq.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_gg5uweCqT8f6GbutQF_ePA_lhkC3GZJ';
 const SUPABASE_ANON_KEY = SUPABASE_KEY;
+const LISTOAPP_BASE_URL = 'https://listoapp.com.co';
 
 /** Bucket público de assets de la plataforma (logo Listo, etc.) */
 const ASSETS_BUCKET = 'assets';
@@ -26,6 +27,7 @@ const supabaseClient =
 
 window.supabaseClient = supabaseClient;
 window.LISTO_LOGO_URL = LISTO_LOGO_URL;
+window.LISTOAPP_BASE_URL = LISTOAPP_BASE_URL;
 
 function initListoLogos() {
   if (!LISTO_LOGO_URL) return;

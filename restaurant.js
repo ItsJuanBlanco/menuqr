@@ -226,21 +226,20 @@ function applyRestaurantBranding(restaurant) {
   }
 }
 
-function getAppBasePath() {
-  return RESTAURANTE_SLUG ? `/${RESTAURANTE_SLUG}` : '/';
-}
-
 function buildAppUrl(hash = '') {
   const params = new URLSearchParams(window.location.search);
   const query = params.toString();
-  const base = `${getAppBasePath()}${query ? `?${query}` : ''}`;
+  const slug = RESTAURANTE_SLUG || getSlugFromUrl() || '';
+  const path = slug ? `/${encodeURIComponent(slug)}` : '';
+  const base = `${LISTOAPP_BASE_URL}${path}${query ? `?${query}` : ''}`;
   return hash ? `${base}${hash}` : base;
 }
 
 function buildHomeUrl() {
   const params = new URLSearchParams(window.location.search);
   const query = params.toString();
-  return `${getAppBasePath()}/home${query ? `?${query}` : ''}`;
+  const slug = RESTAURANTE_SLUG || getSlugFromUrl() || '';
+  return `${LISTOAPP_BASE_URL}/${encodeURIComponent(slug)}/home${query ? `?${query}` : ''}`;
 }
 
 async function initRestaurant() {

@@ -754,10 +754,7 @@ async function loadGroupPayments() {
 }
 
 function getPagarBaseUrl() {
-  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-    return `${window.location.origin}/pagar`;
-  }
-  return 'https://menuqr-virid.vercel.app/pagar';
+  return `${LISTOAPP_BASE_URL}/pagar`;
 }
 
 function cleanupLegacySplitUi() {
@@ -1172,11 +1169,13 @@ function buildWompiPaymentReference() {
 const WOMPI_PENDING_STORAGE_KEY = 'listo_wompi_pending_payment';
 
 function buildWompiRedirectUrl() {
-  const url = new URL(window.location.href);
-  url.searchParams.delete('id');
-  url.searchParams.delete('status');
-  url.searchParams.delete('reference');
-  return url.toString();
+  const params = new URLSearchParams(window.location.search);
+  ['id', 'status', 'reference'].forEach((key) => params.delete(key));
+  const slug = RESTAURANTE_SLUG || '';
+  const query = params.toString();
+  const path = slug ? `/${encodeURIComponent(slug)}` : '';
+  const hash = window.location.hash || '';
+  return `${LISTOAPP_BASE_URL}${path}${query ? `?${query}` : ''}${hash}`;
 }
 
 function getWompiRedirectParams() {
