@@ -262,6 +262,59 @@ async function showPaymentSuccess(totalPaid, sesionId = null) {
   }
 }
 
+async function fetchSessionDisplayTotal(sesionId) {
+  let sesion = null;
+
+  const { data, error: sesionError } = await supabaseClient
+    .from('sesiones')
+    .select('total, cargo_servicio, propina')
+    .eq('id', sesionId)
+    .maybeSingle();
+
+  if (sesionError) {
+    const { data: fallback, error: fallbackError } = await supabaseClient
+      .from('sesiones')
+      .select('cargo_servicio, propina')
+      .eq('id', sesionId)
+      .maybeSingle();
+
+    if (fallbackError) throw fallbackError;
+    sesion = fallback;
+  } else {
+    sesion = data;
+  }
+
+  const sessionTotal = Number(sesion?.total);
+  if (Number.isFinite(sessionTotal) && sessionTotal > 0) {
+    return sessionTotal;
+  }
+
+  const { data: items, error: itemsError } = await supabaseClient
+    .from('pedido_items')
+    .select(`
+      subtotal,
+      precio_unitario,
+      cantidad,
+      pedidos!inner ( sesion_id, archivado, restaurante_id )
+    `)
+    .eq('pedidos.sesion_id', sesionId)
+    .eq('pedidos.restaurante_id', RESTAURANTE_ID)
+    .eq('pedidos.archivado', false)
+    .eq('confirmado_por_mesero', true);
+
+  if (itemsError) throw itemsError;
+
+  const itemsSubtotal = (items || []).reduce(
+    (sum, item) => sum + Number(item.subtotal ?? item.precio_unitario * item.cantidad),
+    0
+  );
+
+  const cargoServicio = Number(sesion?.cargo_servicio) || 0;
+  const propina = Number(sesion?.propina) || 0;
+
+  return itemsSubtotal + cargoServicio + propina;
+}
+
 async function checkSessionStatus() {
   if (!state.sesionId || paymentSuccessShown) return;
 
@@ -276,7 +329,15 @@ async function checkSessionStatus() {
 
     if (data?.pago_pendiente_confirmacion === true) {
       const sesionId = state.sesionId;
-      const totalPaid = getPaymentBreakdown().total || getAccountDeliveredTotal();
+      let totalPaid = getPaymentBreakdown().total || getAccountDeliveredTotal();
+
+      try {
+        const fetchedTotal = await fetchSessionDisplayTotal(sesionId);
+        if (fetchedTotal > 0) totalPaid = fetchedTotal;
+      } catch (fetchError) {
+        console.error(fetchError);
+      }
+
       await showPaymentSuccess(totalPaid, sesionId);
     }
   } catch (error) {
@@ -287,6 +348,13 @@ async function checkSessionStatus() {
 async function resolveSessionPaidTotal(sesionId) {
   const breakdown = getPaymentBreakdown();
   if (breakdown.total > 0) return breakdown.total;
+
+  try {
+    const sessionTotal = await fetchSessionDisplayTotal(sesionId);
+    if (sessionTotal > 0) return sessionTotal;
+  } catch (error) {
+    console.error(error);
+  }
 
   try {
     const approvedTotal = await getSessionApprovedPaymentsTotal(sesionId);

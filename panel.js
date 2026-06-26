@@ -1093,8 +1093,12 @@ function renderMesas() {
                     </div>`;
                 } else if (isPaying) {
                   paymentInfo = `<span class="mesa-card__payment-badge mesa-card__payment-badge--paying">💳 Pagando...</span>`;
-                } else if (paidTotal > 0 && sessionTotal > 0) {
-                  paymentInfo = `<p class="mesa-card__payment-progress">💳 ${formatCOP(paidTotal)} pagados de ${formatCOP(sessionTotal)}</p>`;
+                } else if (
+                  paidTotal > 0 &&
+                  sessionTotal > 0 &&
+                  paidTotal < sessionTotal
+                ) {
+                  paymentInfo = `<p class="mesa-card__payment-progress">💳 ${formatCOP(paidTotal)} / ${formatCOP(sessionTotal)} pagados</p>`;
                 }
 
                 return `
