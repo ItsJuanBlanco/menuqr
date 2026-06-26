@@ -134,6 +134,7 @@ const state = {
   paymentPendingConfirmation: false,
   paymentSubmitting: false,
   splitCount: 2,
+  splitGroupCreated: false,
   groupPayments: [],
   lastSplitQrUrl: '',
   sessionSplitCode: null,
@@ -816,6 +817,16 @@ function clearSplitQrCanvas() {
   state.lastSplitQrUrl = '';
 }
 
+function resetSplitPaymentGroup() {
+  state.splitGroupCreated = false;
+  clearSplitQrCanvas();
+}
+
+function getSplitGroupHintText() {
+  const others = Math.max(0, state.splitCount - 1);
+  return `Mostrá este QR a las otras ${others} personas para que escaneen y paguen su parte`;
+}
+
 function usesRestaurantQrPayment() {
   return RESTAURANTE?.metodo_pago === 'qr_propio';
 }
@@ -1059,14 +1070,14 @@ function hideRestaurantSplitPaymentExtras() {
 function renderRestaurantSplitQr(shareAmount) {
   const canvas = document.getElementById('splitQrCanvas');
   const box = document.getElementById('splitQrBox');
-  const hint = box?.querySelector('.account__split-qr-hint');
+  const hintEl = document.getElementById('splitQrHint');
   const amountEl = document.getElementById('splitRestaurantQrAmount');
   const linkBtn = document.getElementById('splitPaymentLinkBtn');
   const divider = document.getElementById('splitPaymentDivider');
   const link = getRestaurantPaymentLink();
   const qrUrl = getRestaurantPaymentQrUrl();
 
-  if (!canvas || !box || !state.sesionId || shareAmount <= 0) {
+  if (!canvas || !box || !state.sesionId || shareAmount <= 0 || !state.splitGroupCreated) {
     if (box) box.hidden = true;
     clearSplitQrCanvas();
     hideRestaurantSplitPaymentExtras();
@@ -1091,7 +1102,7 @@ function renderRestaurantSplitQr(shareAmount) {
   if (qrUrl) {
     canvas.hidden = false;
     const img = document.createElement('img');
-    img.className = 'account__split-restaurant-qr-img';
+    img.className = 'account__split-restaurant-qr-img account__split-restaurant-qr-img--large';
     img.src = qrUrl;
     img.alt = 'QR de pago Nequi/Daviplata';
     canvas.appendChild(img);
@@ -1099,14 +1110,10 @@ function renderRestaurantSplitQr(shareAmount) {
     canvas.hidden = true;
   }
 
-  if (hint) {
-    if (link && qrUrl) {
-      hint.textContent = 'Abrí el link o escaneá el QR para transferir tu parte';
-    } else if (link) {
-      hint.textContent = 'Abrí el link para transferir tu parte';
-    } else {
-      hint.textContent = 'Transferí tu parte escaneando este QR';
-    }
+  if (hintEl) {
+    hintEl.textContent = link
+      ? `${getSplitGroupHintText()} También podés abrir el link de pago.`
+      : getSplitGroupHintText();
   }
 }
 
@@ -1122,11 +1129,11 @@ function renderSplitPaymentQr(shareAmount) {
 async function renderSplitQr(shareAmount) {
   const canvas = document.getElementById('splitQrCanvas');
   const box = document.getElementById('splitQrBox');
-  const hint = box?.querySelector('.account__split-qr-hint');
+  const hintEl = document.getElementById('splitQrHint');
 
   hideRestaurantSplitPaymentExtras();
 
-  if (!canvas || !box || !state.sesionId || shareAmount <= 0) {
+  if (!canvas || !box || !state.sesionId || shareAmount <= 0 || !state.splitGroupCreated) {
     if (box) box.hidden = true;
     clearSplitQrCanvas();
     return;
@@ -1150,7 +1157,10 @@ async function renderSplitQr(shareAmount) {
 
   const url = buildSplitPaymentUrl(shareAmount, splitCode);
 
-  if (url === state.lastSplitQrUrl && canvas.childNodes.length > 0) return;
+  if (url === state.lastSplitQrUrl && canvas.childNodes.length > 0) {
+    if (hintEl) hintEl.textContent = getSplitGroupHintText();
+    return;
+  }
 
   state.lastSplitQrUrl = url;
   canvas.innerHTML = '';
@@ -1162,15 +1172,44 @@ async function renderSplitQr(shareAmount) {
 
   new QRCode(canvas, {
     text: url,
-    width: 220,
-    height: 220,
+    width: 280,
+    height: 280,
     colorDark: '#0a0a0c',
     colorLight: '#ffffff',
     correctLevel: QRCode.CorrectLevel.M,
   });
 
-  if (hint) {
-    hint.textContent = 'Cada persona escanea este QR y paga su parte';
+  if (hintEl) hintEl.textContent = getSplitGroupHintText();
+}
+
+async function createSplitPaymentGroup() {
+  if (!state.sesionId || state.paymentSubmitting || state.splitGroupCreated) return;
+
+  const deliveredTotal = getAccountDeliveredTotal();
+  const share = getPerPersonPaymentAmount(deliveredTotal);
+  if (share.total <= 0) {
+    showToast('No hay monto para dividir.', 'error');
+    return;
+  }
+
+  const btn = document.getElementById('createSplitGroupBtn');
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = 'Creando…';
+  }
+
+  try {
+    state.sessionSplitCode = await ensureSessionSplitCode(state.sesionId);
+    state.splitGroupCreated = true;
+    refreshPaymentUi();
+  } catch (error) {
+    console.error(error);
+    showToast(error.message || 'No se pudo crear el grupo de pago.', 'error');
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = 'Crear grupo de pago';
+    }
   }
 }
 
@@ -1182,6 +1221,8 @@ function updateSplitBillUI(deliveredTotal) {
   const minusBtn = document.getElementById('splitCountMinus');
   const plusBtn = document.getElementById('splitCountPlus');
   const splitPayBtn = document.getElementById('splitPayBtn');
+  const createBtn = document.getElementById('createSplitGroupBtn');
+  const box = document.getElementById('splitQrBox');
 
   if (!splitSection) return;
 
@@ -1193,23 +1234,29 @@ function updateSplitBillUI(deliveredTotal) {
   splitSection.hidden = !showSplit;
 
   if (!showSplit) {
-    const box = document.getElementById('splitQrBox');
     if (box) box.hidden = true;
-    clearSplitQrCanvas();
+    resetSplitPaymentGroup();
     return;
   }
 
   if (splitInput) splitInput.value = String(state.splitCount);
-  if (minusBtn) minusBtn.disabled = state.splitCount <= 2 || state.paymentSubmitting;
-  if (plusBtn) plusBtn.disabled = state.splitCount >= 20 || state.paymentSubmitting;
-
-  const shareAmount = getPerPersonPaymentAmount(deliveredTotal).total;
-  if (splitShareEl) {
-    splitShareEl.textContent = `Cada uno paga: ${formatCOP(shareAmount)}`;
+  if (minusBtn) {
+    minusBtn.disabled = state.splitCount <= 2 || state.paymentSubmitting || state.splitGroupCreated;
+  }
+  if (plusBtn) {
+    plusBtn.disabled = state.splitCount >= 20 || state.paymentSubmitting || state.splitGroupCreated;
   }
 
+  const share = getPerPersonPaymentAmount(deliveredTotal);
   const paidTotal = getGroupPaidTotal();
   const breakdown = getPaymentBreakdown(deliveredTotal);
+  const isComplete = paidTotal >= breakdown.total;
+
+  if (createBtn) {
+    createBtn.hidden = state.splitGroupCreated;
+    createBtn.disabled = state.paymentSubmitting || share.total <= 0 || isComplete;
+  }
+
   if (splitProgressEl) {
     if (paidTotal > 0) {
       splitProgressEl.hidden = false;
@@ -1220,17 +1267,28 @@ function updateSplitBillUI(deliveredTotal) {
     }
   }
 
-  if (paidTotal >= breakdown.total) {
-    const box = document.getElementById('splitQrBox');
+  if (isComplete) {
+    if (box) box.hidden = true;
+    resetSplitPaymentGroup();
+    return;
+  }
+
+  if (!state.splitGroupCreated) {
     if (box) box.hidden = true;
     clearSplitQrCanvas();
     return;
   }
 
-  renderSplitPaymentQr(shareAmount);
+  if (box) box.hidden = false;
+
+  if (splitShareEl) {
+    splitShareEl.textContent = `Cada uno paga: ${formatCOP(share.total)}`;
+  }
+
+  renderSplitPaymentQr(share.total);
 
   if (splitPayBtn) {
-    splitPayBtn.disabled = state.paymentSubmitting || shareAmount <= 0;
+    splitPayBtn.disabled = state.paymentSubmitting || share.total <= 0;
   }
 }
 
@@ -2117,7 +2175,7 @@ function initPaymentExtras() {
 
       if (btn.dataset.action === 'confirm-remove-service') {
         state.serviceChargeEnabled = false;
-        state.lastSplitQrUrl = '';
+        resetSplitPaymentGroup();
         hideServiceRemoveConfirm();
         refreshPaymentUi();
         return;
@@ -2161,7 +2219,7 @@ function initPaymentExtras() {
         return;
       }
 
-      state.lastSplitQrUrl = '';
+      resetSplitPaymentGroup();
       refreshPaymentUi();
     });
   }
@@ -2177,7 +2235,7 @@ function initPaymentExtras() {
       if (Number(tipCustomInput.value) !== state.tipCustomAmount) {
         tipCustomInput.value = state.tipCustomAmount > 0 ? String(state.tipCustomAmount) : '';
       }
-      state.lastSplitQrUrl = '';
+      resetSplitPaymentGroup();
       refreshPaymentUi();
     });
   }
@@ -2218,13 +2276,14 @@ function initSplitBill() {
 
   const minusBtn = document.getElementById('splitCountMinus');
   const plusBtn = document.getElementById('splitCountPlus');
+  const createBtn = document.getElementById('createSplitGroupBtn');
 
   if (minusBtn && !minusBtn.dataset.bound) {
     minusBtn.dataset.bound = 'true';
     minusBtn.addEventListener('click', () => {
-      if (state.splitCount <= 2) return;
+      if (state.splitCount <= 2 || state.splitGroupCreated) return;
       state.splitCount -= 1;
-      state.lastSplitQrUrl = '';
+      resetSplitPaymentGroup();
       refreshPaymentUi();
     });
   }
@@ -2232,10 +2291,17 @@ function initSplitBill() {
   if (plusBtn && !plusBtn.dataset.bound) {
     plusBtn.dataset.bound = 'true';
     plusBtn.addEventListener('click', () => {
-      if (state.splitCount >= 20) return;
+      if (state.splitCount >= 20 || state.splitGroupCreated) return;
       state.splitCount += 1;
-      state.lastSplitQrUrl = '';
+      resetSplitPaymentGroup();
       refreshPaymentUi();
+    });
+  }
+
+  if (createBtn && !createBtn.dataset.bound) {
+    createBtn.dataset.bound = 'true';
+    createBtn.addEventListener('click', () => {
+      void createSplitPaymentGroup();
     });
   }
 
@@ -2379,6 +2445,7 @@ function applySession(session) {
   state.sessionTipo = session.tipo;
   state.sessionNumero = session.numero;
   state.splitCount = 2;
+  state.splitGroupCreated = false;
   state.sessionSplitCode = null;
   paymentSuccessShown = false;
   clearSplitQrCanvas();
