@@ -19,6 +19,7 @@
   --cart-bar-height: 60px;
   --cart-bar-gap: 20px;
   --header-height: 64px;
+  --app-powered-height: 68px;
   --toast-top: calc(env(safe-area-inset-top, 0px) + 8px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
   --font: 'DM Sans', system-ui, -apple-system, sans-serif;
@@ -156,7 +157,7 @@ ul {
 /* ── Main content ── */
 .main {
   flex: 1;
-  padding-bottom: calc(var(--nav-height) + var(--safe-bottom) + 16px);
+  padding-bottom: calc(var(--nav-height) + var(--app-powered-height) + var(--safe-bottom) + 8px);
 }
 
 .panel {
@@ -164,11 +165,20 @@ ul {
 }
 
 .app-powered {
+  position: fixed;
+  bottom: calc(var(--nav-height) + var(--safe-bottom));
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 45;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  padding: 16px;
+  width: 100%;
+  max-width: 480px;
+  height: var(--app-powered-height);
+  padding: 0 16px;
+  pointer-events: none;
   user-select: none;
 }
 
@@ -390,7 +400,8 @@ ul {
 
 #panel-carta {
   padding-bottom: calc(
-    var(--nav-height) + var(--cart-bar-height) + var(--cart-bar-gap) + var(--safe-bottom) + 16px
+    var(--nav-height) + var(--app-powered-height) + var(--cart-bar-height) + var(--cart-bar-gap) +
+      var(--safe-bottom) + 16px
   );
 }
 
@@ -914,8 +925,12 @@ ul {
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   text-align: center;
-  padding: 48px 24px 24px;
+  padding: 48px 24px;
+  min-height: calc(
+    100dvh - var(--header-height) - var(--nav-height) - var(--app-powered-height) - var(--safe-bottom) - 8px
+  );
 }
 
 .waiter__icon {
