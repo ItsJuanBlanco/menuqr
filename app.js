@@ -146,9 +146,27 @@ const state = {
 const PAYMENT_PENDING_MESSAGE = 'Pago recibido ✓ El mesero lo confirmará en un momento';
 
 let paymentSuccessReviewTimer = null;
-let sessionClosedLocally = false;
 let paymentSuccessShown = false;
 let mesaRealtimeChannel = null;
+let sessionPolling = null;
+
+const SESSION_POLL_INTERVAL_MS = 3000;
+
+function stopSessionPolling() {
+  if (sessionPolling) {
+    clearInterval(sessionPolling);
+    sessionPolling = null;
+  }
+}
+
+function startSessionPolling() {
+  stopSessionPolling();
+
+  if (!state.sesionId || paymentSuccessShown) return;
+
+  void checkSessionStatus();
+  sessionPolling = setInterval(checkSessionStatus, SESSION_POLL_INTERVAL_MS);
+}
 
 function getGoogleReviewUrl() {
   const url = RESTAURANTE?.google_review_url;
@@ -188,7 +206,7 @@ function clearClientSessionState() {
   if (badge) badge.hidden = true;
 }
 
-function showPaymentSuccessScreen(totalPaid) {
+function renderPaymentSuccessUi(totalPaid) {
   const screen = document.getElementById('paymentSuccessScreen');
   const amountEl = document.getElementById('paymentSuccessAmount');
   const subtitle = document.getElementById('paymentSuccessSubtitle');
@@ -221,6 +239,51 @@ function showPaymentSuccessScreen(totalPaid) {
   }, 2000);
 }
 
+async function showPaymentSuccess(totalPaid, sesionId = null) {
+  if (paymentSuccessShown) return;
+
+  paymentSuccessShown = true;
+  stopSessionPolling();
+
+  const sessionId = sesionId || state.sesionId;
+  clearClientSessionState();
+  renderPaymentSuccessUi(totalPaid);
+
+  if (!sessionId) return;
+
+  try {
+    const refinedTotal = await resolveSessionPaidTotal(sessionId);
+    if (refinedTotal > 0 && refinedTotal !== totalPaid) {
+      const amountEl = document.getElementById('paymentSuccessAmount');
+      if (amountEl) amountEl.textContent = formatCOP(refinedTotal);
+    }
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+async function checkSessionStatus() {
+  if (!state.sesionId || paymentSuccessShown) return;
+
+  try {
+    const { data, error } = await supabaseClient
+      .from('sesiones')
+      .select('pago_pendiente_confirmacion')
+      .eq('id', state.sesionId)
+      .maybeSingle();
+
+    if (error) throw error;
+
+    if (data?.pago_pendiente_confirmacion === true) {
+      const sesionId = state.sesionId;
+      const totalPaid = getPaymentBreakdown().total || getAccountDeliveredTotal();
+      await showPaymentSuccess(totalPaid, sesionId);
+    }
+  } catch (error) {
+    console.error(error);
+  }
+}
+
 async function resolveSessionPaidTotal(sesionId) {
   const breakdown = getPaymentBreakdown();
   if (breakdown.total > 0) return breakdown.total;
@@ -233,91 +296,6 @@ async function resolveSessionPaidTotal(sesionId) {
   }
 
   return getAccountDeliveredTotal();
-}
-
-async function handleSessionDeactivated(payload) {
-  const oldRow = payload.old;
-  const newRow = payload.new;
-
-  if (!newRow || newRow.activa !== false) return;
-  if (oldRow?.activa === false) return;
-  if (!state.sesionId || newRow.id !== state.sesionId) return;
-
-  if (sessionClosedLocally) {
-    sessionClosedLocally = false;
-    return;
-  }
-
-  if (paymentSuccessShown) return;
-
-  const sesionId = state.sesionId;
-  const immediateTotal = getPaymentBreakdown().total || getAccountDeliveredTotal();
-
-  paymentSuccessShown = true;
-  clearClientSessionState();
-  showPaymentSuccessScreen(immediateTotal);
-
-  try {
-    const refinedTotal = await resolveSessionPaidTotal(sesionId);
-    if (refinedTotal > 0 && refinedTotal !== immediateTotal) {
-      const amountEl = document.getElementById('paymentSuccessAmount');
-      if (amountEl) amountEl.textContent = formatCOP(refinedTotal);
-    }
-  } catch (error) {
-    console.error(error);
-  }
-}
-
-async function closeSessionAfterWompiPayment(referenciaWompi, totalPaid) {
-  const sesionId = state.sesionId;
-  const mesaId = state.mesaId;
-
-  if (!sesionId || !mesaId) return;
-
-  const { error: pedidosError } = await supabaseClient
-    .from('pedidos')
-    .update({ archivado: true })
-    .eq('sesion_id', sesionId)
-    .eq('restaurante_id', RESTAURANTE_ID)
-    .eq('archivado', false);
-
-  if (pedidosError) throw pedidosError;
-
-  const { error: sesionError } = await supabaseClient
-    .from('sesiones')
-    .update({
-      activa: false,
-      pago_en_proceso: false,
-      pago_pendiente_confirmacion: false,
-      referencia_wompi: referenciaWompi,
-    })
-    .eq('id', sesionId);
-
-  if (sesionError) throw sesionError;
-
-  const { data: activeSessions, error: activeError } = await supabaseClient
-    .from('sesiones')
-    .select('id')
-    .eq('mesa_id', mesaId)
-    .eq('restaurante_id', RESTAURANTE_ID)
-    .eq('activa', true)
-    .limit(1);
-
-  if (activeError) throw activeError;
-
-  if (!activeSessions?.length) {
-    const { error: mesaError } = await supabaseClient
-      .from('mesas')
-      .update({ estado: 'libre', mesero_requerido: false })
-      .eq('id', mesaId);
-
-    if (mesaError) throw mesaError;
-  }
-
-  sessionClosedLocally = true;
-  paymentSuccessShown = true;
-  clearClientSessionState();
-  showPaymentSuccessScreen(totalPaid);
 }
 
 /* ── Utilidades ── */
@@ -1124,8 +1102,6 @@ function buildWompiPaymentReference() {
 }
 
 const WOMPI_PENDING_STORAGE_KEY = 'listo_wompi_pending_payment';
-const WOMPI_REDIRECT_SUCCESS_MESSAGE =
-  '¡Pago exitoso! ✓ El mesero confirmará tu cuenta en un momento.';
 
 function buildWompiRedirectUrl() {
   const url = new URL(window.location.href);
@@ -1282,9 +1258,7 @@ function subscribeToRealtime() {
     mesaRealtimeChannel = null;
   }
 
-  mesaRealtimeChannel = supabaseClient.channel(
-    `mesa-${state.mesaId}-sesion-${state.sesionId || 'none'}`
-  );
+  mesaRealtimeChannel = supabaseClient.channel(`mesa-${state.mesaId}`);
 
   mesaRealtimeChannel
     .on(
@@ -1299,13 +1273,6 @@ function subscribeToRealtime() {
     );
 
   if (state.sesionId) {
-    mesaRealtimeChannel.on(
-      'postgres_changes',
-      { event: 'UPDATE', schema: 'public', table: 'sesiones', filter: `id=eq.${state.sesionId}` },
-      (payload) => {
-        void handleSessionDeactivated(payload);
-      }
-    );
     mesaRealtimeChannel.on(
       'postgres_changes',
       { event: '*', schema: 'public', table: 'pagos_grupo', filter: `sesion_id=eq.${state.sesionId}` },
@@ -1811,16 +1778,17 @@ async function handleApprovedWompiPayment(monto, referenciaWompi, extras = {}) {
     await loadGroupPayments();
 
     if (breakdown.total > 0 && paidTotal >= breakdown.total) {
-      if (extras.manualConfirmation || extras.fromRedirect) {
-        await markPaymentPendingConfirmation(
-          extras.fromRedirect ? WOMPI_REDIRECT_SUCCESS_MESSAGE : PAYMENT_PENDING_MESSAGE,
-          {
-            skipSubmittingGuard: true,
-            referenciaWompi: referenciaWompi,
-          }
-        );
-      } else {
-        await closeSessionAfterWompiPayment(referenciaWompi, breakdown.total);
+      await markPaymentPendingConfirmation(
+        extras.manualConfirmation ? PAYMENT_PENDING_MESSAGE : null,
+        {
+          skipSubmittingGuard: true,
+          referenciaWompi: referenciaWompi,
+          skipToast: !extras.manualConfirmation,
+        }
+      );
+
+      if (!extras.manualConfirmation) {
+        void checkSessionStatus();
       }
     } else {
       await clearPaymentInProgress();
@@ -1838,7 +1806,7 @@ async function handleApprovedWompiPayment(monto, referenciaWompi, extras = {}) {
 }
 
 async function markPaymentPendingConfirmation(successMessage, options = {}) {
-  const { skipSubmittingGuard = false, referenciaWompi = null } = options;
+  const { skipSubmittingGuard = false, referenciaWompi = null, skipToast = false } = options;
 
   if (!state.sesionId) return;
   if (!skipSubmittingGuard && state.paymentSubmitting) return;
@@ -1864,7 +1832,9 @@ async function markPaymentPendingConfirmation(successMessage, options = {}) {
 
     state.paymentPendingConfirmation = true;
     renderAccount();
-    showToast(successMessage || PAYMENT_PENDING_MESSAGE, 'success', 5000);
+    if (!skipToast) {
+      showToast(successMessage || PAYMENT_PENDING_MESSAGE, 'success', 5000);
+    }
   } catch (error) {
     console.error(error);
     showToast(error.message || 'No se pudo registrar el pago.', 'error');
@@ -1904,11 +1874,13 @@ async function handleWompiRedirectReturn() {
 
   const referenciaWompi = id || reference;
 
-  await markPaymentPendingConfirmation(WOMPI_REDIRECT_SUCCESS_MESSAGE, {
+  await markPaymentPendingConfirmation(null, {
     referenciaWompi,
+    skipToast: true,
   });
 
   clearWompiPendingPayment();
+  void checkSessionStatus();
   switchTab('cuenta');
   return true;
 }
@@ -2250,6 +2222,7 @@ function applySession(session) {
   clearSplitQrCanvas();
   updateSessionBadge(session);
   subscribeToRealtime();
+  startSessionPolling();
 }
 
 /* ── Init ── */
@@ -2296,7 +2269,6 @@ async function init() {
 
     await loadAccountItems();
     await handleWompiRedirectReturn();
-    subscribeToRealtime();
   } catch (error) {
     console.error('Error inicializando Supabase:', error);
     showToast(error.message || 'Error conectando con Supabase.', 'error');

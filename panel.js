@@ -1034,16 +1034,14 @@ function handleSesionWompiPaymentClosed(payload) {
   const oldRow = payload.old;
   const newRow = payload.new;
 
-  if (!newRow || newRow.activa !== false) return false;
-  if (oldRow?.activa === false) return false;
+  if (!newRow) return false;
+
+  const pendingNow = newRow.pago_pendiente_confirmacion === true;
+  const pendingBefore = oldRow?.pago_pendiente_confirmacion === true;
+
+  if (!pendingNow || pendingBefore) return false;
 
   const referencia = newRow.referencia_wompi;
-  const hadPaymentActivity =
-    Boolean(referencia) ||
-    oldRow?.pago_en_proceso === true ||
-    oldRow?.pago_pendiente_confirmacion === true;
-
-  if (!hadPaymentActivity) return false;
   if (referencia && String(referencia).startsWith('qr-propio')) return false;
 
   const mesaNum = resolveMesaNumeroFromId(newRow.mesa_id);
@@ -1090,8 +1088,8 @@ function renderMesas() {
                 let paymentInfo = '';
                 if (isComplete) {
                   paymentInfo = `<div class="mesa-card__payment-alert">
-                      <span class="mesa-card__payment-badge mesa-card__payment-badge--complete">✅ Pagado — confirmar</span>
-                      <button type="button" class="mesa-card__payment-btn" data-action="confirmar-pago" data-sesion-id="${session.id}" data-mesa-id="${mesa.id}" data-mesa-num="${mesa.numero}">Confirmar</button>
+                      <span class="mesa-card__payment-badge mesa-card__payment-badge--complete">✅ Pago recibido</span>
+                      <button type="button" class="mesa-card__payment-btn" data-action="confirmar-pago" data-sesion-id="${session.id}" data-mesa-id="${mesa.id}" data-mesa-num="${mesa.numero}">Cerrar mesa</button>
                     </div>`;
                 } else if (isPaying) {
                   paymentInfo = `<span class="mesa-card__payment-badge mesa-card__payment-badge--paying">💳 Pagando...</span>`;
@@ -1160,7 +1158,7 @@ function bindMesasActions() {
     else if (action === 'cerrar-mesa') closeMesa(mesaId, mesaNum);
     else if (action === 'atender-mesero') markWaiterAttended(mesaId);
     else if (action === 'confirmar-pago') {
-      confirmSessionPayment(btn.dataset.sesionId, mesaId, mesaNum);
+      confirmSessionPayment(btn.dataset.sesionId, mesaId, mesaNum, 'Mesa cerrada');
     }
   });
 
