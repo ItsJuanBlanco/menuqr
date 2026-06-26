@@ -1104,7 +1104,10 @@ function extractSesionIdFromWompiReference(reference) {
 async function fetchWompiSignature(amountInCents, reference) {
   const response = await fetch(WOMPI_SIGNATURE_URL, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+    },
     body: JSON.stringify({ amount: amountInCents, reference }),
   });
 
@@ -1793,20 +1796,11 @@ async function handleWompiRedirectReturn() {
     return true;
   }
 
-  const pending = loadWompiPendingPayment(reference);
   const referenciaWompi = id || reference;
 
-  if (pending?.amount > 0) {
-    await handleApprovedWompiPayment(pending.amount, referenciaWompi, {
-      cargoServicio: pending.cargoServicio,
-      propina: pending.propina,
-      fromRedirect: true,
-    });
-  } else {
-    await markPaymentPendingConfirmation(WOMPI_REDIRECT_SUCCESS_MESSAGE, {
-      referenciaWompi,
-    });
-  }
+  await markPaymentPendingConfirmation(WOMPI_REDIRECT_SUCCESS_MESSAGE, {
+    referenciaWompi,
+  });
 
   clearWompiPendingPayment();
   switchTab('cuenta');

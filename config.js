@@ -1,5 +1,6 @@
 const SUPABASE_URL = 'https://fnkustudjcbczmmwhypq.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_gg5uweCqT8f6GbutQF_ePA_lhkC3GZJ';
+const SUPABASE_ANON_KEY = SUPABASE_KEY;
 
 /** Bucket público de assets de la plataforma (logo Listo, etc.) */
 const ASSETS_BUCKET = 'assets';
