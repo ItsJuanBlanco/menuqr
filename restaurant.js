@@ -115,18 +115,68 @@ function showRestaurantError() {
   `;
 }
 
+function applyRestaurantBrandBlock({ logoEl, titleEl, subtitleEl, restaurant }) {
+  if (!restaurant) return;
+
+  const logoUrl = restaurant.logo_url?.trim();
+  const name = restaurant.nombre?.trim();
+
+  if (logoUrl && logoEl) {
+    logoEl.onerror = () => {
+      logoEl.hidden = true;
+      logoEl.removeAttribute('src');
+      if (titleEl) {
+        titleEl.hidden = false;
+        if (name) titleEl.textContent = name;
+      }
+    };
+    logoEl.src = logoUrl;
+    logoEl.alt = name || 'Restaurante';
+    logoEl.hidden = false;
+    if (titleEl) titleEl.hidden = true;
+  } else {
+    if (logoEl) {
+      logoEl.hidden = true;
+      logoEl.removeAttribute('src');
+    }
+    if (titleEl) {
+      titleEl.hidden = false;
+      if (name) titleEl.textContent = name;
+    }
+  }
+
+  if (subtitleEl) {
+    if (restaurant.ciudad?.trim()) {
+      subtitleEl.textContent = restaurant.ciudad.trim();
+    }
+  }
+}
+
 function applyRestaurantBranding(restaurant) {
-  if (!restaurant?.nombre) return;
+  if (!restaurant?.nombre && !restaurant?.logo_url) return;
 
-  const titleEl = document.querySelector('.header__title');
-  if (titleEl) titleEl.textContent = restaurant.nombre;
+  applyRestaurantBrandBlock({
+    logoEl: document.getElementById('restaurantBrandLogo'),
+    titleEl: document.getElementById('restaurantBrandTitle'),
+    subtitleEl: document.getElementById('restaurantBrandSubtitle'),
+    restaurant,
+  });
 
-  const panelTitle = document.querySelector('.panel-header__title');
-  if (panelTitle) panelTitle.textContent = restaurant.nombre;
+  applyRestaurantBrandBlock({
+    logoEl: document.getElementById('panelBrandLogo'),
+    titleEl: document.getElementById('panelBrandTitle'),
+    subtitleEl: document.querySelector('.panel-header__subtitle'),
+    restaurant,
+  });
+
+  const loginTitle = document.getElementById('panelLoginRestaurantName');
+  if (loginTitle && restaurant.nombre) {
+    loginTitle.textContent = restaurant.nombre;
+  }
 
   if (document.title.includes('·')) {
-    document.title = `${restaurant.nombre} · ${document.title.split('·').slice(1).join('·').trim()}`;
-  } else {
+    document.title = `${restaurant.nombre || 'Restaurante'} · ${document.title.split('·').slice(1).join('·').trim()}`;
+  } else if (restaurant.nombre) {
     document.title = restaurant.nombre;
   }
 }
@@ -159,7 +209,7 @@ async function initRestaurant() {
 
   const { data, error } = await supabaseClient
     .from('restaurantes')
-    .select('id, slug, nombre, wompi_public_key')
+    .select('id, slug, nombre, ciudad, logo_url, wompi_public_key')
     .eq('slug', slug)
     .maybeSingle();
 

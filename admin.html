@@ -16,7 +16,7 @@
   <div class="admin-login" id="adminLogin">
     <div class="admin-login__card">
       <div class="admin-login__brand">
-        <span class="admin-login__logo" aria-hidden="true">⚙️</span>
+        <img class="listo-logo listo-logo--login" data-listo-logo alt="Listo" hidden>
         <h1 class="admin-login__title">MenuQR Admin</h1>
         <p class="admin-login__subtitle">Panel de control de la plataforma</p>
       </div>
@@ -49,9 +49,12 @@
 
   <div class="panel-app admin-app" id="adminApp" hidden>
     <header class="panel-header">
-      <div class="panel-header__left">
-        <h1 class="panel-header__title">MenuQR Admin</h1>
-        <p class="panel-header__subtitle" id="adminUserLabel">Plataforma</p>
+      <div class="panel-header__left panel-header__left--listo">
+        <img class="listo-logo listo-logo--header" data-listo-logo alt="Listo" hidden>
+        <div class="panel-header__brand-copy">
+          <h1 class="panel-header__title">MenuQR Admin</h1>
+          <p class="panel-header__subtitle" id="adminUserLabel">Plataforma</p>
+        </div>
       </div>
       <div class="panel-header__right">
         <span class="panel-header__count" id="adminRestaurantCount">0 restaurantes</span>

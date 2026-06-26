@@ -92,6 +92,22 @@ ul {
   display: flex;
   align-items: center;
   gap: 10px;
+  min-width: 0;
+}
+
+.header__brand-copy {
+  min-width: 0;
+}
+
+.brand-logo {
+  display: block;
+  flex-shrink: 0;
+  object-fit: contain;
+}
+
+.brand-logo--header {
+  height: 40px;
+  max-width: 140px;
 }
 
 .header__logo {

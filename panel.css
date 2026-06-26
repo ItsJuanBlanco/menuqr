@@ -65,6 +65,26 @@ button {
   border-bottom: 1px solid var(--border);
 }
 
+.panel-header__left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.panel-header__brand-copy {
+  min-width: 0;
+}
+
+.panel-header__left--listo {
+  gap: 14px;
+}
+
+.brand-logo--panel {
+  height: 36px;
+  max-width: 160px;
+}
+
 .panel-header__title {
   font-size: 1.5rem;
   font-weight: 700;

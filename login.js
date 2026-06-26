@@ -13,10 +13,6 @@ function setPanelLoginError(message) {
 
 function applyLoginBranding(restaurant) {
   if (!restaurant?.nombre) return;
-
-  const titleEl = document.getElementById('panelLoginRestaurantName');
-  if (titleEl) titleEl.textContent = restaurant.nombre;
-
   document.title = `${restaurant.nombre} · Acceso al panel`;
 }
 
