@@ -222,8 +222,17 @@
 
           <section class="account__switch" id="accountSwitchSection">
             <h3 class="account__section-title">Cambiar a otra cuenta</h3>
-            <p class="account__switch-hint">Ingresá el código de 4 dígitos para unirte a otra cuenta. Tus pedidos activos se moverán a esa cuenta.</p>
+            <p class="account__switch-hint">
+              Ingresá el código de 4 dígitos de la otra cuenta. Lo podés ver
+              <strong>arriba a la derecha</strong> en el encabezado de quien ya está en esa cuenta:
+            </p>
+            <p class="account__switch-reference" aria-hidden="true">
+              <span class="account__switch-example">Propia · 0019</span>
+              <span class="account__switch-example account__switch-example--mesa">Mesa 1</span>
+            </p>
+            <p class="account__switch-note">Tus pedidos activos se moverán a esa cuenta.</p>
             <form class="account__switch-form" id="accountSwitchForm">
+              <label class="visually-hidden" for="accountSwitchCode">Código de la otra cuenta</label>
               <input
                 type="text"
                 class="account__switch-input"
@@ -233,7 +242,7 @@
                 maxlength="4"
                 placeholder="0000"
                 autocomplete="one-time-code"
-                aria-label="Código de cuenta destino"
+                aria-label="Código de la otra cuenta (4 dígitos, visible arriba a la derecha en el encabezado)"
               >
               <button type="submit" class="account__switch-btn" id="accountSwitchBtn">Confirmar cambio</button>
             </form>
