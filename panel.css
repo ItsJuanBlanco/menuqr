@@ -3262,6 +3262,10 @@ body.mesa-qr-printing .mesa-qr-print {
     grid-template-columns: 1fr;
   }
 
+  .panel-mesas {
+    gap: 8px;
+  }
+
   .panel-orders {
     gap: 10px;
   }
@@ -3390,6 +3394,76 @@ body.mesa-qr-printing .mesa-qr-print {
 
   .order-card__items .item-row--done {
     opacity: 0.55;
+  }
+
+  /* Mesas libres — fila compacta; expandir al tocar */
+  .mesa-card--libre {
+    box-shadow: none;
+  }
+
+  .mesa-card--libre:not(.mesa-card--expanded) {
+    max-height: 50px;
+  }
+
+  .mesa-card--libre .mesa-card__head {
+    padding: 0 12px;
+    min-height: 48px;
+    max-height: 50px;
+    border-bottom: none;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .mesa-card--libre .mesa-card__num {
+    font-size: 0.875rem;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+
+  .mesa-card--libre .mesa-card__head-badges {
+    flex-wrap: nowrap;
+  }
+
+  .mesa-card--libre .mesa-card__status {
+    padding: 2px 8px;
+    font-size: 0.5625rem;
+    letter-spacing: 0.04em;
+  }
+
+  .mesa-card--libre:not(.mesa-card--expanded) .mesa-card__details {
+    display: none;
+  }
+
+  .mesa-card--libre.mesa-card--expanded {
+    max-height: none;
+  }
+
+  .mesa-card--libre.mesa-card--expanded .mesa-card__head {
+    max-height: none;
+    min-height: 0;
+    padding: 10px 12px;
+    border-bottom: 1px solid color-mix(in srgb, var(--border) 75%, transparent);
+  }
+
+  .mesa-card--libre.mesa-card--expanded .mesa-card__body,
+  .mesa-card--libre.mesa-card--expanded .mesa-card__total,
+  .mesa-card--libre.mesa-card--expanded .mesa-card__alert {
+    display: none;
+  }
+
+  .mesa-card--libre.mesa-card--expanded .mesa-card__actions {
+    display: flex;
+    padding: 8px 12px 10px;
+  }
+
+  .mesa-card--libre.mesa-card--expanded .mesa-card__btn:not(.mesa-card__btn--new) {
+    display: none;
+  }
+
+  .mesa-card--libre.mesa-card--expanded .mesa-card__btn--new {
+    width: 100%;
+    padding: 10px 12px;
+    font-size: 0.8125rem;
   }
 
   .menu-product {

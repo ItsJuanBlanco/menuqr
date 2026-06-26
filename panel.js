@@ -9,6 +9,7 @@ let activePanel = 'pedidos';
 let updating = new Set();
 let listClickBound = false;
 let mesasClickBound = false;
+let expandedLibreMesas = new Set();
 let realtimeChannel = null;
 let realtimeRefreshTimer = null;
 let dataphoneModalState = null;
@@ -1562,6 +1563,13 @@ function renderMesas() {
     return;
   }
 
+  for (const mesaId of expandedLibreMesas) {
+    const mesa = mesas.find((row) => row.id === mesaId);
+    if (!mesa || (mesa.estado || 'libre') !== 'libre') {
+      expandedLibreMesas.delete(mesaId);
+    }
+  }
+
   list.innerHTML = mesas
     .map((mesa) => {
       const accountItems = mesaAccounts[mesa.id] || [];
@@ -1571,6 +1579,8 @@ function renderMesas() {
         ? sessions.reduce((sum, session) => sum + session.total, 0)
         : grouped.reduce((sum, g) => sum + g.subtotal, 0);
       const estado = mesa.estado || 'libre';
+      const isLibre = estado === 'libre';
+      const isExpanded = isLibre && expandedLibreMesas.has(mesa.id);
       const isMesaPaying = sessions.some(
         (session) => session.pago_en_proceso === true && session.pago_pendiente_confirmacion !== true
       );
@@ -1619,31 +1629,55 @@ function renderMesas() {
           </div>`
         : '';
 
+      const cardClasses = [
+        'mesa-card',
+        mesa.mesero_requerido ? 'mesa-card--calling' : '',
+        isLibre ? 'mesa-card--libre' : 'mesa-card--ocupada',
+        isExpanded ? 'mesa-card--expanded' : '',
+      ]
+        .filter(Boolean)
+        .join(' ');
+
+      const headToggleAttrs = isLibre
+        ? ` data-action="toggle-libre-mesa" data-mesa-id="${mesa.id}" role="button" tabindex="0" aria-expanded="${isExpanded ? 'true' : 'false'}" aria-label="Mesa ${mesa.numero}, ${formatMesaEstado(estado)}"`
+        : '';
+
       return `
-        <article class="mesa-card${mesa.mesero_requerido ? ' mesa-card--calling' : ''}">
-          <header class="mesa-card__head">
+        <article class="${cardClasses}" data-mesa-id="${mesa.id}">
+          <header class="mesa-card__head"${headToggleAttrs}>
             <span class="mesa-card__num">Mesa ${mesa.numero}</span>
             <div class="mesa-card__head-badges">
               ${isMesaPaying ? '<span class="mesa-card__paying-badge mesa-card__paying-badge--pulse">💳 Pagando...</span>' : ''}
               <span class="mesa-card__status mesa-card__status--${estado}">${formatMesaEstado(estado)}</span>
             </div>
           </header>
-          ${waiterAlert}
-          <div class="mesa-card__body">${sessionsHtml}</div>
-          <div class="mesa-card__total">
-            <span class="mesa-card__total-label">Total acumulado</span>
-            <strong class="mesa-card__total-amount">${formatCOP(total)}</strong>
-          </div>
-          <div class="mesa-card__actions">
-            <button type="button" class="mesa-card__btn mesa-card__btn--new" data-action="nueva-orden" data-mesa-id="${mesa.id}" data-mesa-num="${mesa.numero}">Nueva orden</button>
-            <button type="button" class="mesa-card__btn mesa-card__btn--view" data-action="ver-cuenta" data-mesa-id="${mesa.id}" data-mesa-num="${mesa.numero}" ${sessions.length === 0 ? 'disabled' : ''}>Ver cuenta</button>
-            <button type="button" class="mesa-card__btn mesa-card__btn--split" data-action="dividir-pago-mesa" data-mesa-id="${mesa.id}" data-mesa-num="${mesa.numero}" ${getChargeableAccountSessions(mesa.id).length === 0 ? 'disabled' : ''}>Dividir pago</button>
-            <button type="button" class="mesa-card__btn mesa-card__btn--close" data-action="cerrar-mesa" data-mesa-id="${mesa.id}" data-mesa-num="${mesa.numero}">Cerrar mesa</button>
+          <div class="mesa-card__details">
+            ${waiterAlert}
+            <div class="mesa-card__body">${sessionsHtml}</div>
+            <div class="mesa-card__total">
+              <span class="mesa-card__total-label">Total acumulado</span>
+              <strong class="mesa-card__total-amount">${formatCOP(total)}</strong>
+            </div>
+            <div class="mesa-card__actions">
+              <button type="button" class="mesa-card__btn mesa-card__btn--new" data-action="nueva-orden" data-mesa-id="${mesa.id}" data-mesa-num="${mesa.numero}">Nueva orden</button>
+              <button type="button" class="mesa-card__btn mesa-card__btn--view" data-action="ver-cuenta" data-mesa-id="${mesa.id}" data-mesa-num="${mesa.numero}" ${sessions.length === 0 ? 'disabled' : ''}>Ver cuenta</button>
+              <button type="button" class="mesa-card__btn mesa-card__btn--split" data-action="dividir-pago-mesa" data-mesa-id="${mesa.id}" data-mesa-num="${mesa.numero}" ${getChargeableAccountSessions(mesa.id).length === 0 ? 'disabled' : ''}>Dividir pago</button>
+              <button type="button" class="mesa-card__btn mesa-card__btn--close" data-action="cerrar-mesa" data-mesa-id="${mesa.id}" data-mesa-num="${mesa.numero}">Cerrar mesa</button>
+            </div>
           </div>
         </article>
       `;
     })
     .join('');
+}
+
+function toggleLibreMesaExpanded(mesaId) {
+  if (expandedLibreMesas.has(mesaId)) {
+    expandedLibreMesas.delete(mesaId);
+  } else {
+    expandedLibreMesas.add(mesaId);
+  }
+  renderMesas();
 }
 
 function bindMesasActions() {
@@ -1654,6 +1688,11 @@ function bindMesasActions() {
     if (!btn || btn.disabled) return;
 
     const { action, mesaId, mesaNum } = btn.dataset;
+
+    if (action === 'toggle-libre-mesa') {
+      toggleLibreMesaExpanded(mesaId);
+      return;
+    }
 
     if (action === 'ver-cuenta') openAccountModal(mesaId, mesaNum);
     else if (action === 'dividir-pago-mesa') openSplitPaymentModal(mesaId, mesaNum);
