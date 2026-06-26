@@ -363,7 +363,10 @@ function showSessionGate(mesaNumero) {
   const app = document.getElementById('mainApp');
   const mesaEl = document.getElementById('sessionGateMesa');
 
-  if (RESTAURANTE) applyRestaurantBranding(RESTAURANTE);
+  if (RESTAURANTE) {
+    applyRestaurantBranding(RESTAURANTE);
+    applySessionGateCover(RESTAURANTE);
+  }
   if (mesaEl) mesaEl.textContent = `Mesa ${mesaNumero}`;
   gate?.removeAttribute('hidden');
   app?.setAttribute('hidden', '');

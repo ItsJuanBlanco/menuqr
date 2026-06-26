@@ -197,6 +197,57 @@ function applyRestaurantCover(restaurant) {
   }
 }
 
+function applySessionGateBranding(restaurant) {
+  if (!restaurant) return;
+
+  const logoEl = document.getElementById('sessionGateBrandLogo');
+  const titleEl = document.getElementById('sessionGateBrandTitle');
+  const logoUrl = restaurant.logo_url?.trim();
+  const name = restaurant.nombre?.trim();
+
+  if (logoEl) {
+    if (logoUrl) {
+      logoEl.onerror = () => {
+        logoEl.hidden = true;
+        logoEl.removeAttribute('src');
+      };
+      logoEl.src = logoUrl;
+      logoEl.alt = name || 'Restaurante';
+      logoEl.hidden = false;
+    } else {
+      logoEl.hidden = true;
+      logoEl.removeAttribute('src');
+    }
+  }
+
+  if (titleEl) {
+    titleEl.textContent = name || 'Restaurante';
+  }
+}
+
+function applySessionGateCover(restaurant) {
+  const gate = document.getElementById('sessionGate');
+  const backdrop = document.getElementById('sessionGateBackdrop');
+  const img = document.getElementById('sessionGateBackdropImg');
+  const url = restaurant?.foto_portada?.trim();
+  const position = normalizeCoverPosition(restaurant?.foto_portada_posicion);
+
+  if (!gate || !backdrop || !img) return;
+
+  if (url) {
+    img.src = url;
+    img.alt = '';
+    img.style.objectPosition = `center ${position}`;
+    backdrop.hidden = false;
+    gate.classList.add('session-gate--has-cover');
+  } else {
+    img.removeAttribute('src');
+    img.style.objectPosition = '';
+    backdrop.hidden = true;
+    gate.classList.remove('session-gate--has-cover');
+  }
+}
+
 function applyRestaurantBranding(restaurant) {
   if (!restaurant?.nombre && !restaurant?.logo_url) return;
 
@@ -214,12 +265,7 @@ function applyRestaurantBranding(restaurant) {
     restaurant,
   });
 
-  applyRestaurantBrandBlock({
-    logoEl: document.getElementById('sessionGateBrandLogo'),
-    titleEl: document.getElementById('sessionGateBrandTitle'),
-    subtitleEl: null,
-    restaurant,
-  });
+  applySessionGateBranding(restaurant);
 
   const loginTitle = document.getElementById('panelLoginRestaurantName');
   if (loginTitle && restaurant.nombre) {
@@ -279,6 +325,7 @@ async function initRestaurant() {
   applyRestaurantTheme(data);
   applyRestaurantBranding(data);
   applyRestaurantCover(data);
+  applySessionGateCover(data);
   return data;
 }
 

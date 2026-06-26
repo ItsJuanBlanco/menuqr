@@ -16,17 +16,23 @@
 <body>
   <!-- Pantalla de bienvenida / sesión -->
   <div class="session-gate" id="sessionGate" hidden>
+    <div class="session-gate__backdrop" id="sessionGateBackdrop" hidden aria-hidden="true">
+      <img class="session-gate__backdrop-img" id="sessionGateBackdropImg" alt="">
+      <div class="session-gate__backdrop-overlay"></div>
+    </div>
+
     <div class="session-gate__shell">
       <header class="session-gate__header">
         <div class="session-gate__brand">
           <img class="brand-logo brand-logo--session-gate" id="sessionGateBrandLogo" alt="" hidden>
-          <p class="session-gate__brand-name" id="sessionGateBrandTitle" hidden>Restaurante</p>
+          <p class="session-gate__greeting">¡Bienvenido a</p>
+          <h1 class="session-gate__brand-name" id="sessionGateBrandTitle">Restaurante</h1>
         </div>
         <p class="session-gate__mesa" id="sessionGateMesa">Mesa 1</p>
       </header>
 
       <div class="session-gate__body">
-        <h1 class="session-gate__title">¿Cómo querés pedir?</h1>
+        <h2 class="session-gate__title">¿Cómo querés pedir?</h2>
         <p class="session-gate__subtitle">Elegí cómo agrupar tu cuenta en esta mesa</p>
 
         <p class="session-gate__loading" id="sessionGateLoading">Verificando sesión…</p>
@@ -34,12 +40,24 @@
         <div class="session-gate__options" id="sessionGateOptions" hidden>
           <div class="session-gate__cards">
             <button type="button" class="session-gate__card" data-session-mode="individual">
-              <span class="session-gate__card-icon" aria-hidden="true">👤</span>
+              <span class="session-gate__card-icon-wrap" aria-hidden="true">
+                <svg class="session-gate__card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="8" r="4"/>
+                  <path d="M5 20c0-3.866 3.134-7 7-7s7 3.134 7 7"/>
+                </svg>
+              </span>
               <span class="session-gate__card-title">Solo yo</span>
               <span class="session-gate__card-desc">Pedís y pagás solo lo tuyo</span>
             </button>
             <button type="button" class="session-gate__card" data-session-mode="grupal">
-              <span class="session-gate__card-icon" aria-hidden="true">👥</span>
+              <span class="session-gate__card-icon-wrap" aria-hidden="true">
+                <svg class="session-gate__card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="9" cy="7" r="3.5"/>
+                  <path d="M2 20c0-3.314 2.686-5.5 7-5.5"/>
+                  <circle cx="17" cy="8" r="2.75"/>
+                  <path d="M13.5 20c0-2.485 1.985-4.25 4.5-4.25"/>
+                </svg>
+              </span>
               <span class="session-gate__card-title">Con el grupo</span>
               <span class="session-gate__card-desc">Una cuenta para toda la mesa</span>
             </button>
@@ -54,7 +72,10 @@
               aria-expanded="false"
               aria-controls="sessionJoinForm"
             >
-              <span class="session-gate__join-toggle-icon" aria-hidden="true">🔗</span>
+              <svg class="session-gate__join-toggle-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+                <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+              </svg>
               Unirme a una cuenta existente
             </button>
 
@@ -79,6 +100,11 @@
 
         <p class="session-gate__error" id="sessionGateError" hidden role="alert"></p>
       </div>
+
+      <footer class="session-gate__powered">
+        <span class="app-powered__label">Powered by</span>
+        <img class="app-powered__logo session-gate__powered-logo" src="/logo-Listo-Inverso.png" alt="Listo" width="80">
+      </footer>
     </div>
   </div>
 
