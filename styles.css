@@ -167,22 +167,22 @@ ul {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 5px;
-  padding: 24px 16px 4px;
-  color: rgba(161, 161, 170, 0.42);
-  font-size: 0.625rem;
+  gap: 8px;
+  padding: 16px;
+  color: var(--text-muted);
+  font-size: 13px;
   font-weight: 500;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.02em;
+  opacity: 0.6;
   user-select: none;
 }
 
 .app-powered__logo {
   display: block;
-  height: 24px;
+  height: 36px;
   width: auto;
-  max-width: 80px;
+  max-width: 120px;
   object-fit: contain;
-  opacity: 0.55;
 }
 
 .panel[hidden] {
