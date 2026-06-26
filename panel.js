@@ -1185,7 +1185,7 @@ function renderOrders() {
           data-action="todo-preparacion"
           data-pedido-id="${order.id}"
           ${updating.has(`bulk-prep-${order.id}`) ? 'disabled' : ''}
-        >Todo en preparación</button>`);
+        >Todo en prep.</button>`);
       }
 
       if (undeliveredCount > 0 && pendingCount === 0) {
@@ -1206,10 +1206,8 @@ function renderOrders() {
         .map(
           (item) => `
             <li class="item-row${isItemDelivered(item) ? ' item-row--done' : ''}">
-              <div class="item-row__info">
-                <p class="item-row__name">${item.productos?.nombre || 'Producto'}</p>
-                <p class="item-row__qty">× ${item.cantidad}</p>
-              </div>
+              <span class="item-row__name">${escapeHtml(item.productos?.nombre || 'Producto')}</span>
+              <span class="item-row__qty">×${item.cantidad}</span>
               <div class="item-row__actions">
                 ${renderItemBadge(item)}
                 ${renderItemButton(item, order.id)}
@@ -1225,8 +1223,8 @@ function renderOrders() {
         <article class="order-card ${cardStateClass}" data-pedido-id="${order.id}">
           <header class="order-card__head">
             <span class="order-card__mesa">${escapeHtml(mesaLabel)}</span>
-            <div class="order-card__meta">
-              <p class="order-card__time">${formatTime(order.created_at)}</p>
+            <div class="order-card__head-right">
+              <span class="order-card__time">${formatTime(order.created_at)}</span>
               <span class="order-card__status order-card__status--${order.estado}">${formatPedidoEstado(order.estado)}</span>
             </div>
           </header>
@@ -1252,7 +1250,7 @@ function renderItemButton(item, orderId) {
       data-item-id="${item.id}"
       data-pedido-id="${orderId}"
       ${isUpdating ? 'disabled' : ''}
-    >En preparación</button>`;
+    >En prep.</button>`;
   }
 
   if (estado === 'en_preparacion') {
@@ -1276,8 +1274,8 @@ function renderItemBadge(item) {
 
   const estado = normalizeItemEstado(item.estado);
   const labels = {
-    pendiente: 'Pendiente',
-    en_preparacion: 'En preparación',
+    pendiente: 'Pend.',
+    en_preparacion: 'En prep.',
     listo: 'Listo',
   };
 
