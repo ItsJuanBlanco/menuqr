@@ -712,72 +712,107 @@ function getAccountDeliveredTotal() {
   return groupDeliveredItems(delivered).reduce((sum, group) => sum + group.subtotal, 0);
 }
 
-function getAccountPaymentState() {
-  const items = state.accountItems || [];
-  const confirmed = items.filter((item) => item.confirmado);
-  const pending = items.filter((item) => !item.confirmado);
-  const deliveredTotal = getAccountDeliveredTotal();
+function getUnconfirmedItemsByEstado() {
+  const unconfirmed = (state.accountItems || []).filter((item) => !item.confirmado);
+  const pendiente = unconfirmed.filter((item) => (item.estado || 'pendiente') === 'pendiente');
+  const enPreparacion = unconfirmed.filter((item) => item.estado === 'en_preparacion');
+  const otros = unconfirmed.filter((item) => {
+    const estado = item.estado || 'pendiente';
+    return estado !== 'pendiente' && estado !== 'en_preparacion';
+  });
 
-  if (items.length === 0) {
-    return { case: 1, items, confirmed, pending, deliveredTotal: 0 };
-  }
-
-  if (confirmed.length === 0) {
-    return { case: 2, items, confirmed, pending, deliveredTotal: 0 };
-  }
-
-  if (pending.length > 0) {
-    return { case: 3, items, confirmed, pending, deliveredTotal };
-  }
-
-  return { case: 4, items, confirmed, pending, deliveredTotal };
+  return { unconfirmed, pendiente, enPreparacion, otros };
 }
 
-let partialDeliveryPayResolver = null;
+function countAccountItemQty(items) {
+  return items.reduce((sum, item) => sum + item.qty, 0);
+}
 
-function openPartialDeliveryPayModal() {
+let paymentConfirmResolver = null;
+
+function openPaymentConfirmModal({ title, text, payLabel, waitLabel }) {
   return new Promise((resolve) => {
-    partialDeliveryPayResolver = resolve;
+    paymentConfirmResolver = resolve;
     const modal = document.getElementById('partialDeliveryPayModal');
+    const titleEl = document.getElementById('partialDeliveryPayTitle');
+    const textEl = document.getElementById('partialDeliveryPayText');
+    const payBtn = document.getElementById('partialDeliveryPayConfirmBtn');
+    const waitBtn = document.getElementById('partialDeliveryPayWaitBtn');
+
     if (!modal) {
       resolve(false);
-      partialDeliveryPayResolver = null;
+      paymentConfirmResolver = null;
       return;
     }
+
+    if (titleEl) titleEl.textContent = title;
+    if (textEl) textEl.textContent = text;
+    if (payBtn) payBtn.textContent = payLabel;
+    if (waitBtn) waitBtn.textContent = waitLabel;
 
     modal.hidden = false;
     modal.setAttribute('aria-hidden', 'false');
   });
 }
 
-function closePartialDeliveryPayModal(proceed) {
+function closePaymentConfirmModal(proceed) {
   const modal = document.getElementById('partialDeliveryPayModal');
   if (modal) {
     modal.hidden = true;
     modal.setAttribute('aria-hidden', 'true');
   }
 
-  if (partialDeliveryPayResolver) {
-    partialDeliveryPayResolver(proceed === true);
-    partialDeliveryPayResolver = null;
+  if (paymentConfirmResolver) {
+    paymentConfirmResolver(proceed === true);
+    paymentConfirmResolver = null;
   }
 }
 
 async function ensurePaymentAllowed() {
-  const paymentState = getAccountPaymentState();
+  const items = state.accountItems || [];
+  const confirmed = items.filter((item) => item.confirmado);
+  const { pendiente, enPreparacion, otros } = getUnconfirmedItemsByEstado();
+  const pendienteQty = countAccountItemQty(pendiente);
+  const preparacionQty = countAccountItemQty(enPreparacion);
+  const otrosQty = countAccountItemQty(otros);
 
-  if (paymentState.case === 1) {
+  if (items.length === 0) {
     showToast('Primero agregá algo a tu cuenta desde la carta');
     return false;
   }
 
-  if (paymentState.case === 2) {
-    showToast('El mesero aún no ha confirmado tu pedido — esperá un momento');
+  if (confirmed.length === 0) {
+    showToast('El mesero aún no ha entregado nada');
     return false;
   }
 
-  if (paymentState.case === 3) {
-    return openPartialDeliveryPayModal();
+  if (pendienteQty > 0) {
+    const itemLabel = pendienteQty === 1 ? 'item' : 'items';
+    return openPaymentConfirmModal({
+      title: '¿Ya recibiste todo?',
+      text: `Tenés ${pendienteQty} ${itemLabel} que el mesero no confirmó aún.`,
+      payLabel: 'Sí, pagar todo',
+      waitLabel: 'Esperar al mesero',
+    });
+  }
+
+  if (preparacionQty > 0) {
+    return openPaymentConfirmModal({
+      title: 'Items en preparación',
+      text: 'Tus items están siendo preparados. ¿Seguro querés pagar ahora?',
+      payLabel: 'Sí, pagar lo entregado',
+      waitLabel: 'Esperar',
+    });
+  }
+
+  if (otrosQty > 0) {
+    const itemLabel = otrosQty === 1 ? 'item' : 'items';
+    return openPaymentConfirmModal({
+      title: '¿Ya recibiste todo?',
+      text: `Tenés ${otrosQty} ${itemLabel} que el mesero no confirmó aún.`,
+      payLabel: 'Sí, pagar lo entregado',
+      waitLabel: 'Esperar al mesero',
+    });
   }
 
   return true;
@@ -2399,7 +2434,7 @@ function initPaymentExtras() {
   }
 }
 
-function initPartialDeliveryPayModal() {
+function initPaymentConfirmModal() {
   const modal = document.getElementById('partialDeliveryPayModal');
   if (!modal || modal.dataset.bound) return;
   modal.dataset.bound = 'true';
@@ -2408,12 +2443,12 @@ function initPartialDeliveryPayModal() {
     const btn = event.target.closest('[data-partial-pay-action]');
     if (!btn) return;
 
-    closePartialDeliveryPayModal(btn.dataset.partialPayAction === 'pay');
+    closePaymentConfirmModal(btn.dataset.partialPayAction === 'pay');
   });
 }
 
 function initWompiPayment() {
-  initPartialDeliveryPayModal();
+  initPaymentConfirmModal();
 
   document.getElementById('wompiPayBtn')?.addEventListener('click', () => {
     const breakdown = getPaymentBreakdown();

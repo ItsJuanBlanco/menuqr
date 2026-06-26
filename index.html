@@ -370,17 +370,17 @@
       </button>
     </nav>
 
-    <!-- Modal: pagar solo lo entregado -->
+    <!-- Modal: confirmación antes de pagar -->
     <div class="payment-confirm-modal" id="partialDeliveryPayModal" hidden aria-hidden="true" role="dialog" aria-labelledby="partialDeliveryPayTitle">
       <div class="payment-confirm-modal__backdrop" data-partial-pay-action="wait"></div>
       <div class="payment-confirm-modal__box">
-        <h2 class="payment-confirm-modal__title" id="partialDeliveryPayTitle">Items pendientes</h2>
-        <p class="payment-confirm-modal__text">Tenés items que aún no fueron entregados. ¿Querés pagar solo lo entregado hasta ahora?</p>
+        <h2 class="payment-confirm-modal__title" id="partialDeliveryPayTitle">Confirmar pago</h2>
+        <p class="payment-confirm-modal__text" id="partialDeliveryPayText"></p>
         <div class="payment-confirm-modal__actions">
-          <button type="button" class="payment-confirm-modal__btn payment-confirm-modal__btn--primary" data-partial-pay-action="pay">
-            Sí, pagar lo entregado
+          <button type="button" class="payment-confirm-modal__btn payment-confirm-modal__btn--primary" id="partialDeliveryPayConfirmBtn" data-partial-pay-action="pay">
+            Sí, pagar
           </button>
-          <button type="button" class="payment-confirm-modal__btn payment-confirm-modal__btn--ghost" data-partial-pay-action="wait">
+          <button type="button" class="payment-confirm-modal__btn payment-confirm-modal__btn--ghost" id="partialDeliveryPayWaitBtn" data-partial-pay-action="wait">
             Esperar
           </button>
         </div>
