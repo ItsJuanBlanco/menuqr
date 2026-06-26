@@ -77,7 +77,7 @@ function getPagarBaseUrl() {
   if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
     return `${window.location.origin}/pagar`;
   }
-  return 'https://listoapp.com.co/pagar';
+  return 'https://menuqr-virid.vercel.app/pagar';
 }
 
 function buildPagarUrl(monto, sesionId, cargoServicio = 0, parte = null) {
@@ -89,19 +89,6 @@ function buildPagarUrl(monto, sesionId, cargoServicio = 0, parte = null) {
   if (parte) params.set('parte', String(parte));
   if (RESTAURANTE_SLUG) params.set('slug', RESTAURANTE_SLUG);
   return `${getPagarBaseUrl()}?${params.toString()}`;
-}
-
-function buildSplitJoinUrl(mesaNumero, splitCode, monto) {
-  const slug = RESTAURANTE_SLUG || '';
-  const mesa = encodeURIComponent(String(mesaNumero));
-  const params = new URLSearchParams({
-    split: splitCode,
-    monto: String(monto),
-  });
-  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-    return `${window.location.origin}/index.html?slug=${encodeURIComponent(slug)}&mesa=${mesa}&${params.toString()}`;
-  }
-  return `https://listoapp.com.co/${encodeURIComponent(slug)}?mesa=${mesa}&${params.toString()}`;
 }
 
 function getPanelSplitShare(subtotal, splitCount, serviceEnabled = true) {
@@ -138,76 +125,6 @@ async function getSessionApprovedPaymentsCount(sesionId) {
 
   if (error) throw error;
   return count || 0;
-}
-
-function getSessionSplitPartsInfo(sessionSubtotal, paymentMontos, serviceEnabled = true) {
-  const montos = (paymentMontos || []).map((m) => Number(m)).filter((m) => m > 0);
-  const paidParts = montos.length;
-  const paidTotal = montos.reduce((sum, m) => sum + m, 0);
-  const chargeTotal = getPanelPaymentBreakdown(Math.max(0, sessionSubtotal), serviceEnabled).total;
-
-  if (chargeTotal <= 0 || paidParts === 0) {
-    return {
-      paidParts,
-      paidTotal,
-      totalParts: 0,
-      chargeTotal,
-      isComplete: false,
-    };
-  }
-
-  const shareAmount = montos[0];
-  const totalParts = Math.max(paidParts, Math.ceil(chargeTotal / shareAmount));
-
-  return {
-    paidParts,
-    paidTotal,
-    totalParts,
-    chargeTotal,
-    isComplete: paidTotal >= chargeTotal,
-  };
-}
-
-function buildSessionSplitInfo(sessionSubtotal, paymentMontos, sessionTipo) {
-  if (sessionTipo !== 'grupal') return null;
-  return getSessionSplitPartsInfo(sessionSubtotal, paymentMontos);
-}
-
-function getGrupalSessionPaymentLabel(session) {
-  const split = session.splitInfo;
-  const isComplete = session.pago_pendiente_confirmacion === true;
-  const isPaying = session.pago_en_proceso === true && !isComplete;
-
-  if (session.tipo !== 'grupal' || !split || split.paidParts <= 0 || split.isComplete || isComplete) {
-    return null;
-  }
-
-  if (isPaying) {
-    return {
-      kind: 'paying',
-      text: `💳 Pagando... ${split.paidParts}/${split.totalParts} partes`,
-    };
-  }
-
-  return {
-    kind: 'progress',
-    text: `💳 ${formatCOP(split.paidTotal)} / ${formatCOP(split.chargeTotal)} pagados (${split.paidParts}/${split.totalParts})`,
-  };
-}
-
-function getMesaPayingBadgeText(sessions) {
-  const payingSessions = sessions.filter(
-    (session) => session.pago_en_proceso === true && session.pago_pendiente_confirmacion !== true
-  );
-
-  if (payingSessions.length === 0) return null;
-
-  for (const session of payingSessions) {
-    const label = getGrupalSessionPaymentLabel(session);
-    if (label?.kind === 'paying') return label.text;
-  }
-
-  return '💳 Pagando...';
 }
 
 async function markSessionReadyForConfirmationIfPaid(sesionId, targetTotal) {
@@ -350,7 +267,7 @@ function sortMesaSessions(sessions) {
   });
 }
 
-function buildMesaSessionBreakdown(items, sesionById, pagosBySesion = new Map(), pagosListBySesion = new Map()) {
+function buildMesaSessionBreakdown(items, sesionById, pagosBySesion = new Map()) {
   const totals = new Map();
 
   items.forEach((item) => {
@@ -361,19 +278,16 @@ function buildMesaSessionBreakdown(items, sesionById, pagosBySesion = new Map(),
   return sortMesaSessions(
     [...totals.entries()].map(([sesionId, total]) => {
       const meta = sesionById.get(sesionId);
-      const paymentMontos = pagosListBySesion.get(sesionId) || [];
-      const tipo = meta?.tipo ?? 'individual';
       return {
         id: sesionId,
         sesionId,
         label: formatSessionLineLabel(meta),
         total,
         numero: meta?.numero ?? null,
-        tipo,
+        tipo: meta?.tipo ?? 'individual',
         pago_pendiente_confirmacion: meta?.pago_pendiente_confirmacion === true,
         pago_en_proceso: meta?.pago_en_proceso === true,
         paidTotal: pagosBySesion.get(sesionId) || 0,
-        splitInfo: buildSessionSplitInfo(total, paymentMontos, tipo),
       };
     })
   );
@@ -966,7 +880,6 @@ async function fetchMesas() {
   const sesionIdsFromItems = [...new Set((itemsData || []).map((item) => item.sesion_id).filter(Boolean))];
   let sesionById = new Map();
   let pagosBySesion = new Map();
-  let pagosListBySesion = new Map();
 
   const mesaIds = mesas.map((mesa) => mesa.id);
   let activeSesiones = [];
@@ -998,8 +911,7 @@ async function fetchMesas() {
           .from('pagos_grupo')
           .select('sesion_id, monto')
           .in('sesion_id', allSesionIds)
-          .eq('estado', 'aprobado')
-          .order('created_at', { ascending: true }),
+          .eq('estado', 'aprobado'),
       ]);
 
     if (sesionesError) throw sesionesError;
@@ -1008,12 +920,10 @@ async function fetchMesas() {
     sesionById = new Map((sesionesData || []).map((sesion) => [sesion.id, sesion]));
 
     (pagosData || []).forEach((pago) => {
-      const sesionId = pago.sesion_id;
-      const monto = Number(pago.monto);
-
-      if (!pagosListBySesion.has(sesionId)) pagosListBySesion.set(sesionId, []);
-      pagosListBySesion.get(sesionId).push(monto);
-      pagosBySesion.set(sesionId, (pagosBySesion.get(sesionId) || 0) + monto);
+      pagosBySesion.set(
+        pago.sesion_id,
+        (pagosBySesion.get(pago.sesion_id) || 0) + Number(pago.monto)
+      );
     });
 
     activeSesiones.forEach((sesion) => {
@@ -1046,24 +956,17 @@ async function fetchMesas() {
   mesas.forEach((mesa) => {
     if (!mesaSessionItems[mesa.id]) mesaSessionItems[mesa.id] = {};
 
-    const breakdown = buildMesaSessionBreakdown(
-      mesaAccounts[mesa.id] || [],
-      sesionById,
-      pagosBySesion,
-      pagosListBySesion
-    );
+    const breakdown = buildMesaSessionBreakdown(mesaAccounts[mesa.id] || [], sesionById, pagosBySesion);
     const byId = new Map(breakdown.map((session) => [session.id, session]));
 
     activeSesiones
       .filter((sesion) => sesion.mesa_id === mesa.id)
       .forEach((sesion) => {
-        const paymentMontos = pagosListBySesion.get(sesion.id) || [];
         const existing = byId.get(sesion.id);
         if (existing) {
           existing.pago_pendiente_confirmacion = sesion.pago_pendiente_confirmacion === true;
           existing.pago_en_proceso = sesion.pago_en_proceso === true;
           existing.paidTotal = pagosBySesion.get(sesion.id) || existing.paidTotal || 0;
-          existing.splitInfo = buildSessionSplitInfo(existing.total, paymentMontos, existing.tipo);
           return;
         }
 
@@ -1077,7 +980,6 @@ async function fetchMesas() {
           pago_pendiente_confirmacion: sesion.pago_pendiente_confirmacion === true,
           pago_en_proceso: sesion.pago_en_proceso === true,
           paidTotal: pagosBySesion.get(sesion.id) || 0,
-          splitInfo: buildSessionSplitInfo(0, paymentMontos, sesion.tipo || 'individual'),
         });
       });
 
@@ -1170,15 +1072,18 @@ function renderMesas() {
         ? sessions.reduce((sum, session) => sum + session.total, 0)
         : grouped.reduce((sum, g) => sum + g.subtotal, 0);
       const estado = mesa.estado || 'libre';
-      const mesaPayingBadge = getMesaPayingBadgeText(sessions);
+      const isMesaPaying = sessions.some(
+        (session) => session.pago_en_proceso === true && session.pago_pendiente_confirmacion !== true
+      );
       const sessionsHtml =
         sessions.length === 0
           ? '<p class="mesa-card__sessions-empty">Sin cuentas activas</p>'
           : `<ul class="mesa-card__session-lines">${sessions
               .map((session) => {
+                const paidTotal = session.paidTotal || 0;
+                const sessionTotal = session.total || 0;
                 const isComplete = session.pago_pendiente_confirmacion === true;
                 const isPaying = session.pago_en_proceso === true && !isComplete;
-                const grupalPayment = getGrupalSessionPaymentLabel(session);
 
                 let paymentInfo = '';
                 if (isComplete) {
@@ -1186,18 +1091,14 @@ function renderMesas() {
                       <span class="mesa-card__payment-badge mesa-card__payment-badge--complete">✅ Pago recibido</span>
                       <button type="button" class="mesa-card__payment-btn" data-action="confirmar-pago" data-sesion-id="${session.id}" data-mesa-id="${mesa.id}" data-mesa-num="${mesa.numero}">Cerrar mesa</button>
                     </div>`;
-                } else if (grupalPayment?.kind === 'paying') {
-                  paymentInfo = `<span class="mesa-card__payment-badge mesa-card__payment-badge--paying">${grupalPayment.text}</span>`;
-                } else if (grupalPayment?.kind === 'progress') {
-                  paymentInfo = `<p class="mesa-card__payment-progress">${grupalPayment.text}</p>`;
                 } else if (isPaying) {
                   paymentInfo = `<span class="mesa-card__payment-badge mesa-card__payment-badge--paying">💳 Pagando...</span>`;
                 } else if (
-                  session.paidTotal > 0 &&
-                  session.total > 0 &&
-                  session.paidTotal < session.total
+                  paidTotal > 0 &&
+                  sessionTotal > 0 &&
+                  paidTotal < sessionTotal
                 ) {
-                  paymentInfo = `<p class="mesa-card__payment-progress">💳 ${formatCOP(session.paidTotal)} / ${formatCOP(session.total)} pagados</p>`;
+                  paymentInfo = `<p class="mesa-card__payment-progress">💳 ${formatCOP(paidTotal)} / ${formatCOP(sessionTotal)} pagados</p>`;
                 }
 
                 return `
@@ -1224,7 +1125,7 @@ function renderMesas() {
           <header class="mesa-card__head">
             <span class="mesa-card__num">Mesa ${mesa.numero}</span>
             <div class="mesa-card__head-badges">
-              ${mesaPayingBadge ? `<span class="mesa-card__paying-badge">${mesaPayingBadge}</span>` : ''}
+              ${isMesaPaying ? '<span class="mesa-card__paying-badge">💳 Pagando...</span>' : ''}
               <span class="mesa-card__status mesa-card__status--${estado}">${formatMesaEstado(estado)}</span>
             </div>
           </header>
@@ -1872,7 +1773,7 @@ function getSelectedSplitPaymentSession() {
   };
 }
 
-async function renderSplitPaymentQr(share, partNumber) {
+function renderSplitPaymentQr(share, partNumber) {
   const box = document.getElementById('splitPaymentQrBox');
   const canvas = document.getElementById('splitPaymentQrCanvas');
   if (!box || !canvas || typeof QRCode === 'undefined') return;
@@ -1885,21 +1786,12 @@ async function renderSplitPaymentQr(share, partNumber) {
 
   box.hidden = false;
   canvas.innerHTML = '';
-
-  let splitCode;
-  try {
-    splitCode = await ensureSessionSplitCode(splitPaymentState.sesionId);
-  } catch (error) {
-    console.error(error);
-    canvas.textContent = 'No se pudo generar el QR.';
-    return;
-  }
-
   new QRCode(canvas, {
-    text: buildSplitJoinUrl(
-      splitPaymentState.mesaNum,
-      splitCode,
-      share.shareTotal
+    text: buildPagarUrl(
+      share.shareTotal,
+      splitPaymentState.sesionId,
+      share.shareServicio,
+      partNumber
     ),
     width: 220,
     height: 220,
@@ -1976,7 +1868,7 @@ async function refreshSplitPaymentModal() {
     qrBtn.disabled = splitPaymentState.submitting || isComplete || share.shareTotal <= 0;
   }
 
-  await renderSplitPaymentQr(share, nextPart);
+  renderSplitPaymentQr(share, nextPart);
 }
 
 function closeSplitPaymentModal() {

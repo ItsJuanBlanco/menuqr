@@ -10,6 +10,8 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/styles.css">
+  <script src="https://checkout.wompi.co/widget.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 </head>
 <body>
   <!-- Pantalla de bienvenida / sesión -->
@@ -220,14 +222,6 @@
               </div>
             </section>
 
-            <section class="account__split-join" id="splitJoinSection" hidden>
-              <h3 class="account__section-title">Pagar tu parte</h3>
-              <p class="account__split-join-amount" id="splitJoinAmount">Tu parte: $0</p>
-              <button type="button" class="wompi-pay-btn" id="splitJoinPayBtn">
-                Pagar con Wompi
-              </button>
-            </section>
-
             <button type="button" class="wompi-pay-btn" id="wompiPayBtn" hidden>
               Pagar con Wompi
             </button>
@@ -354,8 +348,6 @@
     </div>
   </div>
 
-  <script src="https://checkout.wompi.co/widget.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="/config.js"></script>
   <script src="/restaurant.js"></script>
