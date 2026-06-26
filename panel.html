@@ -30,6 +30,7 @@
       <button type="button" class="panel-tabs__btn panel-tabs__btn--active" id="tabPedidos" role="tab" aria-selected="true" data-panel="pedidos">Pedidos</button>
       <button type="button" class="panel-tabs__btn" id="tabMesas" role="tab" aria-selected="false" data-panel="mesas">Mesas</button>
       <button type="button" class="panel-tabs__btn" id="tabMenu" role="tab" aria-selected="false" data-panel="menu">Menú</button>
+      <button type="button" class="panel-tabs__btn" id="tabQr" role="tab" aria-selected="false" data-panel="qr">QR</button>
     </nav>
 
     <main class="panel-main">
@@ -58,6 +59,19 @@
           <button type="button" class="menu-toolbar__btn" id="addProductBtn">+ Agregar producto</button>
         </div>
         <div class="menu-sections" id="menuList"></div>
+      </section>
+
+      <!-- QR mesas -->
+      <section class="panel-view" id="viewQr" role="tabpanel" aria-labelledby="tabQr" hidden>
+        <div class="mesa-qr-toolbar">
+          <p class="mesa-qr-toolbar__hint">QR de acceso a la carta por mesa</p>
+          <button type="button" class="menu-toolbar__btn" id="printAllQrBtn">Imprimir todos</button>
+        </div>
+        <div class="panel-empty" id="mesaQrEmpty" hidden>
+          <p class="panel-empty__title">Sin mesas registradas</p>
+          <p class="panel-empty__text">Las mesas aparecerán aquí cuando estén creadas en Supabase.</p>
+        </div>
+        <div class="mesa-qr-grid" id="mesaQrGrid"></div>
       </section>
     </main>
 
@@ -217,6 +231,10 @@
     </div>
 
     <div class="panel-toast" id="toast" role="status" aria-live="polite"></div>
+  </div>
+
+  <div class="mesa-qr-print" id="mesaQrPrintArea" hidden aria-hidden="true">
+    <div class="mesa-qr-print__grid" id="mesaQrPrintGrid"></div>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>

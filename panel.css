@@ -1225,6 +1225,139 @@ button {
   line-height: 1.45;
 }
 
+/* QR mesas */
+.mesa-qr-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.mesa-qr-toolbar__hint {
+  font-size: 0.9375rem;
+  color: var(--text-muted);
+}
+
+.mesa-qr-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 16px;
+}
+
+.mesa-qr-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 20px 16px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+.mesa-qr-card__canvas {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px;
+  background: #fff;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+}
+
+.mesa-qr-card__canvas img,
+.mesa-qr-card__canvas canvas {
+  display: block;
+}
+
+.mesa-qr-card__label {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.mesa-qr-card__download {
+  padding: 8px 14px;
+  border-radius: var(--radius-sm);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+}
+
+.mesa-qr-card__download:hover {
+  border-color: rgba(234, 88, 12, 0.35);
+  color: var(--accent);
+}
+
+.mesa-qr-print {
+  display: none;
+}
+
+body.mesa-qr-printing .mesa-qr-print {
+  display: block;
+}
+
+.mesa-qr-print__grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 32px 24px;
+  padding: 24px;
+}
+
+.mesa-qr-print__item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 16px;
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+.mesa-qr-print__canvas {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+}
+
+.mesa-qr-print__canvas img,
+.mesa-qr-print__canvas canvas {
+  display: block;
+}
+
+.mesa-qr-print__label {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: #000;
+  text-align: center;
+}
+
+@media print {
+  body.mesa-qr-printing .panel-app {
+    display: none !important;
+  }
+
+  body.mesa-qr-printing .mesa-qr-print {
+    display: block !important;
+    position: static;
+  }
+
+  body.mesa-qr-printing .panel-toast {
+    display: none !important;
+  }
+
+  .mesa-qr-print__grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
 /* Menú admin */
 .menu-toolbar {
   display: flex;
