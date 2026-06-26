@@ -226,11 +226,39 @@
             </section>
 
             <section class="account__split-join" id="splitJoinSection" hidden>
-              <h3 class="account__section-title">Pagar tu parte</h3>
-              <p class="account__split-join-amount" id="splitJoinAmount">Tu parte: $0</p>
-              <button type="button" class="wompi-pay-btn" id="splitJoinPayBtn">
-                Pagar con Wompi
-              </button>
+              <div class="split-join-card">
+                <p class="split-join-card__label">Tu parte a pagar</p>
+                <p class="split-join-card__amount" id="splitJoinAmount">$0</p>
+                <p class="split-join-card__meta" id="splitJoinMeta">Cuenta grupal · Mesa 1</p>
+                <div class="split-join-card__actions">
+                  <button type="button" class="split-join-card__pay split-join-card__pay--wompi" id="splitJoinPayBtn">
+                    <span class="split-join-card__pay-icon" aria-hidden="true">
+                      <img
+                        src="https://cdn.wompi.co/static/images/wompi-logo-white.svg"
+                        alt=""
+                        class="split-join-card__pay-logo"
+                        width="72"
+                        height="22"
+                        decoding="async"
+                      >
+                      <span class="split-join-card__pay-icon-fallback">W</span>
+                    </span>
+                    <span class="split-join-card__pay-label" id="splitJoinPayLabel">Pagar con Wompi</span>
+                  </button>
+                  <p class="split-join-card__alt-label" id="splitJoinBancolombiaAltLabel" hidden>También podés pagar con:</p>
+                  <button type="button" class="split-join-card__pay split-join-card__pay--bancolombia" id="splitJoinBancolombiaBtn" hidden>
+                    <img
+                      src="https://upload.wikimedia.org/wikipedia/commons/thumb/0/0c/Bancolombia_logo.svg/200px-Bancolombia_logo.svg.png"
+                      alt=""
+                      class="split-join-card__pay-logo split-join-card__pay-logo--banco"
+                      width="120"
+                      height="24"
+                      decoding="async"
+                    >
+                    <span class="split-join-card__pay-fallback">Bancolombia</span>
+                  </button>
+                </div>
+              </div>
             </section>
 
             <button type="button" class="wompi-pay-btn" id="wompiPayBtn" hidden>

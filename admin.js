@@ -305,6 +305,13 @@ function normalizeLinkPago(value) {
   return raw;
 }
 
+function normalizeLinkBancolombia(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return null;
+  if (/^https?:\/\//i.test(raw) || /^\d+$/.test(raw)) return raw;
+  throw new Error('El link de Bancolombia debe empezar con http:// o https://, o ser un número de cuenta.');
+}
+
 function updateAdminPaymentFieldsVisibility(metodo) {
   const wompiFields = document.getElementById('adminWompiFields');
   const qrFields = document.getElementById('adminQrPropioFields');
@@ -376,6 +383,7 @@ function resetAdminPaymentForm() {
   });
   document.getElementById('adminWompiPublicKey').value = '';
   document.getElementById('adminLinkPago').value = '';
+  document.getElementById('adminLinkBancolombia').value = '';
   updateAdminPaymentFieldsVisibility(DEFAULT_METODO_PAGO);
   resetAdminQrPagoField('');
 }
@@ -387,6 +395,7 @@ function populateAdminPaymentForm(restaurant = {}) {
   });
   document.getElementById('adminWompiPublicKey').value = restaurant.wompi_public_key || '';
   document.getElementById('adminLinkPago').value = restaurant.link_pago || '';
+  document.getElementById('adminLinkBancolombia').value = restaurant.link_bancolombia || '';
   updateAdminPaymentFieldsVisibility(metodo);
   resetAdminQrPagoField(restaurant.qr_pago_url || '');
 }
@@ -433,11 +442,13 @@ function readAdminPaymentFormValues() {
   const metodo_pago = getAdminSelectedMetodoPago();
   const wompi_public_key = document.getElementById('adminWompiPublicKey')?.value?.trim() || null;
   const link_pago = normalizeLinkPago(document.getElementById('adminLinkPago')?.value);
+  const link_bancolombia = normalizeLinkBancolombia(document.getElementById('adminLinkBancolombia')?.value);
 
   return {
     metodo_pago,
     wompi_public_key,
     link_pago,
+    link_bancolombia,
     qr_pago_url: currentAdminQrPagoUrl,
   };
 }
@@ -611,7 +622,7 @@ async function openEditRestaurantModal(restaurantId) {
     const client = assertSupabaseClient();
     const { data, error } = await client
       .from('restaurantes')
-      .select('id, nombre, slug, ciudad, email, pin_mesero, pin_admin, metodo_pago, wompi_public_key, link_pago, qr_pago_url')
+      .select('id, nombre, slug, ciudad, email, pin_mesero, pin_admin, metodo_pago, wompi_public_key, link_pago, link_bancolombia, qr_pago_url')
       .eq('id', restaurantId)
       .single();
 
@@ -689,6 +700,7 @@ async function saveRestaurantPaymentSettings(restaurantId) {
       metodo_pago: payment.metodo_pago,
       wompi_public_key: payment.wompi_public_key,
       link_pago: payment.link_pago,
+      link_bancolombia: payment.link_bancolombia,
       qr_pago_url,
     })
     .eq('id', restaurantId);
@@ -725,6 +737,7 @@ async function createRestaurant({ nombre, slug, ciudad, email, pin_mesero, pin_a
       metodo_pago: payment.metodo_pago,
       wompi_public_key: payment.wompi_public_key,
       link_pago: payment.link_pago,
+      link_bancolombia: payment.link_bancolombia,
     })
     .select('id, nombre, slug, ciudad, email, activo, created_at')
     .single();

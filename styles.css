@@ -1603,17 +1603,144 @@ ul {
 }
 
 .account__split-join {
-  margin-top: 1.25rem;
-  padding: 1rem;
-  border-radius: 16px;
-  background: var(--surface-elevated, #fafafa);
-  border: 1px solid var(--border, #e4e4e7);
+  margin-top: 20px;
 }
 
-.account__split-join-amount {
-  margin: 0.5rem 0 1rem;
+.split-join-card {
+  padding: 24px 20px;
+  border-radius: var(--radius);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.28);
+}
+
+.split-join-card__label {
+  margin: 0 0 8px;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.split-join-card__amount {
+  margin: 0;
+  font-size: 2.5rem;
+  font-weight: 800;
+  line-height: 1.05;
+  letter-spacing: -0.03em;
+  color: var(--color-primary, #ff6b00);
+}
+
+.split-join-card__meta {
+  margin: 10px 0 20px;
+  font-size: 0.875rem;
+  color: var(--text-dim);
+}
+
+.split-join-card__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.split-join-card__pay {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 52px;
+  padding: 14px 18px;
+  border: none;
+  border-radius: 12px;
+  font-family: var(--font);
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1.2;
+  cursor: pointer;
+  transition: transform 0.15s ease, opacity 0.15s ease;
+}
+
+.split-join-card__pay:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.split-join-card__pay:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.split-join-card__pay--wompi {
+  color: #fff;
+  background: #00c853;
+  box-shadow: 0 6px 18px rgba(0, 200, 83, 0.28);
+}
+
+.split-join-card__pay--bancolombia {
+  color: #000;
+  background: #ffcb05;
+}
+
+.split-join-card__pay-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  min-width: 22px;
+}
+
+.split-join-card__pay-logo {
+  display: block;
+  width: auto;
+  height: 22px;
+  object-fit: contain;
+}
+
+.split-join-card__pay-logo--banco {
+  height: 20px;
+  max-width: 120px;
+}
+
+.split-join-card__pay-icon-fallback {
+  display: none;
   font-size: 1.125rem;
-  font-weight: 600;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.split-join-card__pay-icon--fallback .split-join-card__pay-logo {
+  display: none;
+}
+
+.split-join-card__pay-icon--fallback .split-join-card__pay-icon-fallback {
+  display: inline-flex;
+}
+
+.split-join-card__pay-fallback {
+  display: none;
+  font-size: 1rem;
+  font-weight: 800;
+  color: #000;
+}
+
+.split-join-card__pay--bancolombia.split-join-card__pay--logo-fallback .split-join-card__pay-logo {
+  display: none;
+}
+
+.split-join-card__pay--bancolombia.split-join-card__pay--logo-fallback .split-join-card__pay-fallback {
+  display: inline;
+}
+
+.split-join-card__pay-label {
+  text-align: center;
+}
+
+.split-join-card__alt-label {
+  margin: 4px 0 0;
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+  text-align: center;
 }
 
 /* ── Modal QR de pago del restaurante ── */
