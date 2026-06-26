@@ -118,7 +118,13 @@
         </div>
       </div>
       <div class="header__meta">
-        <span class="header__session" id="sessionBadge" hidden>Cuenta</span>
+        <div class="header__session-row">
+          <span class="header__session" id="sessionBadge" hidden>Cuenta</span>
+          <button type="button" class="header__change-session" id="changeSessionBtn" hidden aria-label="Cambiar cuenta">
+            <span class="header__change-session-icon" aria-hidden="true">⚙️</span>
+            <span class="header__change-session-label">Cambiar cuenta</span>
+          </button>
+        </div>
         <div class="header__table" id="tableBadge">Mesa 1</div>
       </div>
     </header>
@@ -363,6 +369,23 @@
         <span>Llamar mesero</span>
       </button>
     </nav>
+
+    <!-- Modal: pagar solo lo entregado -->
+    <div class="payment-confirm-modal" id="partialDeliveryPayModal" hidden aria-hidden="true" role="dialog" aria-labelledby="partialDeliveryPayTitle">
+      <div class="payment-confirm-modal__backdrop" data-partial-pay-action="wait"></div>
+      <div class="payment-confirm-modal__box">
+        <h2 class="payment-confirm-modal__title" id="partialDeliveryPayTitle">Items pendientes</h2>
+        <p class="payment-confirm-modal__text">Tenés items que aún no fueron entregados. ¿Querés pagar solo lo entregado hasta ahora?</p>
+        <div class="payment-confirm-modal__actions">
+          <button type="button" class="payment-confirm-modal__btn payment-confirm-modal__btn--primary" data-partial-pay-action="pay">
+            Sí, pagar lo entregado
+          </button>
+          <button type="button" class="payment-confirm-modal__btn payment-confirm-modal__btn--ghost" data-partial-pay-action="wait">
+            Esperar
+          </button>
+        </div>
+      </div>
+    </div>
 
     <!-- Modal QR de pago del restaurante -->
     <div class="restaurant-qr-pay-modal" id="restaurantQrPayModal" hidden aria-hidden="true" role="dialog" aria-labelledby="restaurantQrPayTitle">

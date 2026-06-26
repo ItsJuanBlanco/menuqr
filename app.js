@@ -211,9 +211,62 @@ function clearClientSessionState() {
   state.accountItems = [];
   state.groupPayments = [];
   state.lastSplitQrUrl = '';
+  state.splitJoinAmount = null;
 
   const badge = document.getElementById('sessionBadge');
   if (badge) badge.hidden = true;
+  updateChangeSessionButtonVisibility();
+}
+
+function hasOpenAccountItems() {
+  return (state.accountItems?.length || 0) > 0;
+}
+
+function updateChangeSessionButtonVisibility() {
+  const btn = document.getElementById('changeSessionBtn');
+  if (!btn) return;
+  btn.hidden = !state.sesionId || paymentSuccessShown;
+}
+
+async function handleChangeSessionClick() {
+  if (!state.mesaId || !state.sesionId || paymentSuccessShown) return;
+
+  if (hasOpenAccountItems()) {
+    showToast(
+      '⚠️ Tenés una cuenta abierta con items. Contactá al mesero para cerrarla o usar el código de cuenta para unirte a otra.'
+    );
+    return;
+  }
+
+  stopSessionPolling();
+  clearClientSessionState();
+
+  setSessionGateLoading(false);
+  setSessionGateError('');
+  setJoinPanelVisible(false);
+  showSessionGate(state.mesaNumero);
+
+  try {
+    const session = await waitForSessionChoice(state.mesaId);
+    hideSessionGate();
+    applySession(session);
+    await loadAccountItems();
+    renderAccount();
+    updateCartBar();
+    switchTab('carta');
+  } catch (error) {
+    console.error(error);
+    showToast(error.message || 'No se pudo cambiar la cuenta.', 'error');
+  }
+}
+
+function initChangeSessionButton() {
+  const btn = document.getElementById('changeSessionBtn');
+  if (!btn || btn.dataset.bound) return;
+  btn.dataset.bound = 'true';
+  btn.addEventListener('click', () => {
+    void handleChangeSessionClick();
+  });
 }
 
 function renderPaymentSuccessUi(totalPaid) {
@@ -659,6 +712,82 @@ function getAccountDeliveredTotal() {
   return groupDeliveredItems(delivered).reduce((sum, group) => sum + group.subtotal, 0);
 }
 
+function getAccountPaymentState() {
+  const items = state.accountItems || [];
+  const confirmed = items.filter((item) => item.confirmado);
+  const pending = items.filter((item) => !item.confirmado);
+  const deliveredTotal = getAccountDeliveredTotal();
+
+  if (items.length === 0) {
+    return { case: 1, items, confirmed, pending, deliveredTotal: 0 };
+  }
+
+  if (confirmed.length === 0) {
+    return { case: 2, items, confirmed, pending, deliveredTotal: 0 };
+  }
+
+  if (pending.length > 0) {
+    return { case: 3, items, confirmed, pending, deliveredTotal };
+  }
+
+  return { case: 4, items, confirmed, pending, deliveredTotal };
+}
+
+let partialDeliveryPayResolver = null;
+
+function openPartialDeliveryPayModal() {
+  return new Promise((resolve) => {
+    partialDeliveryPayResolver = resolve;
+    const modal = document.getElementById('partialDeliveryPayModal');
+    if (!modal) {
+      resolve(false);
+      partialDeliveryPayResolver = null;
+      return;
+    }
+
+    modal.hidden = false;
+    modal.setAttribute('aria-hidden', 'false');
+  });
+}
+
+function closePartialDeliveryPayModal(proceed) {
+  const modal = document.getElementById('partialDeliveryPayModal');
+  if (modal) {
+    modal.hidden = true;
+    modal.setAttribute('aria-hidden', 'true');
+  }
+
+  if (partialDeliveryPayResolver) {
+    partialDeliveryPayResolver(proceed === true);
+    partialDeliveryPayResolver = null;
+  }
+}
+
+async function ensurePaymentAllowed() {
+  const paymentState = getAccountPaymentState();
+
+  if (paymentState.case === 1) {
+    showToast('Primero agregá algo a tu cuenta desde la carta');
+    return false;
+  }
+
+  if (paymentState.case === 2) {
+    showToast('El mesero aún no ha confirmado tu pedido — esperá un momento');
+    return false;
+  }
+
+  if (paymentState.case === 3) {
+    return openPartialDeliveryPayModal();
+  }
+
+  return true;
+}
+
+function syncPayButtonDisabled(button, canPayNow) {
+  if (!button || button.hidden) return;
+  button.disabled = !canPayNow || state.paymentSubmitting;
+}
+
 const MAX_TIP_PERCENT = 100;
 
 function getMaxCustomTipAmount(subtotal = getAccountDeliveredTotal()) {
@@ -934,18 +1063,47 @@ async function confirmRestaurantQrPayment() {
   });
 }
 
-function startPaymentFlow(amount, options = {}) {
+async function startPaymentFlow(amount, options = {}) {
+  const allowed = await ensurePaymentAllowed();
+  if (!allowed) return;
+
+  const deliveredTotal = getAccountDeliveredTotal();
+  if (deliveredTotal <= 0) return;
+
+  let paymentAmount = amount;
+  let paymentOptions = { ...options };
+
+  if (!options.preserveAmount) {
+    const breakdown = getPaymentBreakdown(deliveredTotal);
+    if (options.cargoServicio !== undefined || options.propina !== undefined) {
+      paymentAmount = breakdown.total;
+      paymentOptions = {
+        ...options,
+        cargoServicio: breakdown.cargoServicio,
+        propina: breakdown.propina,
+      };
+    } else if (options.useShareAmount) {
+      const share = getPerPersonPaymentAmount(deliveredTotal);
+      paymentAmount = share.total;
+      paymentOptions = {
+        ...options,
+        cargoServicio: share.cargoServicio,
+        propina: share.propina,
+      };
+    }
+  }
+
   if (usesRestaurantQrPayment()) {
     if (!canUseRestaurantQrPayment()) {
       showToast('El restaurante no configuró métodos de pago propios.', 'error');
       return;
     }
 
-    openRestaurantQrPayModal(amount, options, options.hint);
+    openRestaurantQrPayModal(paymentAmount, paymentOptions, paymentOptions.hint);
     return;
   }
 
-  openWompiCheckout(amount, options);
+  openWompiCheckout(paymentAmount, paymentOptions);
 }
 
 function updatePaymentExtrasUI(deliveredTotal) {
@@ -1080,7 +1238,9 @@ function updateSplitJoinUI() {
     labelEl.textContent = `Pagar ${formatCOP(amount)} con Wompi`;
   }
 
-  if (btn) btn.disabled = state.paymentSubmitting;
+  if (btn) {
+    btn.disabled = state.paymentSubmitting || getAccountDeliveredTotal() <= 0;
+  }
 }
 
 function hideRestaurantSplitPaymentExtras() {
@@ -1319,7 +1479,7 @@ function updateSplitBillUI(deliveredTotal) {
   renderSplitPaymentQr(share.total);
 
   if (splitPayBtn) {
-    splitPayBtn.disabled = state.paymentSubmitting || share.total <= 0;
+    splitPayBtn.disabled = state.paymentSubmitting || deliveredTotal <= 0;
   }
 }
 
@@ -1809,6 +1969,8 @@ function renderAccount() {
   const groupedDelivered = groupDeliveredItems(delivered);
   const deliveredTotal = getAccountDeliveredTotal();
   const inProgressCount = inProgress.reduce((sum, item) => sum + item.qty, 0);
+  const showPayButton = !state.paymentPendingConfirmation && !isGrupal && items.length > 0;
+  const canPayNow = deliveredTotal > 0;
 
   if (items.length === 0) {
     empty.style.display = state.splitJoinAmount ? 'none' : 'block';
@@ -1861,25 +2023,24 @@ function renderAccount() {
       .join('');
     document.getElementById('totalAmount').textContent = formatCOP(deliveredTotal);
     totalEl.hidden = false;
-
-    const showPayButton = deliveredTotal > 0 && !state.paymentPendingConfirmation && !isGrupal;
-    if (wompiPayBtn) {
-      wompiPayBtn.hidden = !showPayButton;
-      if (showPayButton) {
-        wompiPayBtn.textContent = usesRestaurantQrPayment() ? 'Pagar' : 'Pagar con Wompi';
-      }
-    }
     if (paymentWaiting) paymentWaiting.hidden = !state.paymentPendingConfirmation;
     updatePaymentExtrasUI(deliveredTotal);
     updateSplitBillUI(deliveredTotal);
     updateSplitJoinUI();
   } else {
     deliveredSection.hidden = true;
-    if (wompiPayBtn) wompiPayBtn.hidden = true;
     if (paymentWaiting) paymentWaiting.hidden = !state.paymentPendingConfirmation;
     updatePaymentExtrasUI(0);
     updateSplitBillUI(0);
     updateSplitJoinUI();
+  }
+
+  if (wompiPayBtn) {
+    wompiPayBtn.hidden = !showPayButton;
+    if (showPayButton) {
+      wompiPayBtn.textContent = usesRestaurantQrPayment() ? 'Pagar' : 'Pagar con Wompi';
+      syncPayButtonDisabled(wompiPayBtn, canPayNow);
+    }
   }
 
   badge.hidden = inProgressCount === 0;
@@ -2238,10 +2399,25 @@ function initPaymentExtras() {
   }
 }
 
+function initPartialDeliveryPayModal() {
+  const modal = document.getElementById('partialDeliveryPayModal');
+  if (!modal || modal.dataset.bound) return;
+  modal.dataset.bound = 'true';
+
+  modal.addEventListener('click', (event) => {
+    const btn = event.target.closest('[data-partial-pay-action]');
+    if (!btn) return;
+
+    closePartialDeliveryPayModal(btn.dataset.partialPayAction === 'pay');
+  });
+}
+
 function initWompiPayment() {
+  initPartialDeliveryPayModal();
+
   document.getElementById('wompiPayBtn')?.addEventListener('click', () => {
     const breakdown = getPaymentBreakdown();
-    startPaymentFlow(breakdown.total, {
+    void startPaymentFlow(breakdown.total, {
       cargoServicio: breakdown.cargoServicio,
       propina: breakdown.propina,
     });
@@ -2251,8 +2427,9 @@ function initWompiPayment() {
     const amount = state.splitJoinAmount;
     if (!amount || state.paymentSubmitting || state.paymentPendingConfirmation) return;
 
-    startPaymentFlow(amount, {
+    void startPaymentFlow(amount, {
       hint: 'Pagá tu parte de la cuenta.',
+      preserveAmount: true,
     });
   });
 
@@ -2319,6 +2496,7 @@ function initSplitBill() {
         cargoServicio: share.cargoServicio,
         propina: share.propina,
         hint: 'Transferí tu parte con el monto indicado.',
+        useShareAmount: true,
       });
     });
   }
@@ -2447,6 +2625,7 @@ function applySession(session) {
   paymentSuccessShown = false;
   clearSplitQrCanvas();
   updateSessionBadge(session);
+  updateChangeSessionButtonVisibility();
   startSessionPolling();
 }
 
@@ -2488,6 +2667,7 @@ async function init() {
     updateCartBar();
     updateCartBarVisibility();
     initWaiterButtons();
+    initChangeSessionButton();
     initAccountSwitch();
     initPaymentExtras();
     initWompiPayment();
