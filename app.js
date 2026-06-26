@@ -167,7 +167,9 @@ function startSessionPolling() {
   if (!state.sesionId || paymentSuccessShown) return;
 
   const pollSession = () => {
-    if (!state.sesionId) return;
+    if (!state.sesionId || paymentSuccessShown) return;
+
+    console.log('polling...');
     void loadAccountItems();
     void checkSessionStatus();
   };
@@ -198,8 +200,6 @@ function bindPaymentSuccessStars() {
 }
 
 function clearClientSessionState() {
-  stopSessionPolling();
-
   const mesaId = state.mesaId;
   if (mesaId) clearStoredSession(mesaId);
 
@@ -2521,6 +2521,10 @@ async function init() {
 
     await loadAccountItems();
     await handleWompiRedirectReturn();
+
+    if (state.sesionId && !paymentSuccessShown) {
+      startSessionPolling();
+    }
 
     if (state.splitJoinAmount) {
       updateSplitJoinUI();
