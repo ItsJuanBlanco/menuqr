@@ -178,9 +178,9 @@ ul {
 
 .app-powered__logo {
   display: block;
-  height: 12px;
+  height: 24px;
   width: auto;
-  max-width: 40px;
+  max-width: 80px;
   object-fit: contain;
   opacity: 0.55;
 }
