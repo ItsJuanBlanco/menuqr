@@ -281,12 +281,12 @@ button {
   background: #2563eb;
 }
 
-.panel-tabs__badge--en-preparacion {
+.panel-tabs__badge--preparacion {
   background: #16a34a;
 }
 
 .panel-tabs__badge--mixto {
-  background: #ea580c;
+  background: #dc2626;
 }
 
 .panel-view[hidden] {
