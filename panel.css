@@ -343,10 +343,38 @@ button {
 .order-card {
   background: var(--bg-card);
   border: 1px solid var(--border);
+  border-left: 4px solid var(--border);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
   overflow: hidden;
   animation: slideIn 0.3s ease;
+}
+
+.order-card--pendiente {
+  border-left-color: #2563eb;
+}
+
+.order-card--en-preparacion {
+  border-left-color: #16a34a;
+}
+
+.order-card--mixto {
+  border-left-color: #ea580c;
+}
+
+.order-card--pendiente .order-card__status {
+  background: #eff6ff;
+  color: #2563eb;
+}
+
+.order-card--en-preparacion .order-card__status {
+  background: #ecfdf5;
+  color: #16a34a;
+}
+
+.order-card--mixto .order-card__status {
+  background: #fff7ed;
+  color: #ea580c;
 }
 
 @keyframes slideIn {

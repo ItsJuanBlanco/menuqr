@@ -632,6 +632,24 @@ function orderHasPendingItems(order) {
   return (order.pedido_items || []).some((item) => !isItemDelivered(item));
 }
 
+function getOrderCardStateClass(order) {
+  const undelivered = (order.pedido_items || []).filter((item) => !isItemDelivered(item));
+  if (undelivered.length === 0) return '';
+
+  let hasPendiente = false;
+  let hasPreparacion = false;
+
+  undelivered.forEach((item) => {
+    const estado = normalizeItemEstado(item.estado);
+    if (estado === 'pendiente') hasPendiente = true;
+    else hasPreparacion = true;
+  });
+
+  if (hasPendiente && hasPreparacion) return 'order-card--mixto';
+  if (hasPendiente) return 'order-card--pendiente';
+  return 'order-card--en-preparacion';
+}
+
 function formatSessionLineLabel(session) {
   if (!session) return 'Cuenta';
   if (session.tipo === 'grupal') return 'Cuenta Grupal';
@@ -1165,8 +1183,10 @@ function renderOrders() {
         )
         .join('');
 
+      const cardStateClass = getOrderCardStateClass(order);
+
       return `
-        <article class="order-card" data-pedido-id="${order.id}">
+        <article class="order-card ${cardStateClass}" data-pedido-id="${order.id}">
           <header class="order-card__head">
             <span class="order-card__mesa">${escapeHtml(mesaLabel)}</span>
             <div class="order-card__meta">
