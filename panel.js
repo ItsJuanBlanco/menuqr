@@ -19,8 +19,10 @@ let mesaQrAddOpen = false;
 let panelPollTimer = null;
 let panelAlertsInitialized = false;
 let panelAudioContext = null;
+let panelSoundsEnabled = true;
 
 const PANEL_POLL_INTERVAL_MS = 5000;
+const PANEL_SOUNDS_STORAGE_KEY = 'panel_sonidos';
 const PANEL_SERVICE_PERCENT = 10;
 
 const VALID_PANEL_TABS = new Set(['pedidos', 'mesas', 'historial', 'menu', 'resumen', 'qr', 'ajustes']);
@@ -230,6 +232,48 @@ function updatePedidosTabBadge() {
   badge.setAttribute('aria-label', `${count} pedido${count !== 1 ? 's' : ''} pendiente${count !== 1 ? 's' : ''}`);
 }
 
+function loadPanelSoundsPreference() {
+  const stored = localStorage.getItem(PANEL_SOUNDS_STORAGE_KEY);
+  panelSoundsEnabled = stored !== 'false';
+}
+
+function isPanelSoundsEnabled() {
+  return panelSoundsEnabled;
+}
+
+function setPanelSoundsEnabled(enabled) {
+  panelSoundsEnabled = enabled;
+  localStorage.setItem(PANEL_SOUNDS_STORAGE_KEY, enabled ? 'true' : 'false');
+  updatePanelSoundsToggleUI();
+}
+
+function updatePanelSoundsToggleUI() {
+  const btn = document.getElementById('panelSoundsToggle');
+  if (!btn) return;
+
+  btn.textContent = panelSoundsEnabled ? '🔔' : '🔕';
+  btn.setAttribute('aria-pressed', panelSoundsEnabled ? 'true' : 'false');
+  btn.setAttribute(
+    'aria-label',
+    panelSoundsEnabled ? 'Sonidos activados' : 'Sonidos desactivados'
+  );
+  btn.title = panelSoundsEnabled ? 'Sonidos activados' : 'Sonidos desactivados';
+  btn.classList.toggle('panel-header__sounds-btn--off', !panelSoundsEnabled);
+}
+
+function bindPanelSoundsToggle() {
+  const btn = document.getElementById('panelSoundsToggle');
+  if (!btn || btn.dataset.bound) return;
+
+  btn.dataset.bound = 'true';
+  btn.addEventListener('click', () => {
+    if (!panelSoundsEnabled) {
+      initAudioContext();
+    }
+    setPanelSoundsEnabled(!panelSoundsEnabled);
+  });
+}
+
 function initAudioContext() {
   if (panelAudioContext) {
     if (panelAudioContext.state === 'suspended') {
@@ -248,6 +292,8 @@ function bindPanelAudioInit() {
 }
 
 function withPanelAudioContext(run) {
+  if (!panelSoundsEnabled) return;
+
   const ctx = panelAudioContext;
   if (!ctx) return;
 
@@ -3439,6 +3485,9 @@ async function init() {
 
   applyPanelRoleAccess(session.role);
   bindPanelSessionActions(slug);
+  loadPanelSoundsPreference();
+  updatePanelSoundsToggleUI();
+  bindPanelSoundsToggle();
   bindPanelAudioInit();
   initTabs();
   initMesaQrSection();

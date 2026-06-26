@@ -113,6 +113,11 @@ ul {
   max-width: 140px;
 }
 
+.brand-logo--session-gate {
+  height: 56px;
+  max-width: 200px;
+}
+
 .header__logo {
   font-size: 1.5rem;
   line-height: 1;
@@ -1219,9 +1224,21 @@ ul {
   padding: 24px 0 12px;
 }
 
-.session-gate__logo {
-  font-size: 2rem;
-  line-height: 1;
+.session-gate__brand {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 56px;
+}
+
+.session-gate__brand-name {
+  margin: 0;
+  font-size: 1.375rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  text-align: center;
+  color: var(--text);
 }
 
 .session-gate__mesa {

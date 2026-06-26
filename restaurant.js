@@ -214,6 +214,13 @@ function applyRestaurantBranding(restaurant) {
     restaurant,
   });
 
+  applyRestaurantBrandBlock({
+    logoEl: document.getElementById('sessionGateBrandLogo'),
+    titleEl: document.getElementById('sessionGateBrandTitle'),
+    subtitleEl: null,
+    restaurant,
+  });
+
   const loginTitle = document.getElementById('panelLoginRestaurantName');
   if (loginTitle && restaurant.nombre) {
     loginTitle.textContent = restaurant.nombre;
