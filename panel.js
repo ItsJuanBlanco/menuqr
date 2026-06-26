@@ -362,10 +362,25 @@ function switchPanel(panelId) {
 
 function buildMesaMenuUrl(mesaNumero) {
   const slug = RESTAURANTE_SLUG || '';
+  const mesa = encodeURIComponent(String(mesaNumero));
   if (window.location.hostname === 'localhost') {
-    return `http://localhost:8080/index.html?slug=${encodeURIComponent(slug)}&mesa=${mesaNumero}`;
+    return `http://localhost:8080/index.html?slug=${encodeURIComponent(slug)}&mesa=${mesa}`;
   }
-  return `https://listoapp.com.co/${slug}?mesa=${mesaNumero}`;
+  return `https://listoapp.com.co/${slug}?mesa=${mesa}`;
+}
+
+function normalizeMesaName(value) {
+  return String(value || '')
+    .trim()
+    .replace(/\s+/g, ' ');
+}
+
+function mesaQrDomKey(numero) {
+  return String(numero).replace(/\s+/g, '-');
+}
+
+function compareMesaNumeros(a, b) {
+  return String(a).localeCompare(String(b), 'es', { numeric: true, sensitivity: 'base' });
 }
 
 function createMesaQrCode(container, url, size = 180) {
@@ -391,7 +406,7 @@ function getQrImageDataUrl(container) {
 }
 
 function downloadMesaQr(mesaNumero) {
-  const item = document.querySelector(`[data-mesa-qr="${mesaNumero}"]`);
+  const item = document.querySelector(`[data-mesa-qr="${CSS.escape(String(mesaNumero))}"]`);
   const canvasWrap = item?.querySelector('.mesa-qr-accordion__canvas');
   const dataUrl = getQrImageDataUrl(canvasWrap);
 
@@ -406,32 +421,42 @@ function downloadMesaQr(mesaNumero) {
   link.click();
 }
 
-function toggleMesaQrAccordion(mesaNumero) {
-  openMesaQrNumero = openMesaQrNumero === mesaNumero ? null : mesaNumero;
+function toggleMesaQrAccordion(mesaRef) {
+  const target = mesas.find((mesa) => String(mesa.numero) === String(mesaRef));
+  if (!target) return;
+
+  openMesaQrNumero = openMesaQrNumero === target.numero ? null : target.numero;
   renderMesaQrs();
 }
 
 function renderOpenMesaQrCode() {
-  if (!openMesaQrNumero) return;
-  const container = document.getElementById(`mesaQrCanvas-${openMesaQrNumero}`);
+  if (openMesaQrNumero == null || openMesaQrNumero === '') return;
+  const container = document.getElementById(`mesaQrCanvas-${mesaQrDomKey(openMesaQrNumero)}`);
   createMesaQrCode(container, buildMesaMenuUrl(openMesaQrNumero));
 }
 
-async function addMesaFromQrTab(rawNumero) {
-  const numero = parseInt(String(rawNumero).trim(), 10);
-  if (!Number.isFinite(numero) || numero < 1) {
-    throw new Error('Ingresá un número de mesa válido.');
+async function addMesaFromQrTab(rawName) {
+  const nombre = normalizeMesaName(rawName);
+  if (!nombre) {
+    throw new Error('Ingresá un nombre para la mesa.');
   }
 
-  if (mesas.some((mesa) => mesa.numero === numero)) {
-    throw new Error(`Ya existe la Mesa ${numero}.`);
+  if (nombre.length > 40) {
+    throw new Error('El nombre no puede superar 40 caracteres.');
+  }
+
+  const exists = mesas.some(
+    (mesa) => String(mesa.numero).toLowerCase() === nombre.toLowerCase()
+  );
+  if (exists) {
+    throw new Error(`Ya existe la mesa «${nombre}».`);
   }
 
   const { data, error } = await supabaseClient
     .from('mesas')
     .insert({
       restaurante_id: RESTAURANTE_ID,
-      numero,
+      numero: nombre,
       estado: 'libre',
       mesero_requerido: false,
     })
@@ -441,12 +466,12 @@ async function addMesaFromQrTab(rawNumero) {
   if (error) throw error;
 
   mesas.push(data);
-  mesas.sort((a, b) => a.numero - b.numero);
+  mesas.sort((a, b) => compareMesaNumeros(a.numero, b.numero));
   mesaQrAddOpen = false;
   openMesaQrNumero = data.numero;
   renderMesas();
   renderMesaQrs();
-  showToast(`Mesa ${numero} creada`, 'success');
+  showToast(`Mesa «${nombre}» creada`, 'success');
   return data;
 }
 
@@ -525,20 +550,22 @@ function renderMesaQrs() {
   list.innerHTML = mesas
     .map((mesa) => {
       const isOpen = openMesaQrNumero === mesa.numero;
+      const domKey = mesaQrDomKey(mesa.numero);
+      const mesaLabel = escapeHtml(String(mesa.numero));
       return `
-        <article class="mesa-qr-accordion__item${isOpen ? ' mesa-qr-accordion__item--open' : ''}" data-mesa-qr="${mesa.numero}">
+        <article class="mesa-qr-accordion__item${isOpen ? ' mesa-qr-accordion__item--open' : ''}" data-mesa-qr="${mesaLabel}">
           <button
             type="button"
             class="mesa-qr-accordion__trigger"
-            data-toggle-qr="${mesa.numero}"
+            data-toggle-qr="${mesaLabel}"
             aria-expanded="${isOpen}"
           >
             <span class="mesa-qr-accordion__arrow" aria-hidden="true">${isOpen ? '▼' : '▶'}</span>
-            Mesa ${mesa.numero}
+            Mesa ${mesaLabel}
           </button>
           <div class="mesa-qr-accordion__panel"${isOpen ? '' : ' hidden'}>
-            <div class="mesa-qr-accordion__canvas" id="mesaQrCanvas-${mesa.numero}"></div>
-            <button type="button" class="mesa-qr-accordion__download" data-download-qr="${mesa.numero}">
+            <div class="mesa-qr-accordion__canvas" id="mesaQrCanvas-${domKey}"></div>
+            <button type="button" class="mesa-qr-accordion__download" data-download-qr="${mesaLabel}">
               Descargar
             </button>
           </div>
@@ -574,14 +601,14 @@ function initMesaQrSection() {
     list.addEventListener('click', (event) => {
       const toggleBtn = event.target.closest('[data-toggle-qr]');
       if (toggleBtn) {
-        toggleMesaQrAccordion(Number(toggleBtn.dataset.toggleQr));
+        toggleMesaQrAccordion(toggleBtn.dataset.toggleQr);
         return;
       }
 
       const downloadBtn = event.target.closest('[data-download-qr]');
       if (downloadBtn) {
         event.stopPropagation();
-        downloadMesaQr(Number(downloadBtn.dataset.downloadQr));
+        downloadMesaQr(downloadBtn.dataset.downloadQr);
       }
     });
   }
@@ -833,7 +860,7 @@ async function fetchAllRestaurantMesas() {
     from += pageSize;
   }
 
-  return allMesas.sort((a, b) => a.numero - b.numero);
+  return allMesas.sort((a, b) => compareMesaNumeros(a.numero, b.numero));
 }
 
 async function fetchMesas() {

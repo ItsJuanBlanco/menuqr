@@ -11,19 +11,23 @@ function showToast(message, type = '', duration = 3200) {
 async function loadMesa() {
   const params = new URLSearchParams(window.location.search);
   const mesaParam = params.get('mesa');
-  const mesaNumero = mesaParam ? Number(mesaParam) : DEFAULT_MESA_NUMERO;
+  const mesaRef = mesaParam?.trim()
+    ? /^\d+$/.test(mesaParam.trim())
+      ? parseInt(mesaParam.trim(), 10)
+      : mesaParam.trim()
+    : DEFAULT_MESA_NUMERO;
 
-  document.getElementById('tableBadge').textContent = `Mesa ${mesaNumero}`;
+  document.getElementById('tableBadge').textContent = `Mesa ${mesaRef}`;
 
   const { data, error } = await supabaseClient
     .from('mesas')
     .select('id, numero')
     .eq('restaurante_id', RESTAURANTE_ID)
-    .eq('numero', mesaNumero)
+    .eq('numero', mesaRef)
     .maybeSingle();
 
   if (error) throw error;
-  if (!data) throw new Error(`No se encontró la mesa ${mesaNumero}.`);
+  if (!data) throw new Error(`No se encontró la mesa ${mesaRef}.`);
 
   return data.id;
 }

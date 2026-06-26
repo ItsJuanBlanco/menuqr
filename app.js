@@ -318,11 +318,17 @@ function isUuid(value) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 }
 
+function parseMesaParam(value) {
+  const trimmed = String(value || '').trim();
+  if (!trimmed) return DEFAULT_MESA_NUMERO;
+  if (/^\d+$/.test(trimmed)) return parseInt(trimmed, 10);
+  return trimmed;
+}
+
 /* ── Supabase: mesa y menú ── */
 async function loadMesa() {
   const params = new URLSearchParams(window.location.search);
-  const mesaParam = params.get('mesa');
-  state.mesaNumero = mesaParam ? Number(mesaParam) : DEFAULT_MESA_NUMERO;
+  state.mesaNumero = parseMesaParam(params.get('mesa'));
 
   document.getElementById('tableBadge').textContent = `Mesa ${state.mesaNumero}`;
 

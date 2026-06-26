@@ -470,10 +470,7 @@ async function removeAdminQrPagoImage() {
 
 function readRestaurantFormValues() {
   const mesasInput = document.getElementById('restaurantMesasCount');
-  const mesas_count =
-    restaurantModalMode === 'create'
-      ? Math.max(1, Math.floor(Number(mesasInput?.value) || DEFAULT_MESAS_COUNT))
-      : undefined;
+  const mesas_count = Math.max(1, Math.floor(Number(mesasInput?.value) || DEFAULT_MESAS_COUNT));
 
   return {
     nombre: document.getElementById('restaurantName')?.value?.trim(),
@@ -486,11 +483,60 @@ function readRestaurantFormValues() {
   };
 }
 
+function getMaxNumericMesaNumero(mesas) {
+  return (mesas || []).reduce((max, mesa) => {
+    const parsed = parseInt(String(mesa.numero), 10);
+    return Number.isFinite(parsed) && parsed > max ? parsed : max;
+  }, 0);
+}
+
+async function fetchRestaurantMesas(restaurantId) {
+  const client = assertSupabaseClient();
+  const { data, error } = await client
+    .from('mesas')
+    .select('id, numero')
+    .eq('restaurante_id', restaurantId);
+
+  if (error) throw error;
+  return data || [];
+}
+
+async function syncRestaurantMesasCount(restaurantId, targetCount) {
+  const existing = await fetchRestaurantMesas(restaurantId);
+  const currentCount = existing.length;
+  const target = Math.max(1, Math.floor(Number(targetCount) || 0));
+
+  if (target <= currentCount) {
+    return { created: 0, total: currentCount };
+  }
+
+  const maxNum = getMaxNumericMesaNumero(existing);
+  const toCreate = target - currentCount;
+  const newMesas = Array.from({ length: toCreate }, (_, index) => ({
+    restaurante_id: restaurantId,
+    numero: maxNum + index + 1,
+    estado: 'libre',
+    mesero_requerido: false,
+  }));
+
+  const client = assertSupabaseClient();
+  const { error } = await client.from('mesas').insert(newMesas);
+  if (error) throw error;
+
+  return { created: toCreate, total: target };
+}
+
 function updateRestaurantFormNote(mesasCount = DEFAULT_MESAS_COUNT) {
   const note = document.getElementById('restaurantFormNote');
-  if (!note || restaurantModalMode !== 'create') return;
+  if (!note) return;
 
   const count = Math.max(1, Math.floor(Number(mesasCount) || DEFAULT_MESAS_COUNT));
+
+  if (restaurantModalMode === 'edit') {
+    note.textContent = `Actualmente hay ${count} mesa${count !== 1 ? 's' : ''}. Si aumentás el número, se crearán mesas adicionales numeradas en secuencia. El slug no se puede cambiar.`;
+    return;
+  }
+
   note.textContent = `Se crearán automáticamente ${count} mesa${count !== 1 ? 's' : ''} (Mesa 1–${count}).`;
 }
 
@@ -520,7 +566,7 @@ function validateRestaurantFormValues(values) {
     return 'Los PIN deben tener al menos 4 caracteres.';
   }
 
-  if (restaurantModalMode === 'create' && (!values.mesas_count || values.mesas_count < 1)) {
+  if (!values.mesas_count || values.mesas_count < 1) {
     return 'Indicá cuántas mesas tiene el restaurante (mínimo 1).';
   }
 
@@ -581,11 +627,13 @@ async function openEditRestaurantModal(restaurantId) {
     document.getElementById('restaurantPinAdmin').value = data.pin_admin || '';
     populateAdminPaymentForm(data);
 
+    const mesas = await fetchRestaurantMesas(restaurantId);
+    setRestaurantMesasFieldVisible(true);
+    document.getElementById('restaurantMesasCount').value = String(mesas.length);
+    updateRestaurantFormNote(mesas.length);
+
     document.getElementById('restaurantModalTitle').textContent = `Editar · ${data.nombre || 'Restaurante'}`;
     document.getElementById('restaurantSubmitBtn').textContent = 'Guardar cambios';
-    setRestaurantMesasFieldVisible(false);
-    document.getElementById('restaurantFormNote').textContent =
-      'El slug no se puede cambiar. Actualizá los PIN si el restaurante necesita nuevos accesos.';
 
     const slugInput = document.getElementById('restaurantSlug');
     if (slugInput) {
@@ -703,7 +751,7 @@ async function createRestaurant({ nombre, slug, ciudad, email, pin_mesero, pin_a
   return { restaurant, mesasCount };
 }
 
-async function updateRestaurant(restaurantId, { nombre, ciudad, email, pin_mesero, pin_admin }) {
+async function updateRestaurant(restaurantId, { nombre, ciudad, email, pin_mesero, pin_admin, mesas_count }) {
   const client = assertSupabaseClient();
 
   const { data, error } = await client
@@ -722,7 +770,8 @@ async function updateRestaurant(restaurantId, { nombre, ciudad, email, pin_meser
   if (error) throw error;
 
   await saveRestaurantPaymentSettings(restaurantId);
-  return data;
+  const mesaSync = await syncRestaurantMesasCount(restaurantId, mesas_count);
+  return { ...data, mesaSync };
 }
 
 function bindRestaurantListActions() {
@@ -859,7 +908,11 @@ function bindRestaurantModal() {
         if (index >= 0) restaurants[index] = { ...restaurants[index], ...updated };
         renderRestaurants();
         closeRestaurantModal();
-        showToast(`Restaurante «${values.nombre}» actualizado`, 'success');
+        const mesaMsg =
+          updated.mesaSync?.created > 0
+            ? ` · ${updated.mesaSync.created} mesa${updated.mesaSync.created !== 1 ? 's' : ''} nueva${updated.mesaSync.created !== 1 ? 's' : ''}`
+            : '';
+        showToast(`Restaurante «${values.nombre}» actualizado${mesaMsg}`, 'success');
       } else {
         const { restaurant, mesasCount } = await createRestaurant(values);
         restaurants.unshift(restaurant);

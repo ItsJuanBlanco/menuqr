@@ -98,16 +98,15 @@
         <div class="mesa-qr-add" id="mesaQrAdd">
           <button type="button" class="mesa-qr-add__btn" id="mesaQrAddBtn">+ Agregar mesa</button>
           <form class="mesa-qr-add__form" id="mesaQrAddForm" hidden>
-            <label class="mesa-qr-add__label" for="mesaQrAddInput">Número de mesa</label>
+            <label class="mesa-qr-add__label" for="mesaQrAddInput">Nombre de mesa</label>
             <div class="mesa-qr-add__row">
               <input
-                type="number"
+                type="text"
                 class="mesa-qr-add__input"
                 id="mesaQrAddInput"
-                min="1"
-                step="1"
-                inputmode="numeric"
-                placeholder="Ej: 6"
+                maxlength="40"
+                autocomplete="off"
+                placeholder="Ej: 6, Privada, Terraza"
                 required
               >
               <button type="submit" class="mesa-qr-add__confirm" id="mesaQrAddSubmit">Confirmar</button>
