@@ -6,6 +6,7 @@ const DEFAULT_MESAS_COUNT = 5;
 let restaurants = [];
 let slugManuallyEdited = false;
 let busyIds = new Set();
+let restaurantModalMode = 'create';
 
 function showToast(message, type = '') {
   const toast = document.getElementById('toast');
@@ -199,6 +200,13 @@ function renderRestaurants() {
             <div class="admin-actions">
               <button
                 type="button"
+                class="admin-action-btn admin-action-btn--edit"
+                data-action="edit-restaurant"
+                data-id="${restaurant.id}"
+                ${busy ? 'disabled' : ''}
+              >Editar</button>
+              <button
+                type="button"
                 class="admin-action-btn admin-action-btn--primary"
                 data-action="open-panel"
                 data-slug="${escapeHtml(restaurant.slug)}"
@@ -261,24 +269,132 @@ async function toggleRestaurantActive(restaurantId, currentlyActive) {
   }
 }
 
-function openNewRestaurantModal() {
-  const modal = document.getElementById('newRestaurantModal');
-  const form = document.getElementById('newRestaurantForm');
-  const errorEl = document.getElementById('newRestaurantError');
+function setRestaurantFormError(message) {
+  const errorEl = document.getElementById('restaurantFormError');
+  if (!errorEl) return;
+  if (message) {
+    errorEl.textContent = message;
+    errorEl.hidden = false;
+  } else {
+    errorEl.textContent = '';
+    errorEl.hidden = true;
+  }
+}
 
+function readRestaurantFormValues() {
+  return {
+    nombre: document.getElementById('restaurantName')?.value?.trim(),
+    slug: slugifyName(document.getElementById('restaurantSlug')?.value?.trim()),
+    ciudad: document.getElementById('restaurantCity')?.value?.trim(),
+    email: normalizeEmail(document.getElementById('restaurantEmail')?.value),
+    pin_mesero: document.getElementById('restaurantPinMesero')?.value?.trim(),
+    pin_admin: document.getElementById('restaurantPinAdmin')?.value?.trim(),
+  };
+}
+
+function validateRestaurantFormValues(values) {
+  if (!values.nombre || !values.ciudad || !values.email || !values.pin_mesero || !values.pin_admin) {
+    return 'Completá todos los campos.';
+  }
+
+  if (restaurantModalMode === 'create' && !values.slug) {
+    return 'Completá todos los campos.';
+  }
+
+  if (values.pin_mesero.length < 4 || values.pin_admin.length < 4) {
+    return 'Los PIN deben tener al menos 4 caracteres.';
+  }
+
+  return '';
+}
+
+function openNewRestaurantModal() {
+  restaurantModalMode = 'create';
   slugManuallyEdited = false;
+
+  const form = document.getElementById('restaurantForm');
   form?.reset();
-  if (errorEl) errorEl.hidden = true;
+  document.getElementById('restaurantId').value = '';
+  document.getElementById('restaurantModalTitle').textContent = 'Nuevo restaurante';
+  document.getElementById('restaurantSubmitBtn').textContent = 'Guardar restaurante';
+  document.getElementById('restaurantFormNote').textContent =
+    'Se crearán automáticamente 5 mesas (Mesa 1–5).';
+
+  const slugInput = document.getElementById('restaurantSlug');
+  if (slugInput) {
+    slugInput.disabled = false;
+    slugInput.required = true;
+  }
+
+  setRestaurantFormError('');
   updateSlugPreview('');
-  modal?.removeAttribute('hidden');
-  modal?.setAttribute('aria-hidden', 'false');
+  openRestaurantModal();
   document.getElementById('restaurantName')?.focus();
 }
 
-function closeNewRestaurantModal() {
-  const modal = document.getElementById('newRestaurantModal');
+async function openEditRestaurantModal(restaurantId) {
+  if (busyIds.has(restaurantId)) return;
+
+  restaurantModalMode = 'edit';
+  slugManuallyEdited = true;
+  busyIds.add(restaurantId);
+  renderRestaurants();
+
+  try {
+    const client = assertSupabaseClient();
+    const { data, error } = await client
+      .from('restaurantes')
+      .select('id, nombre, slug, ciudad, email, pin_mesero, pin_admin')
+      .eq('id', restaurantId)
+      .single();
+
+    if (error) throw error;
+    if (!data) throw new Error('Restaurante no encontrado.');
+
+    document.getElementById('restaurantId').value = data.id;
+    document.getElementById('restaurantName').value = data.nombre || '';
+    document.getElementById('restaurantSlug').value = data.slug || '';
+    document.getElementById('restaurantCity').value = data.ciudad || '';
+    document.getElementById('restaurantEmail').value = data.email || '';
+    document.getElementById('restaurantPinMesero').value = data.pin_mesero || '';
+    document.getElementById('restaurantPinAdmin').value = data.pin_admin || '';
+
+    document.getElementById('restaurantModalTitle').textContent = `Editar · ${data.nombre || 'Restaurante'}`;
+    document.getElementById('restaurantSubmitBtn').textContent = 'Guardar cambios';
+    document.getElementById('restaurantFormNote').textContent =
+      'El slug no se puede cambiar. Actualizá los PIN si el restaurante necesita nuevos accesos.';
+
+    const slugInput = document.getElementById('restaurantSlug');
+    if (slugInput) {
+      slugInput.disabled = true;
+      slugInput.required = false;
+    }
+
+    updateSlugPreview(data.slug || '');
+    setRestaurantFormError('');
+    openRestaurantModal();
+    document.getElementById('restaurantPinMesero')?.focus();
+  } catch (error) {
+    console.error(error);
+    showToast(error.message || 'No se pudo cargar el restaurante.', 'error');
+  } finally {
+    busyIds.delete(restaurantId);
+    renderRestaurants();
+  }
+}
+
+function openRestaurantModal() {
+  const modal = document.getElementById('restaurantModal');
+  modal?.removeAttribute('hidden');
+  modal?.setAttribute('aria-hidden', 'false');
+}
+
+function closeRestaurantModal() {
+  const modal = document.getElementById('restaurantModal');
   modal?.setAttribute('hidden', '');
   modal?.setAttribute('aria-hidden', 'true');
+  restaurantModalMode = 'create';
+  setRestaurantFormError('');
 }
 
 function updateSlugPreview(slug) {
@@ -321,6 +437,26 @@ async function createRestaurant({ nombre, slug, ciudad, email, pin_mesero, pin_a
   return restaurant;
 }
 
+async function updateRestaurant(restaurantId, { nombre, ciudad, email, pin_mesero, pin_admin }) {
+  const client = assertSupabaseClient();
+
+  const { data, error } = await client
+    .from('restaurantes')
+    .update({
+      nombre,
+      ciudad,
+      email,
+      pin_mesero,
+      pin_admin,
+    })
+    .eq('id', restaurantId)
+    .select('id, nombre, slug, ciudad, email, activo, created_at')
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
 function bindRestaurantListActions() {
   const list = document.getElementById('adminRestaurantList');
   if (!list || list.dataset.bound) return;
@@ -335,32 +471,37 @@ function bindRestaurantListActions() {
       return;
     }
 
+    if (btn.dataset.action === 'edit-restaurant') {
+      openEditRestaurantModal(btn.dataset.id);
+      return;
+    }
+
     if (btn.dataset.action === 'toggle-active') {
       toggleRestaurantActive(btn.dataset.id, btn.dataset.active === '1');
     }
   });
 }
 
-function bindNewRestaurantModal() {
-  const modal = document.getElementById('newRestaurantModal');
-  const form = document.getElementById('newRestaurantForm');
+function bindRestaurantModal() {
+  const modal = document.getElementById('restaurantModal');
+  const form = document.getElementById('restaurantForm');
   const nameInput = document.getElementById('restaurantName');
   const slugInput = document.getElementById('restaurantSlug');
-  const errorEl = document.getElementById('newRestaurantError');
-  const submitBtn = document.getElementById('newRestaurantSubmit');
+  const submitBtn = document.getElementById('restaurantSubmitBtn');
 
-  modal?.querySelectorAll('[data-close-modal]').forEach((el) => {
-    el.addEventListener('click', closeNewRestaurantModal);
+  modal?.querySelectorAll('[data-close-restaurant-modal]').forEach((el) => {
+    el.addEventListener('click', closeRestaurantModal);
   });
 
   nameInput?.addEventListener('input', () => {
-    if (slugManuallyEdited) return;
+    if (restaurantModalMode !== 'create' || slugManuallyEdited) return;
     const slug = slugifyName(nameInput.value);
     if (slugInput) slugInput.value = slug;
     updateSlugPreview(slug);
   });
 
   slugInput?.addEventListener('input', () => {
+    if (restaurantModalMode !== 'create') return;
     slugManuallyEdited = true;
     updateSlugPreview(slugifyName(slugInput.value));
     if (slugInput.value !== slugifyName(slugInput.value)) {
@@ -372,59 +513,45 @@ function bindNewRestaurantModal() {
     event.preventDefault();
     if (submitBtn?.disabled) return;
 
-    const nombre = nameInput?.value?.trim();
-    const slug = slugifyName(slugInput?.value?.trim());
-    const ciudad = document.getElementById('restaurantCity')?.value?.trim();
-    const email = normalizeEmail(document.getElementById('restaurantEmail')?.value);
-    const pin_mesero = document.getElementById('restaurantPinMesero')?.value?.trim();
-    const pin_admin = document.getElementById('restaurantPinAdmin')?.value?.trim();
+    const values = readRestaurantFormValues();
+    const validationError = validateRestaurantFormValues(values);
 
-    if (!nombre || !slug || !ciudad || !email || !pin_mesero || !pin_admin) {
-      if (errorEl) {
-        errorEl.textContent = 'Completá todos los campos.';
-        errorEl.hidden = false;
-      }
-      return;
-    }
-
-    if (pin_mesero.length < 4 || pin_admin.length < 4) {
-      if (errorEl) {
-        errorEl.textContent = 'Los PIN deben tener al menos 4 caracteres.';
-        errorEl.hidden = false;
-      }
+    if (validationError) {
+      setRestaurantFormError(validationError);
       return;
     }
 
     submitBtn.disabled = true;
     submitBtn.textContent = 'Guardando…';
-    if (errorEl) errorEl.hidden = true;
+    setRestaurantFormError('');
 
     try {
-      const restaurant = await createRestaurant({
-        nombre,
-        slug,
-        ciudad,
-        email,
-        pin_mesero,
-        pin_admin,
-      });
-      restaurants.unshift(restaurant);
-      renderRestaurants();
-      closeNewRestaurantModal();
-      showToast(`Restaurante «${nombre}» creado con 5 mesas`, 'success');
+      if (restaurantModalMode === 'edit') {
+        const restaurantId = document.getElementById('restaurantId')?.value;
+        const updated = await updateRestaurant(restaurantId, values);
+        const index = restaurants.findIndex((entry) => entry.id === restaurantId);
+        if (index >= 0) restaurants[index] = { ...restaurants[index], ...updated };
+        renderRestaurants();
+        closeRestaurantModal();
+        showToast(`Restaurante «${values.nombre}» actualizado`, 'success');
+      } else {
+        const restaurant = await createRestaurant(values);
+        restaurants.unshift(restaurant);
+        renderRestaurants();
+        closeRestaurantModal();
+        showToast(`Restaurante «${values.nombre}» creado con 5 mesas`, 'success');
+      }
     } catch (error) {
       console.error(error);
       const message =
         error.code === '23505'
           ? 'Ese slug ya está en uso. Elegí otro.'
-          : error.message || 'No se pudo crear el restaurante.';
-      if (errorEl) {
-        errorEl.textContent = message;
-        errorEl.hidden = false;
-      }
+          : error.message || 'No se pudo guardar el restaurante.';
+      setRestaurantFormError(message);
     } finally {
       submitBtn.disabled = false;
-      submitBtn.textContent = 'Guardar restaurante';
+      submitBtn.textContent =
+        restaurantModalMode === 'edit' ? 'Guardar cambios' : 'Guardar restaurante';
     }
   });
 }
@@ -466,7 +593,7 @@ async function init() {
   bindLogin();
   bindLogout();
   bindRestaurantListActions();
-  bindNewRestaurantModal();
+  bindRestaurantModal();
 
   document.getElementById('newRestaurantBtn')?.addEventListener('click', openNewRestaurantModal);
 

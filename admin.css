@@ -292,6 +292,44 @@
   color: var(--text-muted);
 }
 
+.admin-form__section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: #fafafa;
+}
+
+.admin-form__section-title {
+  margin: 0;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+.admin-form__section-hint {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+  line-height: 1.45;
+}
+
+.admin-form__input:disabled {
+  background: #f4f4f5;
+  color: var(--text-muted);
+  cursor: not-allowed;
+}
+
+.admin-action-btn--edit {
+  border-color: #bfdbfe;
+  background: var(--prep-soft);
+  color: var(--prep);
+}
+
 .admin-form__error {
   font-size: 0.875rem;
   color: #dc2626;

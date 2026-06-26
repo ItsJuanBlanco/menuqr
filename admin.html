@@ -88,19 +88,20 @@
     </main>
   </div>
 
-  <div class="modal" id="newRestaurantModal" hidden aria-hidden="true">
-    <div class="modal__backdrop" data-close-modal></div>
-    <div class="modal__box admin-modal" role="dialog" aria-labelledby="newRestaurantTitle">
+  <div class="modal" id="restaurantModal" hidden aria-hidden="true">
+    <div class="modal__backdrop" data-close-restaurant-modal></div>
+    <div class="modal__box admin-modal" role="dialog" aria-labelledby="restaurantModalTitle">
       <header class="modal__head">
-        <h2 class="modal__title" id="newRestaurantTitle">Nuevo restaurante</h2>
-        <button type="button" class="modal__close" data-close-modal aria-label="Cerrar">×</button>
+        <h2 class="modal__title" id="restaurantModalTitle">Nuevo restaurante</h2>
+        <button type="button" class="modal__close" data-close-restaurant-modal aria-label="Cerrar">×</button>
       </header>
-      <form class="admin-form" id="newRestaurantForm">
+      <form class="admin-form" id="restaurantForm">
+        <input type="hidden" id="restaurantId">
         <label class="admin-form__field">
           <span class="admin-form__label">Nombre del restaurante</span>
           <input type="text" class="admin-form__input" id="restaurantName" required maxlength="120">
         </label>
-        <label class="admin-form__field">
+        <label class="admin-form__field" id="restaurantSlugField">
           <span class="admin-form__label">Slug (URL)</span>
           <input type="text" class="admin-form__input" id="restaurantSlug" required maxlength="80" pattern="[a-z0-9]+(?:-[a-z0-9]+)*">
           <span class="admin-form__hint">menuqr…vercel.app/<strong id="slugPreview">slug</strong></span>
@@ -113,38 +114,42 @@
           <span class="admin-form__label">Email de contacto</span>
           <input type="email" class="admin-form__input" id="restaurantEmail" required maxlength="120">
         </label>
-        <div class="admin-form__row">
-          <label class="admin-form__field">
-            <span class="admin-form__label">PIN mesero</span>
-            <input
-              type="text"
-              class="admin-form__input"
-              id="restaurantPinMesero"
-              required
-              minlength="4"
-              maxlength="20"
-              inputmode="numeric"
-              autocomplete="off"
-              placeholder="1234"
-            >
-          </label>
-          <label class="admin-form__field">
-            <span class="admin-form__label">PIN admin</span>
-            <input
-              type="text"
-              class="admin-form__input"
-              id="restaurantPinAdmin"
-              required
-              minlength="4"
-              maxlength="20"
-              autocomplete="off"
-              placeholder="Dueño / gerente"
-            >
-          </label>
+        <div class="admin-form__section">
+          <p class="admin-form__section-title">Acceso al panel</p>
+          <p class="admin-form__section-hint">Estos PIN se usan en la página de login de cada restaurante.</p>
+          <div class="admin-form__row">
+            <label class="admin-form__field">
+              <span class="admin-form__label">PIN mesero</span>
+              <input
+                type="text"
+                class="admin-form__input"
+                id="restaurantPinMesero"
+                required
+                minlength="4"
+                maxlength="20"
+                inputmode="numeric"
+                autocomplete="off"
+                placeholder="1234"
+              >
+            </label>
+            <label class="admin-form__field">
+              <span class="admin-form__label">PIN admin</span>
+              <input
+                type="text"
+                class="admin-form__input"
+                id="restaurantPinAdmin"
+                required
+                minlength="4"
+                maxlength="20"
+                autocomplete="off"
+                placeholder="Dueño / gerente"
+              >
+            </label>
+          </div>
         </div>
-        <p class="admin-form__note">Se crearán automáticamente 5 mesas (Mesa 1–5).</p>
-        <p class="admin-form__error" id="newRestaurantError" hidden role="alert"></p>
-        <button type="submit" class="dataphone-modal__confirm" id="newRestaurantSubmit">Guardar restaurante</button>
+        <p class="admin-form__note" id="restaurantFormNote">Se crearán automáticamente 5 mesas (Mesa 1–5).</p>
+        <p class="admin-form__error" id="restaurantFormError" hidden role="alert"></p>
+        <button type="submit" class="dataphone-modal__confirm" id="restaurantSubmitBtn">Guardar restaurante</button>
       </form>
     </div>
   </div>

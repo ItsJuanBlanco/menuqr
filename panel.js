@@ -80,14 +80,81 @@ function getPagarBaseUrl() {
   return 'https://menuqr-virid.vercel.app/pagar';
 }
 
-function buildPagarUrl(monto, sesionId, cargoServicio = 0) {
+function buildPagarUrl(monto, sesionId, cargoServicio = 0, parte = null) {
   const params = new URLSearchParams({
     monto: String(monto),
     sesion: sesionId,
   });
   if (cargoServicio > 0) params.set('servicio', String(cargoServicio));
+  if (parte) params.set('parte', String(parte));
   if (RESTAURANTE_SLUG) params.set('slug', RESTAURANTE_SLUG);
   return `${getPagarBaseUrl()}?${params.toString()}`;
+}
+
+function getPanelSplitShare(subtotal, splitCount, serviceEnabled = true) {
+  const breakdown = getPanelPaymentBreakdown(subtotal, serviceEnabled);
+  const count = Math.max(2, Number(splitCount) || 2);
+
+  return {
+    count,
+    breakdown,
+    shareSubtotal: Math.ceil(breakdown.subtotal / count),
+    shareServicio: Math.ceil(breakdown.cargoServicio / count),
+    shareTotal: Math.ceil(breakdown.total / count),
+  };
+}
+
+async function getSessionApprovedPaymentsTotal(sesionId) {
+  const { data, error } = await supabaseClient
+    .from('pagos_grupo')
+    .select('monto')
+    .eq('sesion_id', sesionId)
+    .eq('estado', 'aprobado');
+
+  if (error) throw error;
+
+  return (data || []).reduce((sum, row) => sum + Number(row.monto), 0);
+}
+
+async function getSessionApprovedPaymentsCount(sesionId) {
+  const { count, error } = await supabaseClient
+    .from('pagos_grupo')
+    .select('id', { count: 'exact', head: true })
+    .eq('sesion_id', sesionId)
+    .eq('estado', 'aprobado');
+
+  if (error) throw error;
+  return count || 0;
+}
+
+async function markSessionReadyForConfirmationIfPaid(sesionId, targetTotal) {
+  const paidTotal = await getSessionApprovedPaymentsTotal(sesionId);
+  if (paidTotal >= targetTotal) {
+    const { error } = await supabaseClient
+      .from('sesiones')
+      .update({ pago_pendiente_confirmacion: true, pago_en_proceso: false })
+      .eq('id', sesionId);
+
+    if (error) throw error;
+  }
+
+  return paidTotal;
+}
+
+async function recordSplitPartPayment(sesionId, share, targetTotal) {
+  const { error } = await supabaseClient.from('pagos_grupo').insert({
+    sesion_id: sesionId,
+    monto: share.shareTotal,
+    estado: 'aprobado',
+  });
+
+  if (error) throw error;
+
+  if (share.shareServicio > 0) {
+    await saveSessionCargoServicio(sesionId, share.shareServicio);
+  }
+
+  return markSessionReadyForConfirmationIfPaid(sesionId, targetTotal);
 }
 
 function formatCOP(amount) {
@@ -898,6 +965,13 @@ function scheduleRealtimeRefresh() {
         console.error('Error refrescando resumen (realtime):', error);
       });
     }
+
+    const splitPaymentModal = document.getElementById('splitPaymentModal');
+    if (splitPaymentModal && !splitPaymentModal.hidden && splitPaymentState.sesionId) {
+      refreshSplitPaymentModal().catch((error) => {
+        console.error('Error refrescando dividir pago (realtime):', error);
+      });
+    }
   }, 250);
 }
 
@@ -974,7 +1048,7 @@ function renderMesas() {
           <div class="mesa-card__actions">
             <button type="button" class="mesa-card__btn mesa-card__btn--new" data-action="nueva-orden" data-mesa-id="${mesa.id}" data-mesa-num="${mesa.numero}">Nueva orden</button>
             <button type="button" class="mesa-card__btn mesa-card__btn--view" data-action="ver-cuenta" data-mesa-id="${mesa.id}" data-mesa-num="${mesa.numero}" ${sessions.length === 0 ? 'disabled' : ''}>Ver cuenta</button>
-            <button type="button" class="mesa-card__btn mesa-card__btn--split" data-action="separar-cuenta-mesa" data-mesa-id="${mesa.id}" data-mesa-num="${mesa.numero}" ${getSplittableSessions(mesa.id).length === 0 ? 'disabled' : ''}>Separar</button>
+            <button type="button" class="mesa-card__btn mesa-card__btn--split" data-action="dividir-pago-mesa" data-mesa-id="${mesa.id}" data-mesa-num="${mesa.numero}" ${getChargeableAccountSessions(mesa.id).length === 0 ? 'disabled' : ''}>Dividir pago</button>
             <button type="button" class="mesa-card__btn mesa-card__btn--close" data-action="cerrar-mesa" data-mesa-id="${mesa.id}" data-mesa-num="${mesa.numero}">Cerrar mesa</button>
           </div>
         </article>
@@ -993,7 +1067,7 @@ function bindMesasActions() {
     const { action, mesaId, mesaNum } = btn.dataset;
 
     if (action === 'ver-cuenta') openAccountModal(mesaId, mesaNum);
-    else if (action === 'separar-cuenta-mesa') openSplitAccountModal(mesaId, mesaNum);
+    else if (action === 'dividir-pago-mesa') openSplitPaymentModal(mesaId, mesaNum);
     else if (action === 'nueva-orden') openNewOrderModal(mesaId, mesaNum);
     else if (action === 'cerrar-mesa') closeMesa(mesaId, mesaNum);
     else if (action === 'atender-mesero') markWaiterAttended(mesaId);
@@ -1084,6 +1158,17 @@ function renderAccountSessionCard(session, items, mesaId, mesaNum, showSessionAc
           ${hasTotal ? '' : 'disabled'}
         >QR</button>
       </div>
+      <button
+        type="button"
+        class="modal__pay-btn modal__pay-btn--split modal__pay-btn--split-row"
+        data-action="dividir-pago"
+        data-sesion-id="${session.id}"
+        data-session-label="${escapeHtml(heading)}"
+        data-session-total="${session.total}"
+        data-mesa-id="${mesaId}"
+        data-mesa-num="${mesaNum}"
+        ${hasTotal ? '' : 'disabled'}
+      >Dividir pago</button>
     `;
 
   return `
@@ -1147,6 +1232,16 @@ function renderAccountModalFooter(sessions, mesaId, mesaNum, total) {
           data-session-label="${escapeHtml(heading)}"
           data-session-total="${singleSession.total}"
         >Enviar QR de pago</button>
+        <button
+          type="button"
+          class="modal__pay-btn modal__pay-btn--split modal__pay-btn--split-row"
+          data-action="dividir-pago"
+          data-sesion-id="${singleSession.id}"
+          data-session-label="${escapeHtml(heading)}"
+          data-session-total="${singleSession.total}"
+          data-mesa-id="${mesaId}"
+          data-mesa-num="${mesaNum}"
+        >Dividir pago</button>
       `;
     } else {
       singleActions.hidden = true;
@@ -1533,6 +1628,265 @@ async function confirmSplitAccount() {
   }
 }
 
+let splitPaymentState = {
+  mesaId: null,
+  mesaNum: null,
+  sesionId: null,
+  sessionLabel: '',
+  subtotal: 0,
+  splitCount: 2,
+  serviceEnabled: true,
+  paidTotal: 0,
+  paidParts: 0,
+  submitting: false,
+};
+
+function getChargeableSessionsForPayment(mesaId) {
+  return getChargeableAccountSessions(mesaId).filter(
+    (session) => !session.pago_pendiente_confirmacion && !session.pago_en_proceso
+  );
+}
+
+function populateSplitPaymentSessionSelect(mesaId, preferredSesionId = null) {
+  const field = document.getElementById('splitPaymentSessionField');
+  const select = document.getElementById('splitPaymentSessionSelect');
+  if (!field || !select) return null;
+
+  const sessions = getChargeableSessionsForPayment(mesaId);
+  field.hidden = sessions.length <= 1;
+
+  select.innerHTML = sessions
+    .map((session) => {
+      const heading = formatAccountSessionHeading(session);
+      return `<option value="${session.id}">${escapeHtml(heading)} · ${formatCOP(session.total)}</option>`;
+    })
+    .join('');
+
+  const defaultSession =
+    sessions.find((session) => session.id === preferredSesionId) || sessions[0] || null;
+
+  if (defaultSession) select.value = defaultSession.id;
+  return defaultSession;
+}
+
+function getSelectedSplitPaymentSession() {
+  const select = document.getElementById('splitPaymentSessionSelect');
+  const sesionId = select?.value || splitPaymentState.sesionId;
+  const session = getChargeableSessionsForPayment(splitPaymentState.mesaId).find(
+    (entry) => entry.id === sesionId
+  );
+
+  return {
+    sesionId,
+    sessionLabel: session ? formatAccountSessionHeading(session) : splitPaymentState.sessionLabel,
+    subtotal: Number(session?.total ?? splitPaymentState.subtotal) || 0,
+  };
+}
+
+function renderSplitPaymentQr(share, partNumber) {
+  const box = document.getElementById('splitPaymentQrBox');
+  const canvas = document.getElementById('splitPaymentQrCanvas');
+  if (!box || !canvas || typeof QRCode === 'undefined') return;
+
+  if (share.shareTotal <= 0 || splitPaymentState.paidTotal >= share.breakdown.total) {
+    box.hidden = true;
+    canvas.innerHTML = '';
+    return;
+  }
+
+  box.hidden = false;
+  canvas.innerHTML = '';
+  new QRCode(canvas, {
+    text: buildPagarUrl(
+      share.shareTotal,
+      splitPaymentState.sesionId,
+      share.shareServicio,
+      partNumber
+    ),
+    width: 220,
+    height: 220,
+    colorDark: '#0f172a',
+    colorLight: '#ffffff',
+    correctLevel: QRCode.CorrectLevel.M,
+  });
+}
+
+async function refreshSplitPaymentModal() {
+  if (!splitPaymentState.sesionId) return;
+
+  const selected = getSelectedSplitPaymentSession();
+  splitPaymentState.sesionId = selected.sesionId;
+  splitPaymentState.sessionLabel = selected.sessionLabel;
+  splitPaymentState.subtotal = selected.subtotal;
+
+  const toggle = document.getElementById('splitPaymentServiceToggle');
+  if (toggle) splitPaymentState.serviceEnabled = toggle.checked;
+
+  splitPaymentState.paidTotal = await getSessionApprovedPaymentsTotal(splitPaymentState.sesionId);
+  splitPaymentState.paidParts = await getSessionApprovedPaymentsCount(splitPaymentState.sesionId);
+
+  const share = getPanelSplitShare(
+    splitPaymentState.subtotal,
+    splitPaymentState.splitCount,
+    splitPaymentState.serviceEnabled
+  );
+
+  document.getElementById('splitPaymentSessionLabel').textContent = splitPaymentState.sessionLabel;
+  document.getElementById('splitPaymentShareAmount').textContent = formatCOP(share.shareTotal);
+  document.getElementById('splitPaymentTotalMeta').textContent =
+    `Total cuenta: ${formatCOP(share.breakdown.total)} · ${share.count} personas`;
+
+  const progressEl = document.getElementById('splitPaymentProgress');
+  const hintEl = document.getElementById('splitPaymentHint');
+  const dataphoneBtn = document.getElementById('splitPaymentDataphoneBtn');
+  const qrBtn = document.getElementById('splitPaymentShowQrBtn');
+  const minusBtn = document.getElementById('splitPaymentCountMinus');
+  const plusBtn = document.getElementById('splitPaymentCountPlus');
+  const countInput = document.getElementById('splitPaymentCountInput');
+
+  if (countInput) countInput.value = String(splitPaymentState.splitCount);
+  if (minusBtn) minusBtn.disabled = splitPaymentState.splitCount <= 2 || splitPaymentState.submitting;
+  if (plusBtn) plusBtn.disabled = splitPaymentState.splitCount >= 20 || splitPaymentState.submitting;
+
+  const isComplete = splitPaymentState.paidTotal >= share.breakdown.total;
+  const nextPart = Math.min(splitPaymentState.paidParts + 1, share.count);
+
+  if (progressEl) {
+    if (splitPaymentState.paidTotal > 0 || isComplete) {
+      progressEl.hidden = false;
+      progressEl.textContent = isComplete
+        ? `Cuenta cubierta · ${formatCOP(splitPaymentState.paidTotal)} de ${formatCOP(share.breakdown.total)}`
+        : `Pagado: ${formatCOP(splitPaymentState.paidTotal)} de ${formatCOP(share.breakdown.total)} · ${splitPaymentState.paidParts}/${share.count} partes`;
+    } else {
+      progressEl.hidden = true;
+      progressEl.textContent = '';
+    }
+  }
+
+  if (hintEl) {
+    hintEl.textContent = isComplete
+      ? 'La cuenta ya está cubierta. Confirmá el pago desde la tarjeta de la mesa.'
+      : `Mostrá ${formatCOP(share.shareTotal)} a la persona ${nextPart} antes de cobrar su parte.`;
+  }
+
+  if (dataphoneBtn) {
+    dataphoneBtn.disabled = splitPaymentState.submitting || isComplete || share.shareTotal <= 0;
+    dataphoneBtn.textContent = isComplete ? 'Cuenta cubierta' : `Cobrar parte ${nextPart}`;
+  }
+
+  if (qrBtn) {
+    qrBtn.disabled = splitPaymentState.submitting || isComplete || share.shareTotal <= 0;
+  }
+
+  renderSplitPaymentQr(share, nextPart);
+}
+
+function closeSplitPaymentModal() {
+  const modal = document.getElementById('splitPaymentModal');
+  modal.hidden = true;
+  modal.setAttribute('aria-hidden', 'true');
+  const canvas = document.getElementById('splitPaymentQrCanvas');
+  if (canvas) canvas.innerHTML = '';
+  splitPaymentState = {
+    mesaId: null,
+    mesaNum: null,
+    sesionId: null,
+    sessionLabel: '',
+    subtotal: 0,
+    splitCount: 2,
+    serviceEnabled: true,
+    paidTotal: 0,
+    paidParts: 0,
+    submitting: false,
+  };
+}
+
+async function openSplitPaymentModal(mesaId, mesaNum, preferredSesionId = null, sessionMeta = null) {
+  const sessions = getChargeableSessionsForPayment(mesaId);
+  if (sessions.length === 0) {
+    showToast('No hay cuentas con monto para dividir el pago.', 'error');
+    return;
+  }
+
+  const defaultSession =
+    sessions.find((session) => session.id === preferredSesionId) ||
+    sessions.find((session) => session.id === sessionMeta?.sesionId) ||
+    sessions[0];
+
+  splitPaymentState = {
+    mesaId,
+    mesaNum,
+    sesionId: defaultSession.id,
+    sessionLabel: sessionMeta?.sessionLabel || formatAccountSessionHeading(defaultSession),
+    subtotal: Number(sessionMeta?.sessionTotal ?? defaultSession.total) || 0,
+    splitCount: 2,
+    serviceEnabled: true,
+    paidTotal: 0,
+    paidParts: 0,
+    submitting: false,
+  };
+
+  document.getElementById('splitPaymentTitle').textContent = `Dividir pago · Mesa ${mesaNum}`;
+  populateSplitPaymentSessionSelect(mesaId, splitPaymentState.sesionId);
+
+  const toggle = document.getElementById('splitPaymentServiceToggle');
+  if (toggle) toggle.checked = true;
+
+  await refreshSplitPaymentModal();
+
+  const modal = document.getElementById('splitPaymentModal');
+  modal.hidden = false;
+  modal.setAttribute('aria-hidden', 'false');
+}
+
+async function collectSplitPaymentPart() {
+  if (splitPaymentState.submitting || !splitPaymentState.sesionId) return;
+
+  const share = getPanelSplitShare(
+    splitPaymentState.subtotal,
+    splitPaymentState.splitCount,
+    splitPaymentState.serviceEnabled
+  );
+
+  if (share.shareTotal <= 0) return;
+
+  if (splitPaymentState.paidTotal >= share.breakdown.total) {
+    showToast('La cuenta ya está cubierta.', 'success');
+    await refreshSplitPaymentModal();
+    return;
+  }
+
+  const btn = document.getElementById('splitPaymentDataphoneBtn');
+  splitPaymentState.submitting = true;
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = 'Registrando…';
+  }
+
+  try {
+    const paidTotal = await recordSplitPartPayment(
+      splitPaymentState.sesionId,
+      share,
+      share.breakdown.total
+    );
+
+    await refreshPanelData();
+    await refreshSplitPaymentModal();
+
+    if (paidTotal >= share.breakdown.total) {
+      showToast('Todas las partes cobradas. Confirmá el pago en la mesa.', 'success');
+    } else {
+      showToast(`Parte cobrada · ${formatCOP(share.shareTotal)}`, 'success');
+    }
+  } catch (error) {
+    console.error(error);
+    showToast(error.message || 'No se pudo registrar la parte.', 'error');
+  } finally {
+    splitPaymentState.submitting = false;
+    await refreshSplitPaymentModal();
+  }
+}
+
 function openDataphoneModalBulk() {
   if (!accountModalState || accountModalState.chargeableSessions.length === 0) return;
 
@@ -1702,6 +2056,12 @@ function handleAccountModalAction(event) {
     if (accountModalState) {
       openSplitAccountModal(accountModalState.mesaId, accountModalState.mesaNum, sesionId);
     }
+  } else if (action === 'dividir-pago') {
+    openSplitPaymentModal(mesaId, mesaNum, sesionId, {
+      sesionId,
+      sessionLabel,
+      sessionTotal,
+    });
   }
 }
 
@@ -1729,6 +2089,40 @@ function initModal() {
   });
 
   document.getElementById('splitAccountConfirmBtn')?.addEventListener('click', confirmSplitAccount);
+
+  document.getElementById('splitPaymentModal')?.querySelectorAll('[data-close-split-payment]').forEach((el) => {
+    el.addEventListener('click', closeSplitPaymentModal);
+  });
+
+  document.getElementById('splitPaymentSessionSelect')?.addEventListener('change', () => {
+    refreshSplitPaymentModal();
+  });
+
+  document.getElementById('splitPaymentServiceToggle')?.addEventListener('change', () => {
+    refreshSplitPaymentModal();
+  });
+
+  document.getElementById('splitPaymentCountMinus')?.addEventListener('click', () => {
+    if (splitPaymentState.splitCount <= 2) return;
+    splitPaymentState.splitCount -= 1;
+    refreshSplitPaymentModal();
+  });
+
+  document.getElementById('splitPaymentCountPlus')?.addEventListener('click', () => {
+    if (splitPaymentState.splitCount >= 20) return;
+    splitPaymentState.splitCount += 1;
+    refreshSplitPaymentModal();
+  });
+
+  document.getElementById('splitPaymentDataphoneBtn')?.addEventListener('click', collectSplitPaymentPart);
+
+  document.getElementById('splitPaymentShowQrBtn')?.addEventListener('click', () => {
+    const box = document.getElementById('splitPaymentQrBox');
+    if (box) {
+      box.hidden = false;
+      box.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  });
 
   document.getElementById('dataphoneConfirmBtn')?.addEventListener('click', async () => {
     if (!dataphoneModalState) return;

@@ -183,6 +183,63 @@
       </div>
     </div>
 
+    <!-- Modal dividir pago -->
+    <div class="modal" id="splitPaymentModal" hidden aria-hidden="true">
+      <div class="modal__backdrop" data-close-split-payment></div>
+      <div class="modal__box modal__box--split-payment" role="dialog" aria-labelledby="splitPaymentTitle">
+        <header class="modal__head">
+          <h2 class="modal__title" id="splitPaymentTitle">Dividir pago</h2>
+          <button type="button" class="modal__close" data-close-split-payment aria-label="Cerrar">×</button>
+        </header>
+        <p class="split-payment__session" id="splitPaymentSessionLabel">Cuenta #0000</p>
+        <label class="split-payment__field" id="splitPaymentSessionField" hidden>
+          <span class="split-payment__label">Cuenta</span>
+          <select class="split-payment__select" id="splitPaymentSessionSelect"></select>
+        </label>
+        <div class="split-payment__amount-card">
+          <span class="split-payment__amount-label">Cada persona paga</span>
+          <strong class="split-payment__amount-value" id="splitPaymentShareAmount">$0</strong>
+        </div>
+        <div class="split-payment__stepper-row">
+          <span class="split-payment__stepper-label">¿Entre cuántos?</span>
+          <div class="split-payment__stepper">
+            <button type="button" class="split-payment__stepper-btn" id="splitPaymentCountMinus" aria-label="Menos personas">−</button>
+            <input
+              type="number"
+              class="split-payment__stepper-input"
+              id="splitPaymentCountInput"
+              min="2"
+              max="20"
+              step="1"
+              inputmode="numeric"
+              value="2"
+              readonly
+            >
+            <button type="button" class="split-payment__stepper-btn" id="splitPaymentCountPlus" aria-label="Más personas">+</button>
+          </div>
+        </div>
+        <p class="split-payment__meta" id="splitPaymentTotalMeta">Total cuenta: $0</p>
+        <p class="split-payment__progress" id="splitPaymentProgress" hidden></p>
+        <label class="split-payment__service">
+          <input type="checkbox" id="splitPaymentServiceToggle" checked>
+          <span>Incluir servicio (10%) en cada parte</span>
+        </label>
+        <div class="split-payment__qr" id="splitPaymentQrBox">
+          <div class="split-payment__qr-canvas" id="splitPaymentQrCanvas"></div>
+          <p class="split-payment__qr-hint">QR para que paguen su parte con Wompi</p>
+        </div>
+        <div class="modal__account-pay-grid">
+          <button type="button" class="modal__pay-btn modal__pay-btn--dataphone" id="splitPaymentDataphoneBtn">
+            Cobrar 1 parte
+          </button>
+          <button type="button" class="modal__pay-btn modal__pay-btn--qr" id="splitPaymentShowQrBtn">
+            Mostrar QR
+          </button>
+        </div>
+        <p class="split-payment__hint" id="splitPaymentHint">Mostrá el monto a cada persona antes de pasar el datáfono.</p>
+      </div>
+    </div>
+
     <!-- Modal cobrar con datáfono -->
     <div class="modal" id="dataphoneModal" hidden aria-hidden="true">
       <div class="modal__backdrop" data-close-dataphone></div>
