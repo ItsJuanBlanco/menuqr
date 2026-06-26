@@ -531,7 +531,8 @@ button {
 
 .order-card__items .item-row__qty {
   font-size: 0.8125rem;
-  color: var(--text-muted);
+  font-weight: 700;
+  color: var(--text);
   white-space: nowrap;
   flex-shrink: 0;
 }
@@ -974,6 +975,69 @@ button {
   flex: 1 1 100%;
   color: #fff;
   background: var(--accent);
+}
+
+/* Mesas libres — acordeón en todas las pantallas */
+.mesa-card--libre {
+  box-shadow: none;
+  border-radius: 6px;
+}
+
+.mesa-card--libre .mesa-card__head {
+  padding: 8px 16px;
+  border-bottom: none;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.mesa-card--libre .mesa-card__num {
+  font-size: 14px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.mesa-card--libre .mesa-card__head-badges {
+  flex-wrap: nowrap;
+}
+
+.mesa-card--libre .mesa-card__status {
+  padding: 1px 6px;
+  font-size: 0.5rem;
+  letter-spacing: 0.03em;
+}
+
+.mesa-card--libre:not(.mesa-card--expanded) .mesa-card__details {
+  display: none;
+}
+
+.mesa-card--libre.mesa-card--expanded .mesa-card__head {
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 75%, transparent);
+}
+
+.mesa-card--libre.mesa-card--expanded .mesa-card__body,
+.mesa-card--libre.mesa-card--expanded .mesa-card__total,
+.mesa-card--libre.mesa-card--expanded .mesa-card__alert {
+  display: none;
+}
+
+.mesa-card--libre.mesa-card--expanded .mesa-card__actions {
+  display: flex;
+  flex-wrap: nowrap;
+  padding: 8px 16px 10px;
+}
+
+.mesa-card--libre.mesa-card--expanded .mesa-card__btn:not(.mesa-card__btn--new) {
+  display: none;
+}
+
+.mesa-card--libre.mesa-card--expanded .mesa-card__btn--new {
+  width: 100%;
+  flex: 1 1 auto;
+}
+
+/* Mesas ocupadas — siempre expandidas, sin colapsar */
+.mesa-card--ocupada .mesa-card__details {
+  display: block;
 }
 
 /* Nueva orden modal */
@@ -3372,7 +3436,8 @@ body.mesa-qr-printing .mesa-qr-print {
   .order-card__items .item-row__qty {
     font-size: 15px;
     font-weight: 700;
-    color: var(--text-dim);
+    color: var(--text);
+    margin-right: 12px;
   }
 
   .order-card__items .item-row:not(.item-row--done) .item-row__badge {
@@ -3403,73 +3468,6 @@ body.mesa-qr-printing .mesa-qr-print {
 
   .order-card__items .item-row--done {
     opacity: 0.55;
-  }
-
-  /* Mesas libres — fila compacta; expandir al tocar */
-  .mesa-card--libre {
-    box-shadow: none;
-    border-radius: 6px;
-  }
-
-  .mesa-card--libre .mesa-card__head {
-    padding: 8px 16px;
-    min-height: 0;
-    max-height: none;
-    border-bottom: none;
-    cursor: pointer;
-    -webkit-tap-highlight-color: transparent;
-  }
-
-  .mesa-card--libre .mesa-card__num {
-    font-size: 14px;
-    font-weight: 700;
-    white-space: nowrap;
-  }
-
-  .mesa-card--libre .mesa-card__head-badges {
-    flex-wrap: nowrap;
-  }
-
-  .mesa-card--libre .mesa-card__status {
-    padding: 1px 6px;
-    font-size: 0.5rem;
-    letter-spacing: 0.03em;
-  }
-
-  .mesa-card--libre:not(.mesa-card--expanded) .mesa-card__details {
-    display: none;
-  }
-
-  .mesa-card--libre.mesa-card--expanded {
-    max-height: none;
-  }
-
-  .mesa-card--libre.mesa-card--expanded .mesa-card__head {
-    max-height: none;
-    min-height: 0;
-    padding: 8px 16px;
-    border-bottom: 1px solid color-mix(in srgb, var(--border) 75%, transparent);
-  }
-
-  .mesa-card--libre.mesa-card--expanded .mesa-card__body,
-  .mesa-card--libre.mesa-card--expanded .mesa-card__total,
-  .mesa-card--libre.mesa-card--expanded .mesa-card__alert {
-    display: none;
-  }
-
-  .mesa-card--libre.mesa-card--expanded .mesa-card__actions {
-    display: flex;
-    padding: 8px 12px 10px;
-  }
-
-  .mesa-card--libre.mesa-card--expanded .mesa-card__btn:not(.mesa-card__btn--new) {
-    display: none;
-  }
-
-  .mesa-card--libre.mesa-card--expanded .mesa-card__btn--new {
-    width: 100%;
-    padding: 10px 12px;
-    font-size: 0.8125rem;
   }
 
   .menu-product {
