@@ -271,6 +271,8 @@ function initChangeSessionButton() {
 
 function renderPaymentSuccessUi(totalPaid) {
   const screen = document.getElementById('paymentSuccessScreen');
+  if (!screen) return;
+
   const amountEl = document.getElementById('paymentSuccessAmount');
   const subtitle = document.getElementById('paymentSuccessSubtitle');
   const review = document.getElementById('paymentSuccessReview');
@@ -287,12 +289,13 @@ function renderPaymentSuccessUi(totalPaid) {
   }
   if (review) review.hidden = true;
 
-  if (screen) {
-    screen.hidden = false;
-    screen.setAttribute('aria-hidden', 'false');
-  }
-
+  document.getElementById('sessionGate')?.setAttribute('hidden', '');
   document.getElementById('mainApp')?.setAttribute('hidden', '');
+
+  screen.hidden = false;
+  screen.removeAttribute('hidden');
+  screen.setAttribute('aria-hidden', 'false');
+
   bindPaymentSuccessStars();
 
   paymentSuccessReviewTimer = setTimeout(() => {
@@ -401,6 +404,7 @@ async function checkSessionStatus() {
         console.error(fetchError);
       }
 
+      switchTab('cuenta');
       await showPaymentSuccess(totalPaid, sesionId);
     }
   } catch (error) {
@@ -2314,8 +2318,8 @@ async function handleWompiRedirectReturn() {
   });
 
   clearWompiPendingPayment();
-  void checkSessionStatus();
   switchTab('cuenta');
+  void checkSessionStatus();
   return true;
 }
 
