@@ -5,7 +5,10 @@ var RESTAURANTE = null;
 
 const STATIC_PAGE_NAMES = new Set([
   'index.html',
+  'carta.html',
   'home.html',
+  'home-listo.html',
+  'contacto.html',
   'panel.html',
   'login.html',
   'styles.css',
@@ -37,6 +40,9 @@ const PAGE_ROUTE_NAMES = new Set([
   'home',
   'home.html',
   'index.html',
+  'carta.html',
+  'home-listo.html',
+  'contacto.html',
   'admin',
   'admin.html',
 ]);
