@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#0a0a0c">
+  <meta name="description" content="Contacto de Juan Blanco — Founder de Listo">
+  <title>Juan Blanco · Listo</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&display=swap" rel="stylesheet">
+  <style>
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+    }
+
+    html {
+      -webkit-text-size-adjust: 100%;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100dvh;
+      font-family: 'DM Sans', system-ui, -apple-system, sans-serif;
+      font-size: 16px;
+      line-height: 1.5;
+      color: #fafafa;
+      background: #0a0a0c;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .contact-page {
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 32px 20px 24px;
+    }
+
+    .contact-card {
+      width: 100%;
+      max-width: 380px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      flex: 1;
+    }
+
+    .contact-logo {
+      width: min(140px, 52vw);
+      height: auto;
+      object-fit: contain;
+      margin-bottom: 28px;
+    }
+
+    .contact-avatar {
+      width: 88px;
+      height: 88px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2rem;
+      font-weight: 700;
+      color: #fff;
+      background: linear-gradient(135deg, #ff8534 0%, #ff6b00 52%, #e55a00 100%);
+      box-shadow: 0 8px 32px rgba(255, 107, 0, 0.28);
+      margin-bottom: 18px;
+    }
+
+    .contact-name {
+      margin: 0;
+      font-size: 1.625rem;
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      text-align: center;
+    }
+
+    .contact-role {
+      margin: 6px 0 28px;
+      font-size: 0.9375rem;
+      font-weight: 500;
+      color: #a1a1aa;
+      text-align: center;
+    }
+
+    .contact-links {
+      width: 100%;
+      list-style: none;
+      margin: 0 0 24px;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .contact-link {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 14px 16px;
+      border-radius: 14px;
+      border: 1px solid #27272a;
+      background: #111113;
+      color: inherit;
+      text-decoration: none;
+      transition: border-color 0.15s ease, background 0.15s ease;
+    }
+
+    .contact-link:hover,
+    .contact-link:focus-visible {
+      border-color: rgba(255, 107, 0, 0.45);
+      background: #161618;
+      outline: none;
+    }
+
+    .contact-link__icon {
+      flex-shrink: 0;
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.125rem;
+      background: rgba(255, 107, 0, 0.12);
+    }
+
+    .contact-link__body {
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .contact-link__label {
+      font-size: 0.6875rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: #71717a;
+    }
+
+    .contact-link__value {
+      font-size: 0.9375rem;
+      font-weight: 600;
+      color: #fafafa;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .contact-save {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      padding: 15px 20px;
+      border: none;
+      border-radius: 14px;
+      font: inherit;
+      font-size: 1rem;
+      font-weight: 700;
+      color: #fff;
+      text-decoration: none;
+      cursor: pointer;
+      background: linear-gradient(135deg, #ff8534 0%, #ff6b00 52%, #e55a00 100%);
+      box-shadow: 0 8px 24px rgba(255, 107, 0, 0.28);
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    .contact-save:hover,
+    .contact-save:focus-visible {
+      transform: translateY(-1px);
+      box-shadow: 0 12px 28px rgba(255, 107, 0, 0.34);
+      outline: none;
+    }
+
+    .contact-save:active {
+      transform: translateY(0);
+    }
+
+    .contact-qr {
+      margin-top: 28px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .contact-qr__canvas {
+      padding: 10px;
+      border-radius: 14px;
+      background: #fff;
+      line-height: 0;
+    }
+
+    .contact-qr__canvas img,
+    .contact-qr__canvas canvas {
+      display: block;
+    }
+
+    .contact-qr__hint {
+      margin: 0;
+      font-size: 0.75rem;
+      color: #71717a;
+      text-align: center;
+    }
+
+    .contact-footer {
+      width: 100%;
+      max-width: 380px;
+      margin-top: auto;
+      padding-top: 32px;
+      font-size: 0.75rem;
+      font-weight: 500;
+      color: #52525b;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="contact-page">
+    <main class="contact-card">
+      <img
+        class="contact-logo"
+        src="/Listo.__1_-removebg-preview.png"
+        alt="Listo"
+        width="140"
+        height="48"
+      >
+
+      <div class="contact-avatar" aria-hidden="true">J</div>
+
+      <h1 class="contact-name">Juan Blanco</h1>
+      <p class="contact-role">Founder · Listo</p>
+
+      <ul class="contact-links">
+        <li>
+          <a class="contact-link" href="https://wa.me/573165398821" target="_blank" rel="noopener noreferrer">
+            <span class="contact-link__icon" aria-hidden="true">💬</span>
+            <span class="contact-link__body">
+              <span class="contact-link__label">WhatsApp</span>
+              <span class="contact-link__value">+57 316 539 8821</span>
+            </span>
+          </a>
+        </li>
+        <li>
+          <a class="contact-link" href="mailto:listoappco@gmail.com">
+            <span class="contact-link__icon" aria-hidden="true">✉️</span>
+            <span class="contact-link__body">
+              <span class="contact-link__label">Email</span>
+              <span class="contact-link__value">listoappco@gmail.com</span>
+            </span>
+          </a>
+        </li>
+        <li>
+          <a class="contact-link" href="https://listoapp.com.co" target="_blank" rel="noopener noreferrer">
+            <span class="contact-link__icon" aria-hidden="true">🌐</span>
+            <span class="contact-link__body">
+              <span class="contact-link__label">Web</span>
+              <span class="contact-link__value">listoapp.com.co</span>
+            </span>
+          </a>
+        </li>
+      </ul>
+
+      <a
+        class="contact-save"
+        href="data:text/vcard;charset=utf-8,BEGIN%3AVCARD%0AVERSION%3A3.0%0AFN%3AJuan%20Blanco%0AN%3ABlanco%3BJuan%3B%3B%3B%0ATITLE%3AFounder%20%C2%B7%20Listo%0AORG%3AListo%0ATEL%3BTYPE%3DCELL%2CVOICE%3A%2B573165398821%0AEMAIL%3BTYPE%3DINTERNET%3Alistoappco%40gmail.com%0AURL%3Ahttps%3A%2F%2Flistoapp.com.co%0AEND%3AVCARD"
+        download="Juan-Blanco.vcf"
+      >
+        Guardar contacto
+      </a>
+
+      <div class="contact-qr">
+        <div class="contact-qr__canvas" id="contactQr" aria-hidden="true"></div>
+        <p class="contact-qr__hint">listoapp.com.co/contacto</p>
+      </div>
+    </main>
+
+    <footer class="contact-footer">
+      Tecnologia para restaurantes · listoapp.com.co
+    </footer>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const qrEl = document.getElementById('contactQr');
+      if (!qrEl || typeof QRCode === 'undefined') return;
+
+      new QRCode(qrEl, {
+        text: 'https://listoapp.com.co/contacto',
+        width: 96,
+        height: 96,
+        colorDark: '#0a0a0c',
+        colorLight: '#ffffff',
+        correctLevel: QRCode.CorrectLevel.M,
+      });
+    });
+  </script>
+</body>
+</html>
