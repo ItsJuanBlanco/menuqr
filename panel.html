@@ -312,7 +312,7 @@
               <p class="settings-panel__hint settings-panel__hint--inline">Agregá meseros para asignarlos al abrir una orden. Los inactivos no aparecen en el selector.</p>
               <ul class="settings-meseros__list" id="settingsMeserosList"></ul>
               <p class="settings-meseros__empty" id="settingsMeserosEmpty" hidden>Sin meseros registrados.</p>
-              <form class="settings-meseros__form" id="settingsMeseroForm">
+              <div class="settings-meseros__form" id="settingsMeseroForm">
                 <input
                   type="text"
                   class="settings-form__text settings-meseros__input"
@@ -321,8 +321,10 @@
                   maxlength="60"
                   autocomplete="off"
                 >
-                <button type="submit" class="menu-toolbar__btn settings-meseros__add-btn">Agregar mesero</button>
-              </form>
+                <button type="button" class="menu-toolbar__btn settings-meseros__add-btn" id="settingsMeseroAddBtn">
+                  Agregar mesero
+                </button>
+              </div>
             </div>
             <p class="settings-form__error" id="settingsFormError" hidden role="alert"></p>
             <button type="submit" class="menu-toolbar__btn settings-form__save" id="settingsSaveBtn">Guardar ajustes</button>

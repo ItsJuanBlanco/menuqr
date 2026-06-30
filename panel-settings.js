@@ -692,7 +692,7 @@ async function loadMeserosSettings() {
 }
 
 async function addSettingsMesero(event) {
-  event.preventDefault();
+  event?.preventDefault?.();
 
   const input = document.getElementById('settingsMeseroNameInput');
   const nombre = input?.value?.trim();
@@ -701,12 +701,23 @@ async function addSettingsMesero(event) {
     return;
   }
 
+  if (!RESTAURANTE_ID) {
+    showToast('Restaurante no cargado. Recargá la página.', 'error');
+    return;
+  }
+
+  const payload = {
+    restaurante_id: RESTAURANTE_ID,
+    nombre,
+    activo: true,
+  };
+
+  console.log('[meseros] insert start', payload);
+
   try {
-    const { error } = await supabaseClient.from('meseros').insert({
-      restaurante_id: RESTAURANTE_ID,
-      nombre,
-      activo: true,
-    });
+    const { data, error } = await supabaseClient.from('meseros').insert(payload).select('id, nombre, activo');
+
+    console.log('[meseros] insert response', { data, error });
 
     if (error) throw error;
 
@@ -714,7 +725,7 @@ async function addSettingsMesero(event) {
     await loadMeserosSettings();
     showToast('Mesero agregado', 'success');
   } catch (error) {
-    console.error(error);
+    console.error('[meseros] insert failed', error);
     showToast(error.message || 'No se pudo agregar el mesero.', 'error');
   }
 }
@@ -760,7 +771,16 @@ async function deleteSettingsMesero(meseroId) {
 function bindMeserosSettings() {
   if (settingsMeserosBound) return;
 
-  document.getElementById('settingsMeseroForm')?.addEventListener('submit', (event) => {
+  const addBtn = document.getElementById('settingsMeseroAddBtn');
+  const input = document.getElementById('settingsMeseroNameInput');
+
+  addBtn?.addEventListener('click', (event) => {
+    void addSettingsMesero(event);
+  });
+
+  input?.addEventListener('keydown', (event) => {
+    if (event.key !== 'Enter') return;
+    event.preventDefault();
     void addSettingsMesero(event);
   });
 
