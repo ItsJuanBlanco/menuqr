@@ -192,7 +192,7 @@ function renderCrmKanban() {
 function renderCrmCard(local) {
   const urgentCount = crmCountUrgentForLocal(local.id);
   const whatsapp = local.whatsapp || local.telefono || '';
-  const contacto = local.contacto || '—';
+  const contacto = local.nombre_contacto || '—';
 
   return `
     <article
@@ -284,7 +284,7 @@ async function fetchCrmLocales() {
   const client = crmAssertClient();
   const { data, error } = await client
     .from('locales')
-    .select('id, nombre, direccion, contacto, telefono, whatsapp, plan, valor_mensual, estado, referido_por, created_at, updated_at')
+    .select('id, nombre, direccion, nombre_contacto, telefono, whatsapp, plan, valor_mensual, estado, referido_por, created_at, updated_at')
     .order('nombre', { ascending: true });
 
   if (error) throw error;
@@ -330,7 +330,7 @@ async function createCrmLocal() {
     const { data, error } = await client
       .from('locales')
       .insert({ nombre: 'Nuevo local', estado: 'prospecto' })
-      .select('id, nombre, direccion, contacto, telefono, whatsapp, plan, valor_mensual, estado, referido_por, created_at, updated_at')
+      .select('id, nombre, direccion, nombre_contacto, telefono, whatsapp, plan, valor_mensual, estado, referido_por, created_at, updated_at')
       .single();
 
     if (error) throw error;
@@ -380,7 +380,7 @@ function updateCrmReferralLine(local) {
 function fillCrmInfoForm(local) {
   document.getElementById('crmNombre').value = local.nombre || '';
   document.getElementById('crmDireccion').value = local.direccion || '';
-  document.getElementById('crmContacto').value = local.contacto || '';
+  document.getElementById('crmContacto').value = local.nombre_contacto || '';
   document.getElementById('crmTelefono').value = local.telefono || '';
   document.getElementById('crmWhatsapp').value = local.whatsapp || '';
   document.getElementById('crmPlan').value = local.plan || '';
@@ -553,7 +553,7 @@ async function saveCrmInfoForm(event) {
   const payload = {
     nombre: document.getElementById('crmNombre')?.value?.trim() || 'Sin nombre',
     direccion: document.getElementById('crmDireccion')?.value?.trim() || null,
-    contacto: document.getElementById('crmContacto')?.value?.trim() || null,
+    nombre_contacto: document.getElementById('crmContacto')?.value?.trim() || null,
     telefono: document.getElementById('crmTelefono')?.value?.trim() || null,
     whatsapp: document.getElementById('crmWhatsapp')?.value?.trim() || null,
     plan: document.getElementById('crmPlan')?.value?.trim() || null,
@@ -574,7 +574,7 @@ async function saveCrmInfoForm(event) {
       .from('locales')
       .update(payload)
       .eq('id', crmActiveLocalId)
-      .select('id, nombre, direccion, contacto, telefono, whatsapp, plan, valor_mensual, estado, referido_por, created_at, updated_at')
+      .select('id, nombre, direccion, nombre_contacto, telefono, whatsapp, plan, valor_mensual, estado, referido_por, created_at, updated_at')
       .single();
 
     if (error) throw error;
