@@ -1119,6 +1119,42 @@ button {
   padding: 10px 12px;
 }
 
+.mesa-card__mesero {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 18px;
+  border-bottom: 1px solid var(--border);
+  background: #fafafa;
+}
+
+.mesa-card__mesero-label {
+  flex-shrink: 0;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+.mesa-card__mesero-select {
+  flex: 1;
+  min-width: 0;
+  min-height: 36px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #fff;
+  font: inherit;
+  font-size: 0.875rem;
+  color: var(--text);
+}
+
+.mesa-card__mesero-select:focus {
+  outline: 2px solid color-mix(in srgb, var(--accent) 45%, transparent);
+  outline-offset: 1px;
+}
+
 /* Nueva orden modal */
 .modal__box--order {
   max-width: 420px;

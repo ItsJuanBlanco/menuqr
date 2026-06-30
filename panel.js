@@ -20,6 +20,7 @@ let panelPollTimer = null;
 let panelAlertsInitialized = false;
 let panelAudioContext = null;
 let panelSoundsEnabled = true;
+let cachedActiveMeseros = [];
 
 const PANEL_POLL_INTERVAL_MS = 5000;
 const PANEL_SOUNDS_STORAGE_KEY = 'panel_sonidos';
@@ -1337,15 +1338,22 @@ async function fetchMesas(options = {}) {
   );
   const previousPaymentSnapshot = snapshotSessionPaymentFlags();
 
-  const [mesasData, itemsResult] = await Promise.all([
+  const [mesasData, itemsResult, activeMeserosData] = await Promise.all([
     fetchAllRestaurantMesas(),
     supabaseClient.rpc('get_mesa_items', { p_restaurante_id: RESTAURANTE_ID }),
+    typeof fetchActiveMeseros === 'function'
+      ? fetchActiveMeseros().catch((error) => {
+          console.error(error);
+          return [];
+        })
+      : Promise.resolve([]),
   ]);
 
   const { data: itemsData, error: itemsError } = itemsResult;
   if (itemsError) throw itemsError;
 
   mesas = mesasData;
+  cachedActiveMeseros = activeMeserosData || [];
   mesaAccounts = {};
   mesaSessionBreakdown = {};
   mesaSessionItems = {};
@@ -1584,6 +1592,73 @@ function renderMesaCardHead(mesa, badgesHtml = '') {
   `;
 }
 
+function getMesaLibreUpdateFields() {
+  return {
+    estado: 'libre',
+    mesero_requerido: false,
+    nombre_personalizado: null,
+    mesero_asignado: null,
+  };
+}
+
+function renderMesaMeseroSelect(mesa) {
+  const current = String(mesa.mesero_asignado || '').trim();
+  const options = [`<option value=""${!current ? ' selected' : ''}>— Mesero —</option>`];
+
+  cachedActiveMeseros.forEach((mesero) => {
+    const nombre = String(mesero.nombre || '').trim();
+    if (!nombre) return;
+    const selected = nombre === current ? ' selected' : '';
+    options.push(`<option value="${escapeHtml(nombre)}"${selected}>${escapeHtml(nombre)}</option>`);
+  });
+
+  if (current && !cachedActiveMeseros.some((mesero) => mesero.nombre === current)) {
+    options.push(
+      `<option value="${escapeHtml(current)}" selected>${escapeHtml(current)} (inactivo)</option>`
+    );
+  }
+
+  return `
+    <label class="mesa-card__mesero">
+      <span class="mesa-card__mesero-label">Mesero</span>
+      <select
+        class="mesa-card__mesero-select"
+        data-mesa-mesero-select
+        data-mesa-id="${mesa.id}"
+        aria-label="Mesero asignado a mesa ${mesa.numero}"
+      >${options.join('')}</select>
+    </label>
+  `;
+}
+
+async function updateMesaMeseroAsignado(mesaId, meseroNombre) {
+  const updateKey = `mesero-${mesaId}`;
+  if (updating.has(updateKey)) return;
+
+  updating.add(updateKey);
+
+  try {
+    const value = meseroNombre?.trim() || null;
+    const { error } = await supabaseClient
+      .from('mesas')
+      .update({ mesero_asignado: value })
+      .eq('id', mesaId);
+
+    if (error) throw error;
+
+    const mesa = mesas.find((entry) => entry.id === mesaId);
+    if (mesa) mesa.mesero_asignado = value;
+
+    showToast(value ? `Mesero asignado: ${value}` : 'Mesero quitado de la mesa', 'success');
+  } catch (error) {
+    console.error(error);
+    showToast(error.message || 'No se pudo actualizar el mesero.', 'error');
+    renderMesas();
+  } finally {
+    updating.delete(updateKey);
+  }
+}
+
 function sortMesasByNumero(a, b) {
   const numA = Number(a.numero);
   const numB = Number(b.numero);
@@ -1664,6 +1739,7 @@ function renderOcupadaMesaCard(mesa) {
       )}
       <div class="mesa-card__details">
         ${waiterAlert}
+        ${renderMesaMeseroSelect(mesa)}
         <div class="mesa-card__body">${sessionsHtml}</div>
         <div class="mesa-card__total">
           <span class="mesa-card__total-label">Total acumulado</span>
@@ -1729,6 +1805,12 @@ function renderMesas() {
 
 function bindMesasActions() {
   if (mesasClickBound) return;
+
+  document.getElementById('mesasList').addEventListener('change', (event) => {
+    const select = event.target.closest('[data-mesa-mesero-select]');
+    if (!select) return;
+    void updateMesaMeseroAsignado(select.dataset.mesaId, select.value);
+  });
 
   document.getElementById('mesasList').addEventListener('click', (event) => {
     const btn = event.target.closest('[data-action]');
@@ -2880,7 +2962,7 @@ async function confirmSessionPayment(sesionId, mesaId, mesaNum, successMessage =
     if (!activeSessions?.length) {
       const { error: mesaError } = await supabaseClient
         .from('mesas')
-        .update({ estado: 'libre', mesero_requerido: false })
+        .update(getMesaLibreUpdateFields())
         .eq('id', mesaId);
 
       if (mesaError) throw mesaError;
@@ -3000,9 +3082,9 @@ async function closeMesa(mesaId, mesaNum) {
 
     const { data: mesaUpdated, error: mesaError } = await supabaseClient
       .from('mesas')
-      .update({ estado: 'libre', mesero_requerido: false })
+      .update(getMesaLibreUpdateFields())
       .eq('id', mesaId)
-      .select('id, numero, estado')
+      .select('id, numero, estado, mesero_requerido, nombre_personalizado, mesero_asignado')
       .single();
 
     if (mesaError) throw mesaError;
