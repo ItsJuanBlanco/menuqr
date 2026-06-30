@@ -149,7 +149,7 @@ function renderCrmUrgentSection() {
     .map((row) => {
       const localName =
         row.local_nombre || crmGetLocalById(row.local_id)?.nombre || 'Local sin nombre';
-      const fecha = row.fecha_hora || row.fecha_programada || row.created_at;
+      const fecha = row.fecha_hora || row.fecha_programada || row.creado_en;
       const nota = row.nota || row.descripcion || '';
       const isLate = row.atrasado === true || row.es_atrasado === true;
 
@@ -284,7 +284,7 @@ async function fetchCrmLocales() {
   const client = crmAssertClient();
   const { data, error } = await client
     .from('locales')
-    .select('id, nombre, direccion, nombre_contacto, telefono, whatsapp, plan, valor_mensual, estado, referido_por, created_at, updated_at')
+    .select('id, nombre, direccion, nombre_contacto, telefono, whatsapp, plan, valor_mensual, estado, referido_por, creado_en, actualizado_en')
     .order('nombre', { ascending: true });
 
   if (error) throw error;
@@ -330,7 +330,7 @@ async function createCrmLocal() {
     const { data, error } = await client
       .from('locales')
       .insert({ nombre: 'Nuevo local', estado: 'prospecto' })
-      .select('id, nombre, direccion, nombre_contacto, telefono, whatsapp, plan, valor_mensual, estado, referido_por, created_at, updated_at')
+      .select('id, nombre, direccion, nombre_contacto, telefono, whatsapp, plan, valor_mensual, estado, referido_por, creado_en, actualizado_en')
       .single();
 
     if (error) throw error;
@@ -396,10 +396,10 @@ async function loadCrmRequisitos(localId) {
   const client = crmAssertClient();
   const { data, error } = await client
     .from('requisitos')
-    .select('id, descripcion, completado, prioridad, created_at')
+    .select('id, descripcion, completado, prioridad, creado_en')
     .eq('local_id', localId)
     .order('completado', { ascending: true })
-    .order('created_at', { ascending: false });
+    .order('creado_en', { ascending: false });
 
   if (error) throw error;
 
@@ -432,9 +432,9 @@ async function loadCrmBitacora(localId) {
   const client = crmAssertClient();
   const { data, error } = await client
     .from('bitacora')
-    .select('id, tipo, nota, created_at')
+    .select('id, tipo, nota, creado_en')
     .eq('local_id', localId)
-    .order('created_at', { ascending: false });
+    .order('creado_en', { ascending: false });
 
   if (error) throw error;
 
@@ -451,7 +451,7 @@ async function loadCrmBitacora(localId) {
         <li class="crm-timeline__item">
           <div class="crm-timeline__meta">
             <span class="crm-timeline__type">${crmEscape(CRM_BITACORA_LABELS[entry.tipo] || entry.tipo || 'Nota')}</span>
-            <time datetime="${crmEscape(entry.created_at || '')}">${crmEscape(crmFormatDateTime(entry.created_at))}</time>
+            <time datetime="${crmEscape(entry.creado_en || '')}">${crmEscape(crmFormatDateTime(entry.creado_en))}</time>
           </div>
           <p class="crm-timeline__text">${crmEscape(entry.nota || '')}</p>
         </li>
@@ -467,7 +467,7 @@ async function loadCrmFollowUps(localId) {
   const client = crmAssertClient();
   const { data, error } = await client
     .from('follow_ups')
-    .select('id, fecha_hora, nota, completado, created_at')
+    .select('id, fecha_hora, nota, completado, creado_en')
     .eq('local_id', localId)
     .order('completado', { ascending: true })
     .order('fecha_hora', { ascending: true });
@@ -485,7 +485,7 @@ async function loadCrmFollowUps(localId) {
   }
 
   const renderRow = (row) => {
-    const fecha = row.fecha_hora || row.created_at;
+    const fecha = row.fecha_hora || row.creado_en;
     return `
       <li class="crm-followups__item${row.completado ? ' crm-followups__item--done' : ''}">
         <div class="crm-followups__body">
@@ -574,7 +574,7 @@ async function saveCrmInfoForm(event) {
       .from('locales')
       .update(payload)
       .eq('id', crmActiveLocalId)
-      .select('id, nombre, direccion, nombre_contacto, telefono, whatsapp, plan, valor_mensual, estado, referido_por, created_at, updated_at')
+      .select('id, nombre, direccion, nombre_contacto, telefono, whatsapp, plan, valor_mensual, estado, referido_por, creado_en, actualizado_en')
       .single();
 
     if (error) throw error;
