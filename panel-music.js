@@ -5,9 +5,9 @@ let musicUpdating = new Set();
 
 const MUSIC_POLL_MS = 5000;
 const MUSIC_ESTADO_LABELS = {
-  pendiente: 'Pendiente',
-  sonando: 'Sonando',
-  reproducida: 'Reproducida',
+  pendiente: 'Nuevo',
+  sonando: 'En cola',
+  reproducida: 'Listo',
   rechazada: 'Rechazada',
 };
 
@@ -47,6 +47,50 @@ function getMusicCreatedAt(entry) {
   return entry.created || entry.created_at;
 }
 
+function compareMusicQueueEntries(a, b) {
+  const timeA = new Date(getMusicCreatedAt(a) || 0).getTime();
+  const timeB = new Date(getMusicCreatedAt(b) || 0).getTime();
+  if (timeA !== timeB) return timeA - timeB;
+  return String(a.id).localeCompare(String(b.id));
+}
+
+function sortMusicQueue(entries = []) {
+  return [...entries].sort(compareMusicQueueEntries);
+}
+
+function buildMusicCardActions(entry, busy) {
+  const estado = entry.estado || 'pendiente';
+  const disabled = busy ? ' disabled' : '';
+
+  if (estado === 'pendiente') {
+    return `
+      <div class="music-card__actions">
+        <button type="button" class="music-card__btn music-card__btn--queue" data-music-action="sonando" data-music-id="${entry.id}"${disabled}>
+          En cola
+        </button>
+        <button type="button" class="music-card__btn music-card__btn--reject" data-music-action="rechazada" data-music-id="${entry.id}"${disabled}>
+          Rechazar
+        </button>
+      </div>
+    `;
+  }
+
+  if (estado === 'sonando') {
+    return `
+      <div class="music-card__actions">
+        <button type="button" class="music-card__btn music-card__btn--done" data-music-action="reproducida" data-music-id="${entry.id}"${disabled}>
+          Listo
+        </button>
+        <button type="button" class="music-card__btn music-card__btn--reject" data-music-action="rechazada" data-music-id="${entry.id}"${disabled}>
+          Rechazar
+        </button>
+      </div>
+    `;
+  }
+
+  return '';
+}
+
 function renderMusicQueue() {
   const list = document.getElementById('musicQueueList');
   const empty = document.getElementById('musicEmpty');
@@ -68,27 +112,7 @@ function renderMusicQueue() {
       const artista = String(entry.artista || '').trim();
       const cancion = escapeHtml(entry.cancion || 'Sin título');
       const busy = musicUpdating.has(entry.id);
-
-      let actions = '';
-      if (!isDone) {
-        const actionButtons = [];
-        if (estado === 'pendiente') {
-          actionButtons.push(
-            `<button type="button" class="music-card__btn music-card__btn--primary" data-music-action="sonando" data-music-id="${entry.id}"${busy ? ' disabled' : ''}>Marcar sonando</button>`
-          );
-        }
-        if (estado === 'sonando') {
-          actionButtons.push(
-            `<button type="button" class="music-card__btn music-card__btn--primary" data-music-action="reproducida" data-music-id="${entry.id}"${busy ? ' disabled' : ''}>Marcar reproducida</button>`
-          );
-        }
-        if (estado !== 'rechazada' && estado !== 'reproducida') {
-          actionButtons.push(
-            `<button type="button" class="music-card__btn music-card__btn--ghost" data-music-action="rechazada" data-music-id="${entry.id}"${busy ? ' disabled' : ''}>Rechazar</button>`
-          );
-        }
-        actions = `<div class="music-card__actions">${actionButtons.join('')}</div>`;
-      }
+      const actions = isDone ? '' : buildMusicCardActions(entry, busy);
 
       const artistHtml = artista
         ? escapeHtml(artista)
@@ -137,7 +161,7 @@ async function loadMusicQueue() {
 
   if (error) throw error;
 
-  musicQueue = data || [];
+  musicQueue = sortMusicQueue(data || []);
   renderMusicQueue();
 }
 

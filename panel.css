@@ -4029,8 +4029,8 @@ body.mesa-qr-printing .mesa-qr-print {
 }
 
 .music-card--sonando {
-  border-color: rgba(34, 197, 94, 0.45);
-  background: rgba(34, 197, 94, 0.08);
+  border-color: rgba(56, 189, 248, 0.45);
+  background: rgba(56, 189, 248, 0.08);
 }
 
 .music-card--reproducida,
@@ -4080,8 +4080,8 @@ body.mesa-qr-printing .mesa-qr-print {
 }
 
 .music-card--sonando .music-card__status {
-  color: #86efac;
-  background: rgba(34, 197, 94, 0.18);
+  color: #7dd3fc;
+  background: rgba(56, 189, 248, 0.18);
 }
 
 .music-card__meta {
@@ -4100,10 +4100,35 @@ body.mesa-qr-printing .mesa-qr-print {
 }
 
 .music-card__btn {
-  padding: 8px 12px;
+  flex: 1 1 120px;
+  min-height: 40px;
+  padding: 10px 14px;
   border-radius: var(--radius-sm);
-  font-size: 0.8125rem;
+  font-size: 0.875rem;
   font-weight: 700;
+  border: 1px solid transparent;
+  transition: transform 0.12s ease, opacity 0.12s ease;
+}
+
+.music-card__btn:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.music-card__btn--queue {
+  color: #fff;
+  background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%);
+  box-shadow: 0 4px 14px rgba(109, 40, 217, 0.25);
+}
+
+.music-card__btn--done {
+  color: #fff;
+  background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+}
+
+.music-card__btn--reject {
+  color: #fca5a5;
+  background: rgba(239, 68, 68, 0.08);
+  border-color: rgba(239, 68, 68, 0.35);
 }
 
 .music-card__btn--primary {
