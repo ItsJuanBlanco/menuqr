@@ -772,7 +772,19 @@ function closePaymentConfirmModal(proceed) {
   }
 }
 
+function isSplitJoinPaymentFlow() {
+  return Number(state.splitJoinAmount) > 0;
+}
+
 async function ensurePaymentAllowed() {
+  if (isSplitJoinPaymentFlow()) {
+    if (!state.sesionId) {
+      showToast('No se pudo identificar tu sesión.', 'error');
+      return false;
+    }
+    return true;
+  }
+
   const items = state.accountItems || [];
   const confirmed = items.filter((item) => item.confirmado);
   const { pendiente, enPreparacion, otros } = getUnconfirmedItemsByEstado();
@@ -945,11 +957,12 @@ function cleanupLegacySplitUi() {
 }
 
 function buildSplitPaymentUrl(monto, splitCode) {
-  const params = new URLSearchParams({
-    split: splitCode,
-    monto: String(monto),
+  return buildSplitPaymentJoinUrl({
+    slug: RESTAURANTE_SLUG,
+    mesaNumero: state.mesaNumero,
+    splitCode,
+    monto,
   });
-  return `${buildMenuBaseUrl()}&${params.toString()}`;
 }
 
 function clearSplitJoinParamsFromUrl() {
@@ -973,6 +986,14 @@ async function tryJoinFromSplitQrParams() {
   const splitCode = params.get('split')?.trim();
   const montoRaw = params.get('monto');
 
+  console.log('[split-qr] tryJoinFromSplitQrParams', {
+    href: window.location.href,
+    splitCode,
+    montoRaw,
+    mesaId: state.mesaId,
+    mesaNumero: state.mesaNumero,
+  });
+
   if (!splitCode || montoRaw == null) return null;
 
   const monto = Math.round(Number(montoRaw));
@@ -983,6 +1004,12 @@ async function tryJoinFromSplitQrParams() {
   const session = await joinSessionBySplitCode(state.mesaId, splitCode);
 
   state.splitJoinAmount = monto;
+
+  console.log('[split-qr] join ok', {
+    splitJoinAmount: state.splitJoinAmount,
+    sesionId: session.id,
+    sessionTipo: session.tipo,
+  });
 
   clearSplitJoinParamsFromUrl();
 
@@ -1103,11 +1130,21 @@ async function confirmRestaurantQrPayment() {
 }
 
 async function startPaymentFlow(amount, options = {}) {
+  console.log('[payment] startPaymentFlow', {
+    amount,
+    options,
+    splitJoinAmount: state.splitJoinAmount,
+    sesionId: state.sesionId,
+    preserveAmount: options.preserveAmount === true,
+  });
+
   const allowed = await ensurePaymentAllowed();
   if (!allowed) return;
 
-  const deliveredTotal = getAccountDeliveredTotal();
-  if (deliveredTotal <= 0) return;
+  if (!options.preserveAmount) {
+    const deliveredTotal = getAccountDeliveredTotal();
+    if (deliveredTotal <= 0) return;
+  }
 
   let paymentAmount = amount;
   let paymentOptions = { ...options };
@@ -1142,6 +1179,7 @@ async function startPaymentFlow(amount, options = {}) {
     return;
   }
 
+  console.log('[payment] startPaymentFlow → openWompiCheckout', { paymentAmount, paymentOptions });
   openWompiCheckout(paymentAmount, paymentOptions);
 }
 
@@ -1278,7 +1316,7 @@ function updateSplitJoinUI() {
   }
 
   if (btn) {
-    btn.disabled = state.paymentSubmitting || getAccountDeliveredTotal() <= 0;
+    btn.disabled = state.paymentSubmitting || amount <= 0;
   }
 }
 
@@ -1386,6 +1424,8 @@ async function renderSplitQr(shareAmount) {
   }
 
   const url = buildSplitPaymentUrl(shareAmount, splitCode);
+
+  console.log('[split-qr] renderSplitQr URL', url, { shareAmount, splitCode, sesionId: state.sesionId });
 
   if (url === state.lastSplitQrUrl && canvas.childNodes.length > 0) {
     if (hintEl) hintEl.textContent = getSplitGroupHintText();
@@ -1611,6 +1651,12 @@ function extractSesionIdFromWompiReference(reference) {
 }
 
 async function fetchWompiSignature(amountInCents, reference) {
+  console.log('[wompi] fetchWompiSignature →', {
+    amountInCents,
+    reference,
+    url: WOMPI_SIGNATURE_URL,
+  });
+
   const response = await fetch(WOMPI_SIGNATURE_URL, {
     method: 'POST',
     headers: {
@@ -1620,7 +1666,25 @@ async function fetchWompiSignature(amountInCents, reference) {
     body: JSON.stringify({ amount: amountInCents, reference }),
   });
 
-  const data = await response.json();
+  let data;
+  try {
+    data = await response.json();
+  } catch (parseError) {
+    console.error('[wompi] fetchWompiSignature respuesta no JSON', {
+      status: response.status,
+      statusText: response.statusText,
+      parseError,
+    });
+    throw new Error(`No se pudo obtener la firma de Wompi (${response.status}).`);
+  }
+
+  console.log('[wompi] fetchWompiSignature ←', {
+    ok: response.ok,
+    status: response.status,
+    hasSignature: Boolean(data?.signature),
+    hasPublicKey: Boolean(data?.publicKey),
+    error: data?.error || null,
+  });
 
   if (!response.ok) {
     throw new Error(data.error || 'No se pudo obtener la firma de Wompi.');
@@ -2336,6 +2400,13 @@ async function handleWompiRedirectReturn() {
 }
 
 async function openWompiCheckout(amount, options = {}) {
+  console.log('[wompi] openWompiCheckout start', {
+    amount,
+    sesionId: state.sesionId,
+    splitJoinAmount: state.splitJoinAmount,
+    options,
+  });
+
   if (typeof WidgetCheckout === 'undefined') {
     showToast('No se pudo cargar Wompi. Recarga la página.', 'error');
     return;
@@ -2363,6 +2434,13 @@ async function openWompiCheckout(amount, options = {}) {
 
   try {
     const { signature, publicKey } = await fetchWompiSignature(amountInCents, reference);
+
+    console.log('[wompi] openWompiCheckout abriendo widget', {
+      reference,
+      amountInCents,
+      publicKeyPrefix: String(publicKey || '').slice(0, 16),
+      signaturePrefix: String(signature || '').slice(0, 12),
+    });
 
     const checkout = new WidgetCheckout({
       currency: 'COP',
@@ -2507,6 +2585,12 @@ function initWompiPayment() {
 
   document.getElementById('splitJoinPayBtn')?.addEventListener('click', () => {
     const amount = state.splitJoinAmount;
+    console.log('[split-qr] splitJoinPayBtn click', {
+      amount,
+      sesionId: state.sesionId,
+      paymentSubmitting: state.paymentSubmitting,
+      paymentPendingConfirmation: state.paymentPendingConfirmation,
+    });
     if (!amount || state.paymentSubmitting || state.paymentPendingConfirmation) return;
 
     void startPaymentFlow(amount, {

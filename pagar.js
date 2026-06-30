@@ -172,6 +172,11 @@ async function openWompiCheckout({ monto, sesionId, parte, publicKey, restaurant
 }
 
 async function initPagar() {
+  console.warn(
+    '[pagar] Ruta deprecada: /pagar ya no genera checkout válido. ' +
+      'Usá la carta con ?mesa=&split=&monto= (QR del panel).'
+  );
+
   const params = new URLSearchParams(window.location.search);
   const monto = Number(params.get('monto'));
   const sesionId = params.get('sesion');

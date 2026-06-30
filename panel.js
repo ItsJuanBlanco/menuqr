@@ -80,24 +80,6 @@ async function saveSessionCargoServicio(sesionId, cargoServicio) {
   if (error) throw error;
 }
 
-function normalizeSplitPaymentMonto(monto) {
-  const value = Math.round(Number(monto));
-  if (!Number.isFinite(value) || value <= 0) {
-    throw new Error('El monto no es válido.');
-  }
-  return value;
-}
-
-function buildPanelSplitPaymentUrl(mesaNumero, monto, splitCode) {
-  const slug = encodeURIComponent(RESTAURANTE_SLUG || '');
-  const mesa = encodeURIComponent(String(mesaNumero));
-  const params = new URLSearchParams({
-    split: splitCode,
-    monto: String(normalizeSplitPaymentMonto(monto)),
-  });
-  return `${LISTOAPP_BASE_URL}/${slug}?mesa=${mesa}&${params.toString()}`;
-}
-
 async function buildPanelSplitPaymentUrlForSession({ mesaNumero, sesionId, monto }) {
   if (!sesionId) throw new Error('Falta la sesión para generar el QR.');
   if (mesaNumero == null || mesaNumero === '') {
@@ -105,7 +87,21 @@ async function buildPanelSplitPaymentUrlForSession({ mesaNumero, sesionId, monto
   }
 
   const splitCode = await ensureSessionSplitCode(sesionId);
-  return buildPanelSplitPaymentUrl(mesaNumero, monto, splitCode);
+  const url = buildSplitPaymentJoinUrl({
+    slug: RESTAURANTE_SLUG,
+    mesaNumero,
+    splitCode,
+    monto,
+  });
+
+  console.log('[panel][split-qr] URL generada', url, {
+    sesionId,
+    mesaNumero,
+    monto: Math.round(Number(monto)),
+    splitCode,
+  });
+
+  return url;
 }
 
 function getPanelSplitShare(subtotal, splitCount, serviceEnabled = true) {

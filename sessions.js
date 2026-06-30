@@ -20,6 +20,25 @@ function isValidSplitCode(value) {
   return new RegExp(`^[A-Z0-9]{${SPLIT_CODE_LENGTH}}$`).test(normalizeSplitCode(value));
 }
 
+function normalizeSplitPaymentMonto(monto) {
+  const value = Math.round(Number(monto));
+  if (!Number.isFinite(value) || value <= 0) {
+    throw new Error('El monto no es v?lido.');
+  }
+  return value;
+}
+
+function buildSplitPaymentJoinUrl({ slug, mesaNumero, splitCode, monto }) {
+  const safeSlug = encodeURIComponent(slug || RESTAURANTE_SLUG || '');
+  const safeMesa = encodeURIComponent(String(mesaNumero));
+  const params = new URLSearchParams({
+    split: normalizeSplitCode(splitCode),
+    monto: String(normalizeSplitPaymentMonto(monto)),
+  });
+  const baseUrl = typeof LISTOAPP_BASE_URL !== 'undefined' ? LISTOAPP_BASE_URL : '';
+  return `${baseUrl}/${safeSlug}?mesa=${safeMesa}&${params.toString()}`;
+}
+
 async function ensureSessionSplitCode(sesionId) {
   const { data: current, error: readError } = await supabaseClient
     .from('sesiones')
