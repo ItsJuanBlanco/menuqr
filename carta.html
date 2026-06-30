@@ -141,6 +141,9 @@
         <button type="button" class="call-waiter-fab" id="callWaiterFab">
           <span aria-hidden="true">🛎️</span> Llamar mesero
         </button>
+        <button type="button" class="request-song-fab" id="requestSongFab" hidden>
+          <span aria-hidden="true">🎵</span> Pedir canción
+        </button>
       </section>
 
       <!-- Tab: Mi cuenta -->
@@ -371,6 +374,28 @@
     </nav>
 
     <!-- Modal: confirmación antes de pagar -->
+    <div class="payment-confirm-modal" id="songRequestModal" hidden aria-hidden="true" role="dialog" aria-labelledby="songRequestTitle">
+      <div class="payment-confirm-modal__backdrop" data-close-song-request></div>
+      <div class="payment-confirm-modal__box song-request-modal__box">
+        <h2 class="payment-confirm-modal__title" id="songRequestTitle">Pedir canción</h2>
+        <form class="song-request-form" id="songRequestForm">
+          <label class="song-request-form__field">
+            <span class="song-request-form__label">Canción</span>
+            <input type="text" class="song-request-form__input" id="songRequestTitleInput" required maxlength="200" autocomplete="off" placeholder="Nombre de la canción">
+          </label>
+          <label class="song-request-form__field">
+            <span class="song-request-form__label">Artista <span class="song-request-form__optional">(opcional)</span></span>
+            <input type="text" class="song-request-form__input" id="songRequestArtistInput" maxlength="200" autocomplete="off" placeholder="Artista o banda">
+          </label>
+          <p class="song-request-form__error" id="songRequestError" hidden role="alert"></p>
+          <div class="payment-confirm-modal__actions">
+            <button type="submit" class="payment-confirm-modal__btn payment-confirm-modal__btn--primary" id="songRequestSubmitBtn">Pedir</button>
+            <button type="button" class="payment-confirm-modal__btn payment-confirm-modal__btn--ghost" data-close-song-request>Cerrar</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
     <div class="payment-confirm-modal" id="partialDeliveryPayModal" hidden aria-hidden="true" role="dialog" aria-labelledby="partialDeliveryPayTitle">
       <div class="payment-confirm-modal__backdrop" data-partial-pay-action="wait"></div>
       <div class="payment-confirm-modal__box">

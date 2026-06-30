@@ -2653,6 +2653,117 @@ function switchTab(tabId) {
   updateCartBarVisibility();
 }
 
+/* ── Pedir canción ── */
+function isMusicEnabled() {
+  return RESTAURANTE?.musica_habilitada === true;
+}
+
+function applyMusicClientUI() {
+  const fab = document.getElementById('requestSongFab');
+  if (fab) fab.hidden = !isMusicEnabled();
+  document.body.classList.toggle('music-request-enabled', isMusicEnabled());
+}
+
+function openSongRequestModal() {
+  const modal = document.getElementById('songRequestModal');
+  const errorEl = document.getElementById('songRequestError');
+  const titleInput = document.getElementById('songRequestTitleInput');
+  const artistInput = document.getElementById('songRequestArtistInput');
+
+  if (!modal) return;
+
+  if (errorEl) {
+    errorEl.hidden = true;
+    errorEl.textContent = '';
+  }
+  if (titleInput) titleInput.value = '';
+  if (artistInput) artistInput.value = '';
+
+  modal.hidden = false;
+  modal.setAttribute('aria-hidden', 'false');
+  titleInput?.focus();
+}
+
+function closeSongRequestModal() {
+  const modal = document.getElementById('songRequestModal');
+  if (!modal) return;
+  modal.hidden = true;
+  modal.setAttribute('aria-hidden', 'true');
+}
+
+async function submitSongRequest(event) {
+  event.preventDefault();
+
+  if (!isMusicEnabled()) {
+    showToast('El pedido de canciones no está disponible.', 'error');
+    return;
+  }
+
+  if (!state.mesaId || !state.sesionId) {
+    showToast('Necesitás una sesión activa para pedir una canción.', 'error');
+    return;
+  }
+
+  const titleInput = document.getElementById('songRequestTitleInput');
+  const artistInput = document.getElementById('songRequestArtistInput');
+  const errorEl = document.getElementById('songRequestError');
+  const submitBtn = document.getElementById('songRequestSubmitBtn');
+  const cancion = String(titleInput?.value || '').trim();
+  const artista = String(artistInput?.value || '').trim();
+
+  if (!cancion) {
+    if (errorEl) {
+      errorEl.textContent = 'Indicá el nombre de la canción.';
+      errorEl.hidden = false;
+    }
+    titleInput?.focus();
+    return;
+  }
+
+  if (errorEl) errorEl.hidden = true;
+  if (submitBtn) submitBtn.disabled = true;
+
+  try {
+    const { error } = await supabaseClient.from('canciones_pedidas').insert({
+      restaurante_id: RESTAURANTE_ID,
+      mesa_id: state.mesaId,
+      sesion_id: state.sesionId,
+      cancion,
+      artista: artista || null,
+      estado: 'pendiente',
+    });
+
+    if (error) throw error;
+
+    closeSongRequestModal();
+    showToast('Canción pedida 🎵', 'success');
+  } catch (error) {
+    console.error(error);
+    const message = error.message || 'No se pudo enviar el pedido de canción.';
+    if (errorEl) {
+      errorEl.textContent = message;
+      errorEl.hidden = false;
+    } else {
+      showToast(message, 'error');
+    }
+  } finally {
+    if (submitBtn) submitBtn.disabled = false;
+  }
+}
+
+function initSongRequest() {
+  const fab = document.getElementById('requestSongFab');
+  const form = document.getElementById('songRequestForm');
+  const modal = document.getElementById('songRequestModal');
+
+  fab?.addEventListener('click', openSongRequestModal);
+  form?.addEventListener('submit', submitSongRequest);
+
+  modal?.querySelectorAll('[data-close-song-request]').forEach((el) => {
+    el.addEventListener('click', closeSongRequestModal);
+  });
+}
+
 /* ── Llamar mesero ── */
 function initWaiterButtons() {
   const tabBtn = document.getElementById('callWaiterBtn');
@@ -2716,6 +2827,8 @@ async function init() {
   const restaurant = await window.restaurantReady;
   if (!restaurant) return;
 
+  applyMusicClientUI();
+
   try {
     await loadMesa();
 
@@ -2749,6 +2862,7 @@ async function init() {
     updateCartBar();
     updateCartBarVisibility();
     initWaiterButtons();
+    initSongRequest();
     initChangeSessionButton();
     initAccountSwitch();
     initPaymentExtras();

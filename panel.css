@@ -3991,3 +3991,133 @@ body.mesa-qr-printing .mesa-qr-print {
     max-height: 220px;
   }
 }
+
+/* ── Música ── */
+.music-panel__head {
+  margin-bottom: 16px;
+}
+
+.music-panel__title {
+  margin: 0 0 4px;
+  font-size: 1.125rem;
+  font-weight: 700;
+}
+
+.music-panel__hint {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--text-muted);
+}
+
+.music-queue {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.music-card {
+  padding: 14px 16px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.music-card--pendiente {
+  border-color: rgba(139, 92, 246, 0.55);
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.14) 0%, rgba(109, 40, 217, 0.08) 100%);
+  box-shadow: 0 0 0 1px rgba(139, 92, 246, 0.15);
+}
+
+.music-card--sonando {
+  border-color: rgba(34, 197, 94, 0.45);
+  background: rgba(34, 197, 94, 0.08);
+}
+
+.music-card--reproducida,
+.music-card--rechazada {
+  opacity: 0.72;
+}
+
+.music-card__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.music-card__title {
+  margin: 0 0 4px;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.music-card__artist {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--text-muted);
+}
+
+.music-card__artist-muted {
+  font-style: italic;
+  opacity: 0.85;
+}
+
+.music-card__status {
+  flex-shrink: 0;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.music-card--pendiente .music-card__status {
+  color: #c4b5fd;
+  background: rgba(139, 92, 246, 0.2);
+}
+
+.music-card--sonando .music-card__status {
+  color: #86efac;
+  background: rgba(34, 197, 94, 0.18);
+}
+
+.music-card__meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+}
+
+.music-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.music-card__btn {
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 0.8125rem;
+  font-weight: 700;
+}
+
+.music-card__btn--primary {
+  color: #fff;
+  background: var(--accent);
+}
+
+.music-card__btn--ghost {
+  color: var(--text-muted);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--border);
+}
+
+.music-card__btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}

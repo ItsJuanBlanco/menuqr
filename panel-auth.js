@@ -41,9 +41,9 @@ function buildPanelUrl(slug) {
 
 function getAllowedPanelTabs(role) {
   if (role === 'admin') {
-    return new Set(['pedidos', 'mesas', 'historial', 'menu', 'resumen', 'meseros', 'qr', 'ajustes']);
+    return new Set(['pedidos', 'mesas', 'historial', 'musica', 'menu', 'resumen', 'meseros', 'qr', 'ajustes']);
   }
-  return new Set(['pedidos', 'mesas', 'historial']);
+  return new Set(['pedidos', 'mesas', 'historial', 'musica']);
 }
 
 function redirectToLogin(slug) {

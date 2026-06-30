@@ -491,6 +491,7 @@ function readRestaurantFormValues() {
     pin_mesero: document.getElementById('restaurantPinMesero')?.value?.trim(),
     pin_admin: document.getElementById('restaurantPinAdmin')?.value?.trim(),
     mesas_count,
+    musica_habilitada: document.getElementById('restaurantMusicaHabilitada')?.checked === true,
   };
 }
 
@@ -606,6 +607,8 @@ function openNewRestaurantModal() {
   setRestaurantFormError('');
   updateSlugPreview('');
   resetAdminPaymentForm();
+  const musicaInput = document.getElementById('restaurantMusicaHabilitada');
+  if (musicaInput) musicaInput.checked = false;
   openRestaurantModal();
   document.getElementById('restaurantName')?.focus();
 }
@@ -622,7 +625,7 @@ async function openEditRestaurantModal(restaurantId) {
     const client = assertSupabaseClient();
     const { data, error } = await client
       .from('restaurantes')
-      .select('id, nombre, slug, ciudad, email, pin_mesero, pin_admin, metodo_pago, wompi_public_key, link_pago, link_bancolombia, qr_pago_url')
+      .select('id, nombre, slug, ciudad, email, pin_mesero, pin_admin, metodo_pago, wompi_public_key, link_pago, link_bancolombia, qr_pago_url, musica_habilitada')
       .eq('id', restaurantId)
       .single();
 
@@ -637,6 +640,9 @@ async function openEditRestaurantModal(restaurantId) {
     document.getElementById('restaurantPinMesero').value = data.pin_mesero || '';
     document.getElementById('restaurantPinAdmin').value = data.pin_admin || '';
     populateAdminPaymentForm(data);
+
+    const musicaInput = document.getElementById('restaurantMusicaHabilitada');
+    if (musicaInput) musicaInput.checked = data.musica_habilitada === true;
 
     const mesas = await fetchRestaurantMesas(restaurantId);
     setRestaurantMesasFieldVisible(true);
@@ -712,7 +718,7 @@ async function saveRestaurantPaymentSettings(restaurantId) {
   currentAdminQrPagoUrl = qr_pago_url;
 }
 
-async function createRestaurant({ nombre, slug, ciudad, email, pin_mesero, pin_admin, mesas_count }) {
+async function createRestaurant({ nombre, slug, ciudad, email, pin_mesero, pin_admin, mesas_count, musica_habilitada }) {
   const client = assertSupabaseClient();
   let payment;
 
@@ -738,6 +744,7 @@ async function createRestaurant({ nombre, slug, ciudad, email, pin_mesero, pin_a
       wompi_public_key: payment.wompi_public_key,
       link_pago: payment.link_pago,
       link_bancolombia: payment.link_bancolombia,
+      musica_habilitada: musica_habilitada === true,
     })
     .select('id, nombre, slug, ciudad, email, activo, created_at')
     .single();
@@ -764,7 +771,7 @@ async function createRestaurant({ nombre, slug, ciudad, email, pin_mesero, pin_a
   return { restaurant, mesasCount };
 }
 
-async function updateRestaurant(restaurantId, { nombre, ciudad, email, pin_mesero, pin_admin, mesas_count }) {
+async function updateRestaurant(restaurantId, { nombre, ciudad, email, pin_mesero, pin_admin, mesas_count, musica_habilitada }) {
   const client = assertSupabaseClient();
 
   const { data, error } = await client
@@ -775,6 +782,7 @@ async function updateRestaurant(restaurantId, { nombre, ciudad, email, pin_meser
       email,
       pin_mesero,
       pin_admin,
+      musica_habilitada: musica_habilitada === true,
     })
     .eq('id', restaurantId)
     .select('id, nombre, slug, ciudad, email, activo, created_at')

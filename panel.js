@@ -26,7 +26,7 @@ const PANEL_POLL_INTERVAL_MS = 5000;
 const PANEL_SOUNDS_STORAGE_KEY = 'panel_sonidos';
 const PANEL_SERVICE_PERCENT = 10;
 
-const VALID_PANEL_TABS = new Set(['pedidos', 'mesas', 'historial', 'menu', 'resumen', 'meseros', 'qr', 'ajustes']);
+const VALID_PANEL_TABS = new Set(['pedidos', 'mesas', 'historial', 'musica', 'menu', 'resumen', 'meseros', 'qr', 'ajustes']);
 const ACTIVE_PANEL_TAB_KEY = 'activePanelTab';
 
 function saveActivePanelTab(panelId) {
@@ -464,6 +464,8 @@ async function runPanelPoll() {
       await fetchMesas({ skipRender: true });
     } else if (activePanel === 'mesas') {
       await Promise.all([fetchMesas(), fetchOrders()]);
+    } else if (activePanel === 'musica' && typeof loadMusicQueue === 'function') {
+      await loadMusicQueue();
     }
   } catch (error) {
     console.error(error);
@@ -790,6 +792,8 @@ async function refreshActivePanelData(panelId) {
       await loadRestaurantSettings();
     } else if (panelId === 'meseros' && typeof loadMeserosPanel === 'function') {
       await loadMeserosPanel();
+    } else if (panelId === 'musica' && typeof loadMusicQueue === 'function') {
+      await loadMusicQueue();
     }
   } catch (error) {
     console.error(error);
@@ -3973,6 +3977,32 @@ function subscribeToRealtime() {
       .on('postgres_changes', { event: 'DELETE', schema: 'public', table }, scheduleRealtimeRefresh);
   });
 
+  if (RESTAURANTE?.musica_habilitada === true) {
+    const musicFilter = `restaurante_id=eq.${RESTAURANTE_ID}`;
+    realtimeChannel
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'canciones_pedidas', filter: musicFilter },
+        () => {
+          if (typeof loadMusicQueue === 'function') void loadMusicQueue();
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'canciones_pedidas', filter: musicFilter },
+        () => {
+          if (typeof loadMusicQueue === 'function') void loadMusicQueue();
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'DELETE', schema: 'public', table: 'canciones_pedidas', filter: musicFilter },
+        () => {
+          if (typeof loadMusicQueue === 'function') void loadMusicQueue();
+        }
+      );
+  }
+
   realtimeChannel
     .on(
       'postgres_changes',
@@ -4035,6 +4065,7 @@ async function init() {
       typeof fetchMenuProducts === 'function' ? fetchMenuProducts() : Promise.resolve(),
     ]);
     restoreActivePanelTab();
+    if (typeof applyMusicPanelVisibility === 'function') applyMusicPanelVisibility();
     subscribeToRealtime();
     panelAlertsInitialized = true;
     startPanelPolling();

@@ -68,6 +68,8 @@ async function syncRestaurantSettings(data) {
   applyRestaurantTheme(data);
   applyRestaurantCover(data);
   populateSettingsForm(data);
+  if (typeof applyMusicPanelVisibility === 'function') applyMusicPanelVisibility();
+  if (typeof subscribeToRealtime === 'function') subscribeToRealtime();
 }
 
 async function updateRestaurantSettingsFields(fields, successMessage) {
@@ -86,7 +88,7 @@ async function updateRestaurantSettingsFields(fields, successMessage) {
       .update(fields)
       .eq('id', RESTAURANTE_ID)
       .select(
-        'id, slug, nombre, ciudad, logo_url, foto_portada, foto_portada_posicion, color_primario, color_fondo, wompi_public_key, metodo_pago, qr_pago_url, link_pago, link_bancolombia, google_review_url'
+        'id, slug, nombre, ciudad, logo_url, foto_portada, foto_portada_posicion, color_primario, color_fondo, wompi_public_key, metodo_pago, qr_pago_url, link_pago, link_bancolombia, google_review_url, musica_habilitada'
       )
       .single();
 
@@ -374,13 +376,16 @@ function populateSettingsForm(restaurant) {
 
   const googleReviewInput = document.getElementById('settingsGoogleReviewUrl');
   if (googleReviewInput) googleReviewInput.value = restaurant?.google_review_url || '';
+
+  const musicaInput = document.getElementById('settingsMusicaHabilitada');
+  if (musicaInput) musicaInput.checked = restaurant?.musica_habilitada === true;
 }
 
 async function fetchRestaurantSettings() {
   const { data, error } = await supabaseClient
     .from('restaurantes')
     .select(
-      'id, slug, nombre, ciudad, logo_url, foto_portada, foto_portada_posicion, color_primario, color_fondo, metodo_pago, qr_pago_url, link_pago, link_bancolombia, google_review_url'
+      'id, slug, nombre, ciudad, logo_url, foto_portada, foto_portada_posicion, color_primario, color_fondo, metodo_pago, qr_pago_url, link_pago, link_bancolombia, google_review_url, musica_habilitada'
     )
     .eq('id', RESTAURANTE_ID)
     .single();
@@ -417,6 +422,7 @@ async function saveRestaurantSettings(event) {
   const linkInput = document.getElementById('settingsLinkPago');
   const bancolombiaInput = document.getElementById('settingsLinkBancolombia');
   const googleReviewInput = document.getElementById('settingsGoogleReviewUrl');
+  const musicaInput = document.getElementById('settingsMusicaHabilitada');
   let link_pago = null;
   let link_bancolombia = null;
   let google_review_url = null;
@@ -489,10 +495,11 @@ async function saveRestaurantSettings(event) {
         link_pago,
         link_bancolombia,
         google_review_url,
+        musica_habilitada: musicaInput?.checked === true,
       })
       .eq('id', RESTAURANTE_ID)
       .select(
-        'id, slug, nombre, ciudad, logo_url, foto_portada, foto_portada_posicion, color_primario, color_fondo, wompi_public_key, metodo_pago, qr_pago_url, link_pago, link_bancolombia, google_review_url'
+        'id, slug, nombre, ciudad, logo_url, foto_portada, foto_portada_posicion, color_primario, color_fondo, wompi_public_key, metodo_pago, qr_pago_url, link_pago, link_bancolombia, google_review_url, musica_habilitada'
       )
       .single();
 
@@ -623,6 +630,14 @@ function bindSettingsForm() {
 
   document.getElementById('settingsCoverPosition')?.addEventListener('input', (event) => {
     applyCoverPositionPreview(event.target.value);
+  });
+
+  document.getElementById('settingsMusicaHabilitada')?.addEventListener('change', async (event) => {
+    const enabled = event.target.checked === true;
+    await updateRestaurantSettingsFields(
+      { musica_habilitada: enabled },
+      enabled ? 'Pedido de canciones activado' : 'Pedido de canciones desactivado'
+    );
   });
 }
 
