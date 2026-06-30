@@ -986,11 +986,41 @@ async function init() {
   bindLogout();
   bindRestaurantListActions();
   bindRestaurantModal();
+  bindAdminTabs();
 
   document.getElementById('newRestaurantBtn')?.addEventListener('click', openNewRestaurantModal);
 
   const restored = await restoreSession();
   if (!restored) showLogin();
+}
+
+function switchAdminTab(tabId) {
+  const restaurantsPanel = document.getElementById('adminRestaurantsPanel');
+  const crmPanel = document.getElementById('adminCrmPanel');
+  const tabRestaurants = document.getElementById('adminTabRestaurants');
+  const tabCrm = document.getElementById('adminTabCrm');
+
+  const isRestaurants = tabId !== 'crm';
+
+  restaurantsPanel?.toggleAttribute('hidden', !isRestaurants);
+  crmPanel?.toggleAttribute('hidden', isRestaurants);
+
+  tabRestaurants?.classList.toggle('admin-tabs__btn--active', isRestaurants);
+  tabCrm?.classList.toggle('admin-tabs__btn--active', !isRestaurants);
+  tabRestaurants?.setAttribute('aria-selected', isRestaurants ? 'true' : 'false');
+  tabCrm?.setAttribute('aria-selected', !isRestaurants ? 'true' : 'false');
+
+  if (!isRestaurants && typeof loadCrmData === 'function') {
+    void loadCrmData();
+  }
+}
+
+function bindAdminTabs() {
+  document.querySelectorAll('[data-admin-tab]').forEach((btn) => {
+    if (btn.dataset.bound) return;
+    btn.dataset.bound = 'true';
+    btn.addEventListener('click', () => switchAdminTab(btn.dataset.adminTab));
+  });
 }
 
 document.addEventListener('DOMContentLoaded', init);

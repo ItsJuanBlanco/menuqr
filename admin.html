@@ -62,7 +62,12 @@
       </div>
     </header>
 
-    <main class="panel-main admin-main">
+    <nav class="admin-tabs" role="tablist" aria-label="Secciones admin">
+      <button type="button" class="admin-tabs__btn admin-tabs__btn--active" id="adminTabRestaurants" data-admin-tab="restaurants" role="tab" aria-selected="true">Restaurantes</button>
+      <button type="button" class="admin-tabs__btn" id="adminTabCrm" data-admin-tab="crm" role="tab" aria-selected="false">CRM</button>
+    </nav>
+
+    <main class="panel-main admin-main" id="adminRestaurantsPanel" role="tabpanel">
       <div class="admin-toolbar">
         <p class="admin-toolbar__hint">Restaurantes registrados en la plataforma</p>
         <button type="button" class="menu-toolbar__btn" id="newRestaurantBtn">+ Nuevo restaurante</button>
@@ -89,6 +94,133 @@
         </table>
       </div>
     </main>
+
+    <main class="panel-main admin-main admin-crm" id="adminCrmPanel" hidden role="tabpanel">
+      <section class="crm-urgent reveal" id="crmUrgentSection" hidden>
+        <div class="crm-urgent__head">
+          <h2 class="crm-urgent__title">Follow-ups de hoy</h2>
+          <span class="crm-urgent__count" id="crmUrgentCount">0</span>
+        </div>
+        <ul class="crm-urgent__list" id="crmUrgentList"></ul>
+      </section>
+
+      <div class="admin-toolbar crm-toolbar">
+        <p class="admin-toolbar__hint">Pipeline de ventas · locales prospecto a cliente</p>
+        <button type="button" class="menu-toolbar__btn" id="crmNewLocalBtn">+ Nuevo local</button>
+      </div>
+
+      <div class="crm-loading" id="crmLoading" hidden>Cargando CRM…</div>
+      <p class="crm-error" id="crmError" hidden role="alert"></p>
+
+      <div class="crm-kanban" id="crmKanban" hidden></div>
+    </main>
+  </div>
+
+  <div class="modal" id="crmLocalModal" hidden aria-hidden="true">
+    <div class="modal__backdrop" data-close-crm-modal></div>
+    <div class="modal__box admin-modal crm-modal" role="dialog" aria-labelledby="crmLocalModalTitle">
+      <header class="modal__head">
+        <div>
+          <h2 class="modal__title" id="crmLocalModalTitle">Local</h2>
+          <p class="crm-modal__referral" id="crmReferralLine" hidden></p>
+        </div>
+        <button type="button" class="modal__close" data-close-crm-modal aria-label="Cerrar">×</button>
+      </header>
+
+      <nav class="crm-modal__tabs" role="tablist" aria-label="Detalle del local">
+        <button type="button" class="crm-modal__tab crm-modal__tab--active" data-crm-tab="info" role="tab" aria-selected="true">Info</button>
+        <button type="button" class="crm-modal__tab" data-crm-tab="requisitos" role="tab" aria-selected="false">Requisitos</button>
+        <button type="button" class="crm-modal__tab" data-crm-tab="bitacora" role="tab" aria-selected="false">Bitácora</button>
+        <button type="button" class="crm-modal__tab" data-crm-tab="followups" role="tab" aria-selected="false">Follow-ups</button>
+      </nav>
+
+      <div class="crm-modal__panels">
+        <section class="crm-modal__panel crm-modal__panel--active" id="crmPanelInfo" data-crm-panel="info" role="tabpanel">
+          <form class="admin-form" id="crmInfoForm">
+            <label class="admin-form__field">
+              <span class="admin-form__label">Nombre del local</span>
+              <input type="text" class="admin-form__input" id="crmNombre" required>
+            </label>
+            <label class="admin-form__field">
+              <span class="admin-form__label">Dirección</span>
+              <input type="text" class="admin-form__input" id="crmDireccion">
+            </label>
+            <label class="admin-form__field">
+              <span class="admin-form__label">Nombre de contacto</span>
+              <input type="text" class="admin-form__input" id="crmContacto">
+            </label>
+            <div class="admin-form__row">
+              <label class="admin-form__field">
+                <span class="admin-form__label">Teléfono</span>
+                <input type="tel" class="admin-form__input" id="crmTelefono">
+              </label>
+              <label class="admin-form__field">
+                <span class="admin-form__label">WhatsApp</span>
+                <input type="tel" class="admin-form__input" id="crmWhatsapp">
+              </label>
+            </div>
+            <div class="admin-form__row">
+              <label class="admin-form__field">
+                <span class="admin-form__label">Plan</span>
+                <input type="text" class="admin-form__input" id="crmPlan" placeholder="Básico, Pro…">
+              </label>
+              <label class="admin-form__field">
+                <span class="admin-form__label">Valor mensual (COP)</span>
+                <input type="number" class="admin-form__input" id="crmValorMensual" min="0" step="1000">
+              </label>
+            </div>
+            <label class="admin-form__field">
+              <span class="admin-form__label">Estado</span>
+              <select class="admin-form__input" id="crmEstado"></select>
+            </label>
+            <label class="admin-form__field">
+              <span class="admin-form__label">Referido por (local)</span>
+              <select class="admin-form__input" id="crmReferidoPor">
+                <option value="">— Ninguno —</option>
+              </select>
+            </label>
+            <p class="admin-form__error" id="crmInfoError" hidden role="alert"></p>
+            <button type="submit" class="dataphone-modal__confirm" id="crmInfoSaveBtn">Guardar cambios</button>
+          </form>
+        </section>
+
+        <section class="crm-modal__panel" id="crmPanelRequisitos" data-crm-panel="requisitos" hidden role="tabpanel">
+          <form class="crm-inline-form" id="crmRequisitoForm">
+            <input type="text" class="admin-form__input" id="crmRequisitoInput" placeholder="Nueva tarea…" required>
+            <select class="admin-form__input crm-inline-form__select" id="crmRequisitoPrioridad">
+              <option value="baja">Baja</option>
+              <option value="media" selected>Media</option>
+              <option value="alta">Alta</option>
+            </select>
+            <button type="submit" class="admin-action-btn admin-action-btn--primary">Agregar</button>
+          </form>
+          <ul class="crm-checklist" id="crmRequisitosList"></ul>
+        </section>
+
+        <section class="crm-modal__panel" id="crmPanelBitacora" data-crm-panel="bitacora" hidden role="tabpanel">
+          <form class="crm-bitacora-form" id="crmBitacoraForm">
+            <select class="admin-form__input" id="crmBitacoraTipo">
+              <option value="llamada">Llamada</option>
+              <option value="visita">Visita</option>
+              <option value="whatsapp">WhatsApp</option>
+              <option value="reunion">Reunión</option>
+            </select>
+            <textarea class="admin-form__input crm-bitacora-form__text" id="crmBitacoraNota" rows="3" placeholder="Notas de la interacción…" required></textarea>
+            <button type="submit" class="admin-action-btn admin-action-btn--primary">Registrar nota</button>
+          </form>
+          <ul class="crm-timeline" id="crmBitacoraList"></ul>
+        </section>
+
+        <section class="crm-modal__panel" id="crmPanelFollowups" data-crm-panel="followups" hidden role="tabpanel">
+          <form class="crm-followup-form" id="crmFollowupForm">
+            <input type="datetime-local" class="admin-form__input" id="crmFollowupFecha" required>
+            <input type="text" class="admin-form__input" id="crmFollowupNota" placeholder="Recordatorio…">
+            <button type="submit" class="admin-action-btn admin-action-btn--primary">Programar</button>
+          </form>
+          <ul class="crm-followups" id="crmFollowupsList"></ul>
+        </section>
+      </div>
+    </div>
   </div>
 
   <div class="modal" id="restaurantModal" hidden aria-hidden="true">
@@ -261,5 +393,6 @@
   <script src="/config.js"></script>
   <script src="/panel-auth.js"></script>
   <script src="/admin.js"></script>
+  <script src="/admin-crm.js"></script>
 </body>
 </html>
