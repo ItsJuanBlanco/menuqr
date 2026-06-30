@@ -157,6 +157,11 @@
             <h2 class="settings-panel__title">Meseros</h2>
             <p class="settings-panel__hint">Gestioná el equipo que puede asignarse al abrir una orden en Mesas.</p>
           </div>
+          <nav class="meseros-panel__tabs" id="meserosSubTabs" role="tablist" aria-label="Secciones meseros" hidden>
+            <button type="button" class="meseros-panel__tab meseros-panel__tab--active" data-meseros-panel="equipo" role="tab" aria-selected="true">Equipo</button>
+            <button type="button" class="meseros-panel__tab" data-meseros-panel="comisiones" role="tab" aria-selected="false">Comisiones</button>
+          </nav>
+          <div class="meseros-panel__section" id="meserosPanelEquipo" data-meseros-section="equipo">
           <div class="settings-meseros__form meseros-panel__form">
             <label class="settings-form__field settings-form__field--full" for="meserosNameInput">
               <span class="settings-form__label">Nombre del mesero</span>
@@ -175,6 +180,19 @@
           </div>
           <ul class="settings-meseros__list" id="meserosList"></ul>
           <p class="settings-meseros__empty" id="meserosEmpty" hidden>Sin meseros registrados.</p>
+          </div>
+          <div class="meseros-panel__section" id="meserosPanelComisiones" data-meseros-section="comisiones" hidden>
+            <div class="meseros-commissions__toolbar">
+              <label class="settings-form__field" for="meserosCommissionDate">
+                <span class="settings-form__label">Fecha</span>
+                <input type="date" class="settings-form__text meseros-commissions__date" id="meserosCommissionDate">
+              </label>
+              <button type="button" class="menu-toolbar__btn" id="meserosCommissionRefreshBtn">Actualizar</button>
+            </div>
+            <div class="meseros-commissions__loading" id="meserosCommissionLoading" hidden>Cargando comisiones…</div>
+            <p class="meseros-commissions__error" id="meserosCommissionError" hidden role="alert"></p>
+            <div class="meseros-commissions__results" id="meserosCommissionResults"></div>
+          </div>
         </div>
       </section>
 
@@ -603,6 +621,10 @@
             <label class="product-form__field">
               <span>Precio (COP)</span>
               <input type="number" id="productPrecio" required min="0" step="100">
+            </label>
+            <label class="product-form__field" id="productPrecioMeseroField" hidden>
+              <span>Precio mesero (COP)</span>
+              <input type="number" id="productPrecioMesero" min="0" step="100" placeholder="Comisión por unidad">
             </label>
             <label class="product-form__field">
               <span>Categoría</span>

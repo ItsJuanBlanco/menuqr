@@ -7,11 +7,28 @@ let menuReloading = false;
 let menuOrderSaving = false;
 const NEW_CATEGORY_VALUE = '__new__';
 const PRODUCT_IMAGE_BUCKET = 'productos';
+const MESERO_PRICE_SLUG = 'donde-juanito';
 const ALLOWED_PRODUCT_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 
 let pendingProductImageFile = null;
 let pendingProductImagePreviewUrl = null;
 let currentProductImageUrl = null;
+
+function isMeseroPriceEnabled() {
+  return RESTAURANTE_SLUG === MESERO_PRICE_SLUG;
+}
+
+function updateProductMeseroPriceFieldVisibility() {
+  const field = document.getElementById('productPrecioMeseroField');
+  if (field) field.hidden = !isMeseroPriceEnabled();
+}
+
+function parseOptionalPrecioInput(value) {
+  const cleaned = String(value ?? '').trim();
+  if (!cleaned) return null;
+  const precio = parseInt(cleaned.replace(/\./g, '').replace(/,/g, ''), 10);
+  return Number.isFinite(precio) && precio >= 0 ? precio : NaN;
+}
 
 function groupProductsByCategory(products) {
   const groups = new Map();
@@ -90,7 +107,7 @@ async function reloadMenuProducts() {
 
     const { data, error } = await supabaseClient
       .from('productos')
-      .select('id, nombre, descripcion, precio, categoria, disponible, imagen_url, restaurante_id')
+      .select('id, nombre, descripcion, precio, precio_mesero, categoria, disponible, imagen_url, restaurante_id')
       .eq('restaurante_id', RESTAURANTE_ID)
       .order('nombre', { ascending: true });
 
@@ -430,6 +447,12 @@ function openProductModal(product = null) {
   document.getElementById('productNombre').value = product?.nombre || '';
   document.getElementById('productDescripcion').value = product?.descripcion || '';
   document.getElementById('productPrecio').value = product?.precio ?? '';
+  const precioMeseroInput = document.getElementById('productPrecioMesero');
+  if (precioMeseroInput) {
+    precioMeseroInput.value =
+      product?.precio_mesero != null && product?.precio_mesero !== '' ? product.precio_mesero : '';
+  }
+  updateProductMeseroPriceFieldVisibility();
   populateProductCategorySelect(product?.categoria || '');
   document.getElementById('productDisponible').checked = product ? product.disponible !== false : true;
   resetProductImageField(product?.imagen_url || '');
@@ -458,14 +481,24 @@ function parsePrecioInput(value) {
 
 function readProductFormPayload() {
   const precio = parsePrecioInput(document.getElementById('productPrecio').value);
-
-  return {
+  const payload = {
     nombre: document.getElementById('productNombre').value.trim(),
     descripcion: document.getElementById('productDescripcion').value.trim() || null,
     precio,
     categoria: getProductCategoryValue(),
     disponible: document.getElementById('productDisponible').checked,
   };
+
+  if (isMeseroPriceEnabled()) {
+    const precioMesero = parseOptionalPrecioInput(document.getElementById('productPrecioMesero')?.value);
+    if (Number.isNaN(precioMesero)) {
+      payload.precio_mesero = '__invalid__';
+    } else {
+      payload.precio_mesero = precioMesero;
+    }
+  }
+
+  return payload;
 }
 
 async function saveProduct(event) {
@@ -480,31 +513,38 @@ async function saveProduct(event) {
     return;
   }
 
+  if (payload.precio_mesero === '__invalid__') {
+    showToast('El precio mesero debe ser un número válido.', 'error');
+    return;
+  }
+
   menuSaving = true;
   document.getElementById('productSaveBtn').disabled = true;
 
   try {
     let productId = id;
     const imageFile = pendingProductImageFile;
+    const savePayload = {
+      nombre: payload.nombre,
+      descripcion: payload.descripcion,
+      precio: payload.precio,
+      categoria: payload.categoria,
+      disponible: payload.disponible,
+    };
+
+    if (isMeseroPriceEnabled()) {
+      savePayload.precio_mesero = payload.precio_mesero;
+    }
 
     if (id) {
-      const { error } = await supabaseClient
-        .from('productos')
-        .update({
-          nombre: payload.nombre,
-          descripcion: payload.descripcion,
-          precio: payload.precio,
-          categoria: payload.categoria,
-          disponible: payload.disponible,
-        })
-        .eq('id', id);
+      const { error } = await supabaseClient.from('productos').update(savePayload).eq('id', id);
 
       if (error) throw error;
     } else {
       const { data, error } = await supabaseClient
         .from('productos')
         .insert({
-          ...payload,
+          ...savePayload,
           restaurante_id: RESTAURANTE_ID,
         })
         .select('id')
@@ -669,6 +709,7 @@ function initMenuPanel() {
   bindProductCategorySelect();
   bindProductImageField();
   bindMenuActions();
+  updateProductMeseroPriceFieldVisibility();
 }
 
 document.addEventListener('DOMContentLoaded', initMenuPanel);
