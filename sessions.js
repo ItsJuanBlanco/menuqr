@@ -1,6 +1,7 @@
 const SESSION_STORAGE_PREFIX = 'menuqr:sesion';
 const SPLIT_CODE_LENGTH = 6;
 const SPLIT_CODE_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+const LISTO_SERVICE_PERCENT = 10;
 
 function generateSplitCode() {
   const bytes = new Uint8Array(SPLIT_CODE_LENGTH);
@@ -77,7 +78,7 @@ async function ensureSessionSplitCode(sesionId) {
     if (refetch?.codigo_split) return refetch.codigo_split;
   }
 
-  throw new Error('No se pudo generar el código de división.');
+  throw new Error('No se pudo generar el c?digo de divisi?n.');
 }
 
 function getSessionStorageKey(mesaId) {
@@ -241,12 +242,12 @@ async function joinOrCreateGroupSession(mesaId) {
 async function findActiveSessionByCode(mesaId, codeInput) {
   const digits = String(codeInput).replace(/\D/g, '');
   if (digits.length === 0 || digits.length > 4) {
-    throw new Error('Ingresá un código de 4 dígitos.');
+    throw new Error('Ingres? un c?digo de 4 d?gitos.');
   }
 
   const numero = parseInt(digits, 10);
   if (!Number.isFinite(numero) || numero < 1) {
-    throw new Error('Ingresá un código válido.');
+    throw new Error('Ingres? un c?digo v?lido.');
   }
 
   const { data, error } = await supabaseClient
@@ -258,7 +259,7 @@ async function findActiveSessionByCode(mesaId, codeInput) {
     .maybeSingle();
 
   if (error) throw error;
-  if (!data) throw new Error('No encontramos una cuenta con ese código en esta mesa.');
+  if (!data) throw new Error('No encontramos una cuenta con ese c?digo en esta mesa.');
 
   return data;
 }
@@ -266,7 +267,7 @@ async function findActiveSessionByCode(mesaId, codeInput) {
 async function joinSessionBySplitCode(mesaId, splitCodeInput) {
   const code = normalizeSplitCode(splitCodeInput);
   if (!isValidSplitCode(code)) {
-    throw new Error('Código de división inválido.');
+    throw new Error('C?digo de divisi?n inv?lido.');
   }
 
   const { data, error } = await supabaseClient
@@ -306,7 +307,7 @@ async function switchSessionByCode(mesaId, currentSesionId, codeInput) {
   const destSession = await findActiveSessionByCode(mesaId, codeInput);
 
   if (destSession.id === currentSesionId) {
-    throw new Error('Ya estás en esa cuenta.');
+    throw new Error('Ya est?s en esa cuenta.');
   }
 
   const { error } = await supabaseClient
@@ -418,7 +419,7 @@ function waitForSessionChoice(mesaId) {
       } catch (error) {
         console.error(error);
         setSessionGateLoading(false);
-        setSessionGateError(error.message || 'No se pudo iniciar la sesión.');
+        setSessionGateError(error.message || 'No se pudo iniciar la sesi?n.');
         busy = false;
       }
     }
@@ -443,7 +444,7 @@ function waitForSessionChoice(mesaId) {
       if (busy) return;
       const code = joinInput?.value?.trim();
       if (!code) {
-        setSessionGateError('Ingresá el código de 4 dígitos.');
+        setSessionGateError('Ingres? el c?digo de 4 d?gitos.');
         return;
       }
       finish({ type: 'join', code });
@@ -492,6 +493,116 @@ function updateSessionBadge(session) {
 
   const tipoLabel =
     session.tipo === 'grupal' ? 'Grupal' : session.tipo === 'individual' ? 'Propia' : 'Cuenta';
-  badge.textContent = `${tipoLabel} · ${formatSessionCode(session.numero)}`;
+  badge.textContent = `${tipoLabel} ? ${formatSessionCode(session.numero)}`;
   badge.hidden = false;
+}
+
+function computeSessionPaymentTargetTotal(subtotal, serviceEnabled = true) {
+  const base = Number(subtotal) || 0;
+  const cargoServicio = serviceEnabled
+    ? Math.round(base * (LISTO_SERVICE_PERCENT / 100))
+    : 0;
+
+  return base + cargoServicio;
+}
+
+async function fetchSessionDeliveredSubtotal(sesionId) {
+  const { data: items, error } = await supabaseClient
+    .from('pedido_items')
+    .select(`
+      subtotal,
+      precio_unitario,
+      cantidad,
+      pedidos!inner ( sesion_id, archivado )
+    `)
+    .eq('pedidos.sesion_id', sesionId)
+    .eq('pedidos.archivado', false)
+    .eq('confirmado_por_mesero', true);
+
+  if (error) throw error;
+
+  return (items || []).reduce((sum, item) => {
+    return (
+      sum +
+      Number(item.subtotal ?? Number(item.precio_unitario) * Number(item.cantidad))
+    );
+  }, 0);
+}
+
+async function fetchSessionApprovedPaymentsTotal(sesionId) {
+  const { data, error } = await supabaseClient
+    .from('pagos_grupo')
+    .select('monto')
+    .eq('sesion_id', sesionId)
+    .eq('estado', 'aprobado');
+
+  if (error) throw error;
+
+  return (data || []).reduce((sum, row) => sum + Number(row.monto), 0);
+}
+
+async function resolveSessionPaymentTargetTotal(sesionId, options = {}) {
+  const explicitTarget = Number(options.targetTotal);
+  if (Number.isFinite(explicitTarget) && explicitTarget > 0) {
+    return explicitTarget;
+  }
+
+  const subtotal =
+    Number(options.subtotal) > 0
+      ? Number(options.subtotal)
+      : await fetchSessionDeliveredSubtotal(sesionId);
+
+  if (subtotal <= 0) return 0;
+
+  if (options.serviceEnabled === true) {
+    return computeSessionPaymentTargetTotal(subtotal, true);
+  }
+
+  if (options.serviceEnabled === false) {
+    return computeSessionPaymentTargetTotal(subtotal, false);
+  }
+
+  const { data: sesion, error: sesionError } = await supabaseClient
+    .from('sesiones')
+    .select('cargo_servicio')
+    .eq('id', sesionId)
+    .maybeSingle();
+
+  if (sesionError) throw sesionError;
+
+  const accumulatedService = Number(sesion?.cargo_servicio) || 0;
+  const paidTotal =
+    options.paidTotal != null
+      ? Number(options.paidTotal)
+      : await fetchSessionApprovedPaymentsTotal(sesionId);
+
+  const serviceEnabled = accumulatedService > 0 || paidTotal > subtotal;
+  return computeSessionPaymentTargetTotal(subtotal, serviceEnabled);
+}
+
+async function markSessionReadyForConfirmationIfPaid(sesionId, targetTotal) {
+  const paidTotal = await fetchSessionApprovedPaymentsTotal(sesionId);
+  const resolvedTarget =
+    targetTotal != null
+      ? Number(targetTotal)
+      : await resolveSessionPaymentTargetTotal(sesionId, { paidTotal });
+
+  if (resolvedTarget > 0 && paidTotal >= resolvedTarget) {
+    const { error } = await supabaseClient
+      .from('sesiones')
+      .update({ pago_pendiente_confirmacion: true, pago_en_proceso: false })
+      .eq('id', sesionId);
+
+    if (error) throw error;
+  }
+
+  return paidTotal;
+}
+
+function estimateSplitPartServicePortion(monto) {
+  const amount = Math.round(Number(monto));
+  if (!Number.isFinite(amount) || amount <= 0) return 0;
+
+  const estimatedSubtotalPortion = Math.round(amount / (1 + LISTO_SERVICE_PERCENT / 100));
+  return Math.max(0, amount - estimatedSubtotalPortion);
 }

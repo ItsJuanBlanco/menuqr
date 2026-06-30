@@ -140,20 +140,6 @@ async function getSessionApprovedPaymentsCount(sesionId) {
   return count || 0;
 }
 
-async function markSessionReadyForConfirmationIfPaid(sesionId, targetTotal) {
-  const paidTotal = await getSessionApprovedPaymentsTotal(sesionId);
-  if (paidTotal >= targetTotal) {
-    const { error } = await supabaseClient
-      .from('sesiones')
-      .update({ pago_pendiente_confirmacion: true, pago_en_proceso: false })
-      .eq('id', sesionId);
-
-    if (error) throw error;
-  }
-
-  return paidTotal;
-}
-
 async function recordSplitPartPayment(sesionId, share, targetTotal) {
   const { error } = await supabaseClient.from('pagos_grupo').insert({
     sesion_id: sesionId,
@@ -1719,12 +1705,14 @@ function renderOcupadaMesaCard(mesa) {
                 </div>`;
             } else if (isPaying) {
               paymentInfo = `<span class="mesa-card__payment-badge mesa-card__payment-badge--paying mesa-card__payment-badge--pulse">💳 Pagando...</span>`;
-            } else if (
-              paidTotal > 0 &&
-              sessionTotal > 0 &&
-              paidTotal < sessionTotal
-            ) {
-              paymentInfo = `<p class="mesa-card__payment-progress">💳 ${formatCOP(paidTotal)} / ${formatCOP(sessionTotal)} pagados</p>`;
+            } else if (paidTotal > 0) {
+              const paymentTarget = computeSessionPaymentTargetTotal(
+                sessionTotal,
+                paidTotal > sessionTotal
+              );
+              if (paidTotal < paymentTarget) {
+                paymentInfo = `<p class="mesa-card__payment-progress">💳 ${formatCOP(paidTotal)} / ${formatCOP(paymentTarget)} pagados</p>`;
+              }
             }
 
             return `
@@ -2415,12 +2403,16 @@ function getChargeableSessionsForPayment(mesaId) {
   );
 }
 
+function getSplitPaymentSessions(mesaId) {
+  return getChargeableAccountSessions(mesaId);
+}
+
 function populateSplitPaymentSessionSelect(mesaId, preferredSesionId = null) {
   const field = document.getElementById('splitPaymentSessionField');
   const select = document.getElementById('splitPaymentSessionSelect');
   if (!field || !select) return null;
 
-  const sessions = getChargeableSessionsForPayment(mesaId);
+  const sessions = getSplitPaymentSessions(mesaId);
   field.hidden = sessions.length <= 1;
 
   select.innerHTML = sessions
@@ -2440,12 +2432,12 @@ function populateSplitPaymentSessionSelect(mesaId, preferredSesionId = null) {
 function getSelectedSplitPaymentSession() {
   const select = document.getElementById('splitPaymentSessionSelect');
   const sesionId = select?.value || splitPaymentState.sesionId;
-  const session = getChargeableSessionsForPayment(splitPaymentState.mesaId).find(
+  const session = getSplitPaymentSessions(splitPaymentState.mesaId).find(
     (entry) => entry.id === sesionId
   );
 
   return {
-    sesionId,
+    sesionId: session?.id || sesionId,
     sessionLabel: session ? formatAccountSessionHeading(session) : splitPaymentState.sessionLabel,
     subtotal: Number(session?.total ?? splitPaymentState.subtotal) || 0,
   };
@@ -2645,7 +2637,7 @@ async function collectSplitPaymentPart() {
       share.breakdown.total
     );
 
-    await refreshPanelData();
+    await fetchMesas();
     await refreshSplitPaymentModal();
 
     if (paidTotal >= share.breakdown.total) {

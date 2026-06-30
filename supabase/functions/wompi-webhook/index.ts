@@ -57,6 +57,29 @@ async function getSessionApprovedPaymentsTotal(
   return (data || []).reduce((sum, row) => sum + Number(row.monto), 0);
 }
 
+async function resolveSessionPaymentTargetTotal(
+  supabase: SupabaseClient,
+  sesionId: string,
+  subtotal: number,
+  paidTotal: number
+): Promise<number> {
+  if (subtotal <= 0) return 0;
+
+  const { data: sesion, error: sesionError } = await supabase
+    .from("sesiones")
+    .select("cargo_servicio")
+    .eq("id", sesionId)
+    .maybeSingle();
+
+  if (sesionError) throw sesionError;
+
+  const accumulatedService = Number(sesion?.cargo_servicio) || 0;
+  const serviceEnabled = accumulatedService > 0 || paidTotal > subtotal;
+  const cargoServicio = serviceEnabled ? Math.round(subtotal * 0.1) : 0;
+
+  return subtotal + cargoServicio;
+}
+
 serve(async (req) => {
   try {
     const body = await req.json();
@@ -112,12 +135,19 @@ serve(async (req) => {
       getSessionDeliveredTotal(supabase, sesionId),
     ]);
 
+    const targetTotal = await resolveSessionPaymentTargetTotal(
+      supabase,
+      sesionId,
+      sessionTotal,
+      paidTotal
+    );
+
     const updatePayload: Record<string, unknown> = {
       pago_en_proceso: false,
       referencia_wompi: referenciaWompi,
     };
 
-    if (sessionTotal > 0 && paidTotal >= sessionTotal) {
+    if (targetTotal > 0 && paidTotal >= targetTotal) {
       updatePayload.pago_pendiente_confirmacion = true;
     }
 

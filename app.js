@@ -2270,27 +2270,48 @@ async function handleApprovedWompiPayment(monto, referenciaWompi, extras = {}) {
 
   const cargoServicio = Number(extras.cargoServicio) || 0;
   const propina = Number(extras.propina) || 0;
+  const isSplitPart = Number(state.splitJoinAmount) > 0;
 
   try {
-    const { error: insertError } = await supabaseClient.from('pagos_grupo').insert({
-      sesion_id: state.sesionId,
-      monto,
-      referencia_wompi: referenciaWompi,
-      estado: 'aprobado',
-    });
+    const { data: existingPayment, error: existingError } = await supabaseClient
+      .from('pagos_grupo')
+      .select('id')
+      .eq('referencia_wompi', referenciaWompi)
+      .maybeSingle();
 
-    if (insertError) throw insertError;
+    if (existingError) throw existingError;
 
-    await saveSessionPaymentExtras(cargoServicio, propina);
+    if (!existingPayment) {
+      const { error: insertError } = await supabaseClient.from('pagos_grupo').insert({
+        sesion_id: state.sesionId,
+        monto,
+        referencia_wompi: referenciaWompi,
+        estado: 'aprobado',
+      });
 
-    const breakdown = getPaymentBreakdown();
+      if (insertError) throw insertError;
+    }
+
+    if (isSplitPart) {
+      const servicePortion = estimateSplitPartServicePortion(monto);
+      if (servicePortion > 0) {
+        await saveSessionPaymentExtras(servicePortion, 0);
+      }
+    } else if (cargoServicio > 0 || propina > 0) {
+      await saveSessionPaymentExtras(cargoServicio, propina);
+    }
+
     const paidTotal = await getSessionApprovedPaymentsTotal(state.sesionId);
 
     await loadGroupPayments();
 
     state.splitJoinAmount = null;
 
-    if (breakdown.total > 0 && paidTotal >= breakdown.total) {
+    const targetTotal = isSplitPart
+      ? await resolveSessionPaymentTargetTotal(state.sesionId, { paidTotal })
+      : getPaymentBreakdown().total;
+
+    if (targetTotal > 0 && paidTotal >= targetTotal) {
       await markPaymentPendingConfirmation(
         extras.manualConfirmation ? PAYMENT_PENDING_MESSAGE : null,
         {
@@ -2305,7 +2326,7 @@ async function handleApprovedWompiPayment(monto, referenciaWompi, extras = {}) {
       }
     } else {
       await clearPaymentInProgress();
-      showToast('Tu parte fue registrada.', 'success', 4000);
+      showToast(isSplitPart ? 'Tu parte fue registrada.' : 'Pago registrado.', 'success', 4000);
       renderAccount();
     }
   } catch (error) {
@@ -2387,15 +2408,24 @@ async function handleWompiRedirectReturn() {
   }
 
   const referenciaWompi = id || reference;
+  const pending = loadWompiPendingPayment(reference);
+  const amount = Number(pending?.amount) || 0;
 
-  await markPaymentPendingConfirmation(null, {
-    referenciaWompi,
-    skipToast: true,
+  if (amount <= 0) {
+    clearWompiPendingPayment();
+    await clearPaymentInProgress();
+    switchTab('cuenta');
+    void checkSessionStatus();
+    return true;
+  }
+
+  await handleApprovedWompiPayment(amount, referenciaWompi, {
+    cargoServicio: pending?.cargoServicio || 0,
+    propina: pending?.propina || 0,
   });
 
   clearWompiPendingPayment();
   switchTab('cuenta');
-  void checkSessionStatus();
   return true;
 }
 
