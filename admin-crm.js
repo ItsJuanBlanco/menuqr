@@ -396,9 +396,9 @@ async function loadCrmRequisitos(localId) {
   const client = crmAssertClient();
   const { data, error } = await client
     .from('requisitos')
-    .select('id, descripcion, completado, prioridad, creado_en')
+    .select('id, descripcion, completado_en, prioridad, creado_en')
     .eq('local_id', localId)
-    .order('completado', { ascending: true })
+    .order('completado_en', { ascending: true, nullsFirst: true })
     .order('creado_en', { ascending: false });
 
   if (error) throw error;
@@ -413,9 +413,9 @@ async function loadCrmRequisitos(localId) {
   list.innerHTML = data
     .map(
       (item) => `
-        <li class="crm-checklist__item${item.completado ? ' crm-checklist__item--done' : ''}">
+        <li class="crm-checklist__item${item.completado_en ? ' crm-checklist__item--done' : ''}">
           <label class="crm-checklist__label">
-            <input type="checkbox" data-toggle-requisito="${item.id}" ${item.completado ? 'checked' : ''}>
+            <input type="checkbox" data-toggle-requisito="${item.id}" ${item.completado_en ? 'checked' : ''}>
             <span>${crmEscape(item.descripcion || '—')}</span>
           </label>
           <span class="crm-checklist__prio crm-checklist__prio--${item.prioridad || 'media'}">${crmEscape(CRM_PRIORIDAD_LABELS[item.prioridad] || item.prioridad || 'Media')}</span>
@@ -617,7 +617,6 @@ async function addCrmRequisito(event) {
       local_id: crmActiveLocalId,
       descripcion,
       prioridad,
-      completado: false,
     });
     if (error) throw error;
     input.value = '';
@@ -634,7 +633,7 @@ async function toggleCrmRequisito(requisitoId, checked) {
     const client = crmAssertClient();
     const { error } = await client
       .from('requisitos')
-      .update({ completado: checked })
+      .update({ completado_en: checked ? new Date().toISOString() : null })
       .eq('id', requisitoId);
     if (error) throw error;
     if (crmActiveLocalId) await loadCrmRequisitos(crmActiveLocalId);
