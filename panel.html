@@ -49,6 +49,7 @@
       <button type="button" class="panel-tabs__btn" id="tabHistorial" role="tab" aria-selected="false" data-panel="historial">Pagos</button>
       <button type="button" class="panel-tabs__btn" id="tabMenu" role="tab" aria-selected="false" data-panel="menu">Menú</button>
       <button type="button" class="panel-tabs__btn" id="tabResumen" role="tab" aria-selected="false" data-panel="resumen">Resumen</button>
+      <button type="button" class="panel-tabs__btn" id="tabMeseros" role="tab" aria-selected="false" data-panel="meseros">Meseros</button>
       <button type="button" class="panel-tabs__btn" id="tabQr" role="tab" aria-selected="false" data-panel="qr">QR</button>
       <button type="button" class="panel-tabs__btn" id="tabAjustes" role="tab" aria-selected="false" data-panel="ajustes">Ajustes</button>
     </nav>
@@ -146,6 +147,34 @@
               <button type="button" class="mesa-qr-add__cancel" id="mesaQrAddCancel">Cancelar</button>
             </div>
           </form>
+        </div>
+      </section>
+
+      <!-- Meseros -->
+      <section class="panel-view" id="viewMeseros" role="tabpanel" aria-labelledby="tabMeseros" hidden>
+        <div class="settings-panel meseros-panel">
+          <div class="settings-panel__head">
+            <h2 class="settings-panel__title">Meseros</h2>
+            <p class="settings-panel__hint">Gestioná el equipo que puede asignarse al abrir una orden en Mesas.</p>
+          </div>
+          <div class="settings-meseros__form meseros-panel__form">
+            <label class="settings-form__field settings-form__field--full" for="meserosNameInput">
+              <span class="settings-form__label">Nombre del mesero</span>
+              <input
+                type="text"
+                class="settings-form__text settings-meseros__input"
+                id="meserosNameInput"
+                placeholder="Ej: Carlos, María…"
+                maxlength="60"
+                autocomplete="off"
+              >
+            </label>
+            <button type="button" class="menu-toolbar__btn settings-meseros__add-btn" id="meserosAddBtn">
+              Agregar mesero
+            </button>
+          </div>
+          <ul class="settings-meseros__list" id="meserosList"></ul>
+          <p class="settings-meseros__empty" id="meserosEmpty" hidden>Sin meseros registrados.</p>
         </div>
       </section>
 
@@ -307,25 +336,6 @@
                 inputmode="url"
               >
             </label>
-            <div class="settings-form__section">
-              <h3 class="settings-form__section-title">Meseros</h3>
-              <p class="settings-panel__hint settings-panel__hint--inline">Agregá meseros para asignarlos al abrir una orden. Los inactivos no aparecen en el selector.</p>
-              <ul class="settings-meseros__list" id="settingsMeserosList"></ul>
-              <p class="settings-meseros__empty" id="settingsMeserosEmpty" hidden>Sin meseros registrados.</p>
-              <div class="settings-meseros__form" id="settingsMeseroForm">
-                <input
-                  type="text"
-                  class="settings-form__text settings-meseros__input"
-                  id="settingsMeseroNameInput"
-                  placeholder="Nombre del mesero"
-                  maxlength="60"
-                  autocomplete="off"
-                >
-                <button type="button" class="menu-toolbar__btn settings-meseros__add-btn" id="settingsMeseroAddBtn">
-                  Agregar mesero
-                </button>
-              </div>
-            </div>
             <p class="settings-form__error" id="settingsFormError" hidden role="alert"></p>
             <button type="submit" class="menu-toolbar__btn settings-form__save" id="settingsSaveBtn">Guardar ajustes</button>
           </form>
@@ -749,5 +759,6 @@
   <script src="/panel-summary.js"></script>
   <script src="/panel-payments.js"></script>
   <script src="/panel-settings.js"></script>
+  <script src="/panel-meseros.js"></script>
 </body>
 </html>

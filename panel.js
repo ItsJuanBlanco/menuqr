@@ -25,7 +25,7 @@ const PANEL_POLL_INTERVAL_MS = 5000;
 const PANEL_SOUNDS_STORAGE_KEY = 'panel_sonidos';
 const PANEL_SERVICE_PERCENT = 10;
 
-const VALID_PANEL_TABS = new Set(['pedidos', 'mesas', 'historial', 'menu', 'resumen', 'qr', 'ajustes']);
+const VALID_PANEL_TABS = new Set(['pedidos', 'mesas', 'historial', 'menu', 'resumen', 'meseros', 'qr', 'ajustes']);
 const ACTIVE_PANEL_TAB_KEY = 'activePanelTab';
 
 function saveActivePanelTab(panelId) {
@@ -758,6 +758,8 @@ function updateHeaderCount() {
     el.textContent = `${mesas.length} QR${mesas.length !== 1 ? 's' : ''} de mesa`;
   } else if (activePanel === 'ajustes') {
     el.textContent = 'Ajustes del restaurante';
+  } else if (activePanel === 'meseros') {
+    el.textContent = 'Meseros del restaurante';
   } else if (activePanel === 'historial') {
     el.textContent = 'Historial de pagos';
   } else if (activePanel === 'resumen') {
@@ -785,6 +787,8 @@ async function refreshActivePanelData(panelId) {
       renderMesaQrs();
     } else if (panelId === 'ajustes' && typeof loadRestaurantSettings === 'function') {
       await loadRestaurantSettings();
+    } else if (panelId === 'meseros' && typeof loadMeserosPanel === 'function') {
+      await loadMeserosPanel();
     }
   } catch (error) {
     console.error(error);
@@ -3206,18 +3210,6 @@ async function markItemEntregado(itemId, pedidoId) {
 let mesaNameModalState = { mesaId: null };
 let mesaNameModalBound = false;
 
-async function fetchActiveMeseros() {
-  const { data, error } = await supabaseClient
-    .from('meseros')
-    .select('id, nombre')
-    .eq('restaurante_id', RESTAURANTE_ID)
-    .eq('activo', true)
-    .order('nombre', { ascending: true });
-
-  if (error) throw error;
-  return data || [];
-}
-
 function getNewOrderMesaNombreValue() {
   return document.getElementById('newOrderMesaNombre')?.value?.trim() || null;
 }
@@ -3249,7 +3241,8 @@ async function populateNewOrderSetupFields(mesa) {
   if (!select || !text) return;
 
   try {
-    const meseros = await fetchActiveMeseros();
+    const fetchMeseros = typeof fetchActiveMeseros === 'function' ? fetchActiveMeseros : null;
+    const meseros = fetchMeseros ? await fetchMeseros() : [];
 
     if (meseros.length > 0) {
       select.hidden = false;

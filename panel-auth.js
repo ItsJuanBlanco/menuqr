@@ -41,7 +41,7 @@ function buildPanelUrl(slug) {
 
 function getAllowedPanelTabs(role) {
   if (role === 'admin') {
-    return new Set(['pedidos', 'mesas', 'historial', 'menu', 'resumen', 'qr', 'ajustes']);
+    return new Set(['pedidos', 'mesas', 'historial', 'menu', 'resumen', 'meseros', 'qr', 'ajustes']);
   }
   return new Set(['pedidos', 'mesas', 'historial']);
 }
@@ -53,7 +53,7 @@ function redirectToLogin(slug) {
 function applyPanelRoleAccess(role) {
   const isAdmin = role === 'admin';
 
-  ['menu', 'resumen', 'qr', 'ajustes'].forEach((panelId) => {
+  ['menu', 'resumen', 'meseros', 'qr', 'ajustes'].forEach((panelId) => {
     const btn = document.querySelector(`.panel-tabs__btn[data-panel="${panelId}"]`);
     if (btn) btn.hidden = !isAdmin;
   });

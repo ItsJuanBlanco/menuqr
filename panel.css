@@ -3418,6 +3418,10 @@ body.mesa-qr-printing .mesa-qr-print {
   margin: 0 0 12px;
 }
 
+.meseros-panel__form {
+  margin-bottom: 16px;
+}
+
 .settings-meseros__list {
   list-style: none;
   margin: 0 0 12px;
