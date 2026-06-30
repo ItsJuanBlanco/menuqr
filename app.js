@@ -2731,6 +2731,7 @@ async function submitSongRequest(event) {
       cancion,
       artista: artista || null,
       estado: 'pendiente',
+      created: new Date().toISOString(),
     });
 
     if (error) throw error;

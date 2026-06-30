@@ -43,6 +43,10 @@ function updateMusicTabBadgeFromQueue() {
   );
 }
 
+function getMusicCreatedAt(entry) {
+  return entry.created || entry.created_at;
+}
+
 function renderMusicQueue() {
   const list = document.getElementById('musicQueueList');
   const empty = document.getElementById('musicEmpty');
@@ -101,7 +105,7 @@ function renderMusicQueue() {
           </div>
           <div class="music-card__meta">
             <span>${escapeHtml(getMusicMesaLabel(entry))}</span>
-            <span>${formatMusicTime(entry.created_at)}</span>
+            <span>${formatMusicTime(getMusicCreatedAt(entry))}</span>
           </div>
           ${actions}
         </article>
@@ -122,13 +126,13 @@ async function loadMusicQueue() {
       cancion,
       artista,
       estado,
-      created_at,
+      created,
       mesa_id,
       sesion_id,
       mesas ( numero, nombre_personalizado )
     `)
     .eq('restaurante_id', RESTAURANTE_ID)
-    .order('created_at', { ascending: true })
+    .order('created', { ascending: true })
     .limit(100);
 
   if (error) throw error;
