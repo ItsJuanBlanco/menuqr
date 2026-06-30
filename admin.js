@@ -146,7 +146,7 @@ async function loadRestaurants() {
     const client = assertSupabaseClient();
     const { data, error } = await client
       .from('restaurantes')
-      .select('id, nombre, slug, ciudad, email, activo, created_at')
+      .select('id, nombre, slug, ciudad, email, activo, created_at, features, musica_habilitada')
       .order('created_at', { ascending: false });
 
     if (error) throw error;
@@ -184,15 +184,31 @@ function renderRestaurants() {
   wrap.hidden = false;
 
   list.innerHTML = restaurants
-    .map((restaurant) => {
+    .flatMap((restaurant) => {
       const isActive = restaurant.activo !== false;
       const busy = busyIds.has(restaurant.id);
+      const expanded = expandedRestaurantId === restaurant.id;
+      const flags = parseRestaurantFeatures(restaurant);
+      const activeFeatures = RESTAURANT_FEATURE_DEFS.filter((def) => flags[def.id])
+        .map((def) => def.label)
+        .join(' · ');
 
-      return `
-        <tr>
+      return [
+        `
+        <tr class="admin-restaurant-row${expanded ? ' admin-restaurant-row--expanded' : ''}">
           <td>
-            <div class="admin-table__name">${escapeHtml(restaurant.nombre || '—')}</div>
+            <button
+              type="button"
+              class="admin-restaurant-name"
+              data-action="toggle-restaurant-drawer"
+              data-id="${restaurant.id}"
+              aria-expanded="${expanded ? 'true' : 'false'}"
+            >
+              <span class="admin-restaurant-name__chevron" aria-hidden="true">${expanded ? '▾' : '▸'}</span>
+              <span class="admin-restaurant-name__text">${escapeHtml(restaurant.nombre || '—')}</span>
+            </button>
             <div class="admin-table__slug">${escapeHtml(restaurant.email || '')}</div>
+            ${activeFeatures ? `<div class="admin-restaurant-features">${escapeHtml(activeFeatures)}</div>` : ''}
           </td>
           <td><span class="admin-table__slug">/${escapeHtml(restaurant.slug || '')}</span></td>
           <td>${escapeHtml(restaurant.ciudad || '—')}</td>
@@ -229,7 +245,11 @@ function renderRestaurants() {
             </div>
           </td>
         </tr>
-      `;
+        <tr class="admin-restaurant-detail${expanded ? ' admin-restaurant-detail--open' : ''}" ${expanded ? '' : 'hidden'}>
+          <td colspan="6">${renderAdminFeaturePanel(restaurant)}</td>
+        </tr>
+        `,
+      ];
     })
     .join('');
 }
@@ -491,7 +511,6 @@ function readRestaurantFormValues() {
     pin_mesero: document.getElementById('restaurantPinMesero')?.value?.trim(),
     pin_admin: document.getElementById('restaurantPinAdmin')?.value?.trim(),
     mesas_count,
-    musica_habilitada: document.getElementById('restaurantMusicaHabilitada')?.checked === true,
   };
 }
 
@@ -607,8 +626,6 @@ function openNewRestaurantModal() {
   setRestaurantFormError('');
   updateSlugPreview('');
   resetAdminPaymentForm();
-  const musicaInput = document.getElementById('restaurantMusicaHabilitada');
-  if (musicaInput) musicaInput.checked = false;
   openRestaurantModal();
   document.getElementById('restaurantName')?.focus();
 }
@@ -625,7 +642,7 @@ async function openEditRestaurantModal(restaurantId) {
     const client = assertSupabaseClient();
     const { data, error } = await client
       .from('restaurantes')
-      .select('id, nombre, slug, ciudad, email, pin_mesero, pin_admin, metodo_pago, wompi_public_key, link_pago, link_bancolombia, qr_pago_url, musica_habilitada')
+      .select('id, nombre, slug, ciudad, email, pin_mesero, pin_admin, metodo_pago, wompi_public_key, link_pago, link_bancolombia, qr_pago_url, features, musica_habilitada')
       .eq('id', restaurantId)
       .single();
 
@@ -640,9 +657,6 @@ async function openEditRestaurantModal(restaurantId) {
     document.getElementById('restaurantPinMesero').value = data.pin_mesero || '';
     document.getElementById('restaurantPinAdmin').value = data.pin_admin || '';
     populateAdminPaymentForm(data);
-
-    const musicaInput = document.getElementById('restaurantMusicaHabilitada');
-    if (musicaInput) musicaInput.checked = data.musica_habilitada === true;
 
     const mesas = await fetchRestaurantMesas(restaurantId);
     setRestaurantMesasFieldVisible(true);
@@ -718,7 +732,7 @@ async function saveRestaurantPaymentSettings(restaurantId) {
   currentAdminQrPagoUrl = qr_pago_url;
 }
 
-async function createRestaurant({ nombre, slug, ciudad, email, pin_mesero, pin_admin, mesas_count, musica_habilitada }) {
+async function createRestaurant({ nombre, slug, ciudad, email, pin_mesero, pin_admin, mesas_count }) {
   const client = assertSupabaseClient();
   let payment;
 
@@ -744,7 +758,7 @@ async function createRestaurant({ nombre, slug, ciudad, email, pin_mesero, pin_a
       wompi_public_key: payment.wompi_public_key,
       link_pago: payment.link_pago,
       link_bancolombia: payment.link_bancolombia,
-      musica_habilitada: musica_habilitada === true,
+      features: {},
     })
     .select('id, nombre, slug, ciudad, email, activo, created_at')
     .single();
@@ -771,7 +785,7 @@ async function createRestaurant({ nombre, slug, ciudad, email, pin_mesero, pin_a
   return { restaurant, mesasCount };
 }
 
-async function updateRestaurant(restaurantId, { nombre, ciudad, email, pin_mesero, pin_admin, mesas_count, musica_habilitada }) {
+async function updateRestaurant(restaurantId, { nombre, ciudad, email, pin_mesero, pin_admin, mesas_count }) {
   const client = assertSupabaseClient();
 
   const { data, error } = await client
@@ -782,7 +796,6 @@ async function updateRestaurant(restaurantId, { nombre, ciudad, email, pin_meser
       email,
       pin_mesero,
       pin_admin,
-      musica_habilitada: musica_habilitada === true,
     })
     .eq('id', restaurantId)
     .select('id, nombre, slug, ciudad, email, activo, created_at')

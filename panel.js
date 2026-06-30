@@ -1606,6 +1606,8 @@ function getMesaLibreUpdateFields() {
 }
 
 function renderMesaMeseroSelect(mesa) {
+  if (!hasRestaurantFeature(RESTAURANTE, 'meseros')) return '';
+
   const current = String(mesa.mesero_asignado || '').trim();
   const options = [`<option value=""${!current ? ' selected' : ''}>— Mesero —</option>`];
 
@@ -3301,6 +3303,8 @@ function getNewOrderMesaNombreValue() {
 }
 
 function getNewOrderMeseroNombreValue() {
+  if (!hasRestaurantFeature(RESTAURANTE, 'meseros')) return null;
+
   const select = document.getElementById('newOrderMeseroSelect');
   const text = document.getElementById('newOrderMeseroText');
 
@@ -3324,7 +3328,11 @@ async function populateNewOrderSetupFields(mesa) {
     nombreInput.value = mesa?.nombre_personalizado || '';
   }
 
-  if (!select || !text) return;
+  if (typeof updateNewOrderMeseroFieldVisibility === 'function') {
+    updateNewOrderMeseroFieldVisibility();
+  }
+
+  if (!hasRestaurantFeature(RESTAURANTE, 'meseros') || !select || !text) return;
 
   try {
     const fetchMeseros = typeof fetchActiveMeseros === 'function' ? fetchActiveMeseros : null;
@@ -3977,7 +3985,7 @@ function subscribeToRealtime() {
       .on('postgres_changes', { event: 'DELETE', schema: 'public', table }, scheduleRealtimeRefresh);
   });
 
-  if (RESTAURANTE?.musica_habilitada === true) {
+  if (RESTAURANTE?.musica_habilitada === true || hasRestaurantFeature(RESTAURANTE, 'musica')) {
     const musicFilter = `restaurante_id=eq.${RESTAURANTE_ID}`;
     realtimeChannel
       .on(
@@ -4065,7 +4073,7 @@ async function init() {
       typeof fetchMenuProducts === 'function' ? fetchMenuProducts() : Promise.resolve(),
     ]);
     restoreActivePanelTab();
-    if (typeof applyMusicPanelVisibility === 'function') applyMusicPanelVisibility();
+    if (typeof applyRestaurantFeaturesVisibility === 'function') applyRestaurantFeaturesVisibility();
     subscribeToRealtime();
     panelAlertsInitialized = true;
     startPanelPolling();

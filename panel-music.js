@@ -20,7 +20,7 @@ const MUSIC_PANEL_HINTS = {
 };
 
 function isMusicPanelEnabled() {
-  return RESTAURANTE?.musica_habilitada === true;
+  return hasRestaurantFeature(RESTAURANTE, 'musica');
 }
 
 function getMusicEstadoLabel(estado) {

@@ -1,7 +1,5 @@
-const MESERO_COMMISSIONS_SLUG = 'donde-juanito';
-
 function isMeseroCommissionsEnabled() {
-  return RESTAURANTE_SLUG === MESERO_COMMISSIONS_SLUG;
+  return hasRestaurantFeature(RESTAURANTE, 'comisiones');
 }
 
 let panelMeseros = [];

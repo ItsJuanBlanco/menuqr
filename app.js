@@ -2655,7 +2655,7 @@ function switchTab(tabId) {
 
 /* ── Pedir canción ── */
 function isMusicEnabled() {
-  return RESTAURANTE?.musica_habilitada === true;
+  return hasRestaurantFeature(RESTAURANTE, 'musica');
 }
 
 function applyMusicClientUI() {

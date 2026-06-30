@@ -23,6 +23,7 @@ const STATIC_PAGE_NAMES = new Set([
   'panel-settings.js',
   'panel-meseros.js',
   'panel-music.js',
+  'restaurant-features.js',
   'category-order.js',
   'login.js',
   'restaurant.js',
@@ -314,7 +315,7 @@ async function initRestaurant() {
 
   const { data, error } = await supabaseClient
     .from('restaurantes')
-    .select('id, slug, nombre, ciudad, logo_url, foto_portada, foto_portada_posicion, color_primario, color_fondo, wompi_public_key, metodo_pago, qr_pago_url, link_pago, link_bancolombia, google_review_url, musica_habilitada')
+    .select('id, slug, nombre, ciudad, logo_url, foto_portada, foto_portada_posicion, color_primario, color_fondo, wompi_public_key, metodo_pago, qr_pago_url, link_pago, link_bancolombia, google_review_url, musica_habilitada, features')
     .eq('slug', slug)
     .maybeSingle();
 

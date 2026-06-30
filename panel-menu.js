@@ -7,7 +7,6 @@ let menuReloading = false;
 let menuOrderSaving = false;
 const NEW_CATEGORY_VALUE = '__new__';
 const PRODUCT_IMAGE_BUCKET = 'productos';
-const MESERO_PRICE_SLUG = 'donde-juanito';
 const ALLOWED_PRODUCT_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 
 let pendingProductImageFile = null;
@@ -15,7 +14,7 @@ let pendingProductImagePreviewUrl = null;
 let currentProductImageUrl = null;
 
 function isMeseroPriceEnabled() {
-  return RESTAURANTE_SLUG === MESERO_PRICE_SLUG;
+  return hasRestaurantFeature(RESTAURANTE, 'comisiones');
 }
 
 function updateProductMeseroPriceFieldVisibility() {
