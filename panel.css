@@ -2733,6 +2733,13 @@ body.mesa-qr-printing .mesa-qr-print {
   color: var(--text-muted);
 }
 
+.product-form__field-hint {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  line-height: 1.35;
+}
+
 .product-form__field input,
 .product-form__field textarea,
 .product-form__field select,

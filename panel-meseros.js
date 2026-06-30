@@ -69,7 +69,7 @@ async function fetchCommissionPedidosForDate(dateStr) {
         cantidad,
         confirmado_por_mesero,
         producto_id,
-        productos ( nombre, precio_mesero )
+        productos ( nombre, precio, precio_mesero )
       )
     `)
     .eq('restaurante_id', RESTAURANTE_ID)
@@ -79,6 +79,13 @@ async function fetchCommissionPedidosForDate(dateStr) {
 
   if (error) throw error;
   return data || [];
+}
+
+function getMeseroCommissionPerUnit(precioCarta, precioMesero) {
+  const carta = Number(precioCarta);
+  const mesero = Number(precioMesero);
+  if (!Number.isFinite(carta) || !Number.isFinite(mesero)) return 0;
+  return Math.max(0, mesero - carta);
 }
 
 function buildMeserosCommissionReport(pedidos, activeMeseros) {
@@ -101,15 +108,17 @@ function buildMeserosCommissionReport(pedidos, activeMeseros) {
     (pedido.pedido_items || []).forEach((item) => {
       if (item.confirmado_por_mesero !== true) return;
 
+      const precioCarta = Number(item.productos?.precio);
       const precioMesero = Number(item.productos?.precio_mesero);
-      if (!Number.isFinite(precioMesero) || precioMesero <= 0) return;
+      const commissionPerUnit = getMeseroCommissionPerUnit(precioCarta, precioMesero);
+      if (commissionPerUnit <= 0) return;
 
       const qty = Number(item.cantidad) || 0;
       if (qty <= 0) return;
 
       const productName = item.productos?.nombre || 'Producto';
       const key = item.producto_id || productName;
-      const lineCommission = precioMesero * qty;
+      const lineCommission = commissionPerUnit * qty;
 
       if (!meseroReport.itemMap.has(key)) {
         meseroReport.itemMap.set(key, { nombre: productName, qty: 0, commission: 0 });
