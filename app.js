@@ -1899,6 +1899,16 @@ async function sendOrder() {
   showToast(successMsg, 'success');
 
   try {
+    const { data: mesaRow, error: mesaError } = await supabaseClient
+      .from('mesas')
+      .select('mesero_asignado')
+      .eq('id', state.mesaId)
+      .maybeSingle();
+
+    if (mesaError) throw mesaError;
+
+    const meseroNombre = mesaRow?.mesero_asignado?.trim() || null;
+
     const { data: pedido, error: pedidoError } = await supabaseClient
       .from('pedidos')
       .insert({
@@ -1908,6 +1918,7 @@ async function sendOrder() {
         estado: 'pendiente',
         total,
         archivado: false,
+        mesero_nombre: meseroNombre,
       })
       .select('id')
       .single();
@@ -1925,6 +1936,7 @@ async function sendOrder() {
         subtotal: product.price * entry.qty,
         estado: 'pendiente',
         confirmado_por_mesero: false,
+        mesero_nombre: meseroNombre,
         notas: notas || null,
       };
     });

@@ -3875,6 +3875,7 @@ async function confirmNewOrder() {
       subtotal: item.subtotal,
       estado: 'pendiente',
       confirmado_por_mesero: false,
+      mesero_nombre: meseroNombre,
     }));
 
     const { error: itemsError } = await supabaseClient.from('pedido_items').insert(items);

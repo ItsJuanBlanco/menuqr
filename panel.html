@@ -182,6 +182,7 @@
           <p class="settings-meseros__empty" id="meserosEmpty" hidden>Sin meseros registrados.</p>
           </div>
           <div class="meseros-panel__section" id="meserosPanelComisiones" data-meseros-section="comisiones" hidden>
+            <p class="settings-panel__hint settings-panel__hint--inline">Comisión = precio de venta − costo base, por ítem entregado y confirmado, solo si había mesero asignado al pedido.</p>
             <div class="meseros-commissions__toolbar">
               <label class="settings-form__field" for="meserosCommissionDate">
                 <span class="settings-form__label">Fecha</span>
@@ -623,9 +624,9 @@
               <input type="number" id="productPrecio" required min="0" step="100">
             </label>
             <label class="product-form__field" id="productPrecioMeseroField" hidden>
-              <span>Precio mesero (COP)</span>
-              <input type="number" id="productPrecioMesero" min="0" step="100" placeholder="Ej: 17000">
-              <span class="product-form__field-hint">Comisión = precio mesero − precio carta (ej: 17.000 − 16.000 = 1.000)</span>
+              <span>Precio mesero (costo base)</span>
+              <input type="number" id="productPrecioMesero" min="0" step="100" placeholder="Ej: 15000">
+              <span class="product-form__field-hint">Costo interno. Comisión del mesero = precio carta − costo base (ej: 16.000 − 15.000 = 1.000). El cliente siempre paga el precio carta.</span>
             </label>
             <label class="product-form__field">
               <span>Categoría</span>
