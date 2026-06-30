@@ -739,6 +739,32 @@ button {
   justify-content: flex-end;
 }
 
+.mesa-card__head-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.mesa-card__edit-name {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: #fff;
+  color: var(--text-muted);
+  font-size: 0.875rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.mesa-card__edit-name:hover {
+  color: var(--accent);
+  border-color: rgba(234, 88, 12, 0.35);
+  background: var(--accent-soft);
+}
+
 .mesa-card__paying-badge {
   font-size: 0.75rem;
   font-weight: 700;
@@ -1023,10 +1049,16 @@ button {
   pointer-events: none;
 }
 
+.mesa-card--libre .mesa-card__edit-name {
+  pointer-events: auto;
+}
+
 .mesa-card--libre .mesa-card__num {
   font-size: 14px;
   font-weight: 700;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .mesa-card--libre .mesa-card__head-badges {
@@ -1126,6 +1158,62 @@ button {
   color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.04em;
+}
+
+.new-order-card__setup {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 18px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.new-order-card__field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.new-order-card__field-label {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.new-order-card__optional {
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.new-order-card__input,
+.new-order-card__select {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: #fff;
+  font: inherit;
+  font-size: 0.9375rem;
+}
+
+.modal__box--compact {
+  max-width: 420px;
+  width: calc(100% - 24px);
+}
+
+.mesa-name-form {
+  padding: 0 18px 18px;
+}
+
+.mesa-name-form__actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.mesa-name-form__actions .mesa-card__btn {
+  flex: 1;
+  min-height: 44px;
 }
 
 .new-order-card__accounts {
@@ -3324,6 +3412,111 @@ body.mesa-qr-printing .mesa-qr-print {
   font-size: 0.9375rem;
   font-weight: 700;
   color: var(--text);
+}
+
+.settings-panel__hint--inline {
+  margin: 0 0 12px;
+}
+
+.settings-meseros__list {
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.settings-meseros__empty {
+  margin: 0 0 12px;
+  font-size: 0.875rem;
+  color: var(--text-muted);
+}
+
+.settings-meseros__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: #fff;
+}
+
+.settings-meseros__item--inactive {
+  opacity: 0.72;
+}
+
+.settings-meseros__info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.settings-meseros__name {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.settings-meseros__badge {
+  flex-shrink: 0;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #f4f4f5;
+  color: var(--text-muted);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.settings-meseros__actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.settings-meseros__btn {
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: #fff;
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.settings-meseros__btn--danger {
+  color: #dc2626;
+  border-color: #fecaca;
+}
+
+.settings-meseros__form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.settings-meseros__input {
+  flex: 1 1 180px;
+}
+
+.settings-meseros__add-btn {
+  flex-shrink: 0;
+}
+
+@media (max-width: 640px) {
+  .settings-meseros__item {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .settings-meseros__actions {
+    justify-content: flex-end;
+  }
 }
 
 .settings-form__field--full {

@@ -913,7 +913,7 @@ async function addMesaFromQrTab(rawName) {
       estado: 'libre',
       mesero_requerido: false,
     })
-    .select('id, numero, estado, mesero_requerido')
+    .select('id, numero, estado, mesero_requerido, nombre_personalizado, mesero_asignado')
     .single();
 
   if (error) throw error;
@@ -1308,7 +1308,7 @@ async function fetchAllRestaurantMesas() {
   while (true) {
     const { data, error } = await supabaseClient
       .from('mesas')
-      .select('id, numero, estado, mesero_requerido')
+      .select('id, numero, estado, mesero_requerido, nombre_personalizado, mesero_asignado')
       .eq('restaurante_id', RESTAURANTE_ID)
       .order('numero', { ascending: true })
       .range(from, from + pageSize - 1);
@@ -1554,6 +1554,32 @@ function onSesionesRealtimeUpdate(payload) {
   scheduleRealtimeRefresh();
 }
 
+function formatMesaDisplayLabel(mesa) {
+  const base = `Mesa ${mesa.numero}`;
+  const custom = String(mesa.nombre_personalizado || '').trim();
+  return custom ? `${base} — ${custom}` : base;
+}
+
+function renderMesaCardHead(mesa, badgesHtml = '') {
+  return `
+    <header class="mesa-card__head">
+      <div class="mesa-card__head-main">
+        <span class="mesa-card__num">${escapeHtml(formatMesaDisplayLabel(mesa))}</span>
+      </div>
+      <div class="mesa-card__head-badges">
+        <button
+          type="button"
+          class="mesa-card__edit-name"
+          data-action="editar-mesa-nombre"
+          data-mesa-id="${mesa.id}"
+          aria-label="Editar nombre de la mesa"
+        >✎</button>
+        ${badgesHtml}
+      </div>
+    </header>
+  `;
+}
+
 function sortMesasByNumero(a, b) {
   const numA = Number(a.numero);
   const numB = Number(b.numero);
@@ -1625,13 +1651,13 @@ function renderOcupadaMesaCard(mesa) {
 
   return `
     <article class="${cardClasses}" data-mesa-id="${mesa.id}">
-      <header class="mesa-card__head">
-        <span class="mesa-card__num">Mesa ${mesa.numero}</span>
-        <div class="mesa-card__head-badges">
+      ${renderMesaCardHead(
+        mesa,
+        `
           ${isMesaPaying ? '<span class="mesa-card__paying-badge mesa-card__paying-badge--pulse">💳 Pagando...</span>' : ''}
           <span class="mesa-card__status mesa-card__status--${estado}">${formatMesaEstado(estado)}</span>
-        </div>
-      </header>
+        `
+      )}
       <div class="mesa-card__details">
         ${waiterAlert}
         <div class="mesa-card__body">${sessionsHtml}</div>
@@ -1659,14 +1685,12 @@ function renderLibreMesaCard(mesa) {
       data-mesa-num="${mesa.numero}"
       role="button"
       tabindex="0"
-      aria-label="Mesa ${mesa.numero}, Libre — Nueva orden"
+      aria-label="${escapeHtml(formatMesaDisplayLabel(mesa))}, Libre — Nueva orden"
     >
-      <header class="mesa-card__head">
-        <span class="mesa-card__num">Mesa ${mesa.numero}</span>
-        <div class="mesa-card__head-badges">
-          <span class="mesa-card__status mesa-card__status--libre">${formatMesaEstado('libre')}</span>
-        </div>
-      </header>
+      ${renderMesaCardHead(
+        mesa,
+        `<span class="mesa-card__status mesa-card__status--libre">${formatMesaEstado('libre')}</span>`
+      )}
     </article>
   `;
 }
@@ -1709,6 +1733,7 @@ function bindMesasActions() {
     const { action, mesaId, mesaNum } = btn.dataset;
 
     if (action === 'ver-cuenta') openAccountModal(mesaId, mesaNum);
+    else if (action === 'editar-mesa-nombre') openMesaNameModal(mesaId);
     else if (action === 'dividir-pago-mesa') openSplitPaymentModal(mesaId, mesaNum);
     else if (action === 'nueva-orden') openNewOrderModal(mesaId, mesaNum);
     else if (action === 'cerrar-mesa') closeMesa(mesaId, mesaNum);
@@ -3178,6 +3203,166 @@ async function markItemEntregado(itemId, pedidoId) {
 }
 
 /* ── Nueva orden (mesero) ── */
+let mesaNameModalState = { mesaId: null };
+let mesaNameModalBound = false;
+
+async function fetchActiveMeseros() {
+  const { data, error } = await supabaseClient
+    .from('meseros')
+    .select('id, nombre')
+    .eq('restaurante_id', RESTAURANTE_ID)
+    .eq('activo', true)
+    .order('nombre', { ascending: true });
+
+  if (error) throw error;
+  return data || [];
+}
+
+function getNewOrderMesaNombreValue() {
+  return document.getElementById('newOrderMesaNombre')?.value?.trim() || null;
+}
+
+function getNewOrderMeseroNombreValue() {
+  const select = document.getElementById('newOrderMeseroSelect');
+  const text = document.getElementById('newOrderMeseroText');
+
+  if (select && !select.hidden) {
+    return select.value.trim() || null;
+  }
+
+  if (text && !text.hidden) {
+    return text.value.trim() || null;
+  }
+
+  return null;
+}
+
+async function populateNewOrderSetupFields(mesa) {
+  const nombreInput = document.getElementById('newOrderMesaNombre');
+  const select = document.getElementById('newOrderMeseroSelect');
+  const text = document.getElementById('newOrderMeseroText');
+
+  if (nombreInput) {
+    nombreInput.value = mesa?.nombre_personalizado || '';
+  }
+
+  if (!select || !text) return;
+
+  try {
+    const meseros = await fetchActiveMeseros();
+
+    if (meseros.length > 0) {
+      select.hidden = false;
+      text.hidden = true;
+      text.value = '';
+
+      const current = mesa?.mesero_asignado || '';
+      select.innerHTML = `<option value="">— Sin asignar —</option>${meseros
+        .map((mesero) => {
+          const selected = mesero.nombre === current ? ' selected' : '';
+          return `<option value="${escapeHtml(mesero.nombre)}"${selected}>${escapeHtml(mesero.nombre)}</option>`;
+        })
+        .join('')}`;
+      return;
+    }
+
+    select.hidden = true;
+    text.hidden = false;
+    select.innerHTML = '';
+    text.value = mesa?.mesero_asignado || '';
+  } catch (error) {
+    console.error(error);
+    select.hidden = true;
+    text.hidden = false;
+    text.value = mesa?.mesero_asignado || '';
+  }
+}
+
+function openMesaNameModal(mesaId) {
+  const mesa = mesas.find((entry) => entry.id === mesaId);
+  if (!mesa) return;
+
+  mesaNameModalState.mesaId = mesaId;
+
+  const title = document.getElementById('mesaNameModalTitle');
+  const input = document.getElementById('mesaNameInput');
+  if (title) title.textContent = `Nombre · Mesa ${mesa.numero}`;
+  if (input) input.value = mesa.nombre_personalizado || '';
+
+  const modal = document.getElementById('mesaNameModal');
+  modal.hidden = false;
+  modal.setAttribute('aria-hidden', 'false');
+  input?.focus();
+}
+
+function closeMesaNameModal() {
+  const modal = document.getElementById('mesaNameModal');
+  modal.hidden = true;
+  modal.setAttribute('aria-hidden', 'true');
+  mesaNameModalState.mesaId = null;
+}
+
+async function saveMesaNombrePersonalizado(mesaId, nombre) {
+  const trimmed = String(nombre || '').trim() || null;
+
+  const { data, error } = await supabaseClient
+    .from('mesas')
+    .update({ nombre_personalizado: trimmed })
+    .eq('id', mesaId)
+    .select('id, numero, estado, mesero_requerido, nombre_personalizado, mesero_asignado')
+    .single();
+
+  if (error) throw error;
+
+  const index = mesas.findIndex((entry) => entry.id === mesaId);
+  if (index >= 0) mesas[index] = { ...mesas[index], ...data };
+
+  renderMesas();
+  showToast(trimmed ? 'Nombre de mesa guardado' : 'Nombre de mesa quitado', 'success');
+}
+
+async function handleMesaNameFormSubmit(event) {
+  event.preventDefault();
+  if (!mesaNameModalState.mesaId) return;
+
+  try {
+    const value = document.getElementById('mesaNameInput')?.value || '';
+    await saveMesaNombrePersonalizado(mesaNameModalState.mesaId, value);
+    closeMesaNameModal();
+  } catch (error) {
+    console.error(error);
+    showToast(error.message || 'No se pudo guardar el nombre.', 'error');
+  }
+}
+
+async function clearMesaNombrePersonalizado() {
+  if (!mesaNameModalState.mesaId) return;
+
+  try {
+    await saveMesaNombrePersonalizado(mesaNameModalState.mesaId, '');
+    document.getElementById('mesaNameInput').value = '';
+    closeMesaNameModal();
+  } catch (error) {
+    console.error(error);
+    showToast(error.message || 'No se pudo quitar el nombre.', 'error');
+  }
+}
+
+function initMesaNameModal() {
+  if (mesaNameModalBound) return;
+
+  document.querySelectorAll('[data-close-mesa-name]').forEach((el) => {
+    el.addEventListener('click', closeMesaNameModal);
+  });
+
+  document.getElementById('mesaNameForm')?.addEventListener('submit', handleMesaNameFormSubmit);
+  document.getElementById('mesaNameClearBtn')?.addEventListener('click', () => {
+    void clearMesaNombrePersonalizado();
+  });
+
+  mesaNameModalBound = true;
+}
+
 let newOrderState = {
   mesaId: null,
   mesaNum: null,
@@ -3509,6 +3694,8 @@ function renderNewOrderSummary() {
 }
 
 async function openNewOrderModal(mesaId, mesaNum) {
+  const mesa = mesas.find((entry) => entry.id === mesaId);
+
   newOrderState.mesaId = mesaId;
   newOrderState.mesaNum = mesaNum;
   newOrderState.step = 'account';
@@ -3522,13 +3709,14 @@ async function openNewOrderModal(mesaId, mesaNum) {
   newOrderState.activeCategory = null;
   newOrderState.submitting = false;
 
-  document.getElementById('newOrderMesaNum').textContent = `Mesa ${mesaNum}`;
+  document.getElementById('newOrderMesaNum').textContent = formatMesaDisplayLabel(mesa || { numero: mesaNum });
 
   const modal = document.getElementById('newOrderModal');
   modal.hidden = false;
   modal.setAttribute('aria-hidden', 'false');
 
   showNewOrderAccountStep();
+  await populateNewOrderSetupFields(mesa);
   renderNewOrderAccountStep();
 }
 
@@ -3585,6 +3773,8 @@ async function confirmNewOrder() {
     }
 
     const total = getNewOrderCartTotal();
+    const nombrePersonalizado = getNewOrderMesaNombreValue();
+    const meseroNombre = getNewOrderMeseroNombreValue();
 
     const { data: pedido, error: pedidoError } = await supabaseClient
       .from('pedidos')
@@ -3595,6 +3785,7 @@ async function confirmNewOrder() {
         estado: 'pendiente',
         total,
         archivado: false,
+        mesero_nombre: meseroNombre,
       })
       .select('id')
       .single();
@@ -3614,10 +3805,20 @@ async function confirmNewOrder() {
     const { error: itemsError } = await supabaseClient.from('pedido_items').insert(items);
     if (itemsError) throw itemsError;
 
-    await supabaseClient
-      .from('mesas')
-      .update({ estado: 'ocupada' })
-      .eq('id', newOrderState.mesaId);
+    const mesaUpdate = {
+      estado: 'ocupada',
+      nombre_personalizado: nombrePersonalizado,
+      mesero_asignado: meseroNombre,
+    };
+
+    await supabaseClient.from('mesas').update(mesaUpdate).eq('id', newOrderState.mesaId);
+
+    const localMesa = mesas.find((entry) => entry.id === newOrderState.mesaId);
+    if (localMesa) {
+      localMesa.estado = 'ocupada';
+      localMesa.nombre_personalizado = nombrePersonalizado;
+      localMesa.mesero_asignado = meseroNombre;
+    }
 
     const sessionCode = String(session.numero).padStart(4, '0');
     const mesaNum = newOrderState.mesaNum;
@@ -3747,6 +3948,7 @@ async function init() {
   initMesaQrSection();
   initModal();
   initNewOrderModal();
+  initMesaNameModal();
   bindListActions();
   bindMesasActions();
 

@@ -307,6 +307,23 @@
                 inputmode="url"
               >
             </label>
+            <div class="settings-form__section">
+              <h3 class="settings-form__section-title">Meseros</h3>
+              <p class="settings-panel__hint settings-panel__hint--inline">Agregá meseros para asignarlos al abrir una orden. Los inactivos no aparecen en el selector.</p>
+              <ul class="settings-meseros__list" id="settingsMeserosList"></ul>
+              <p class="settings-meseros__empty" id="settingsMeserosEmpty" hidden>Sin meseros registrados.</p>
+              <form class="settings-meseros__form" id="settingsMeseroForm">
+                <input
+                  type="text"
+                  class="settings-form__text settings-meseros__input"
+                  id="settingsMeseroNameInput"
+                  placeholder="Nombre del mesero"
+                  maxlength="60"
+                  autocomplete="off"
+                >
+                <button type="submit" class="menu-toolbar__btn settings-meseros__add-btn">Agregar mesero</button>
+              </form>
+            </div>
             <p class="settings-form__error" id="settingsFormError" hidden role="alert"></p>
             <button type="submit" class="menu-toolbar__btn settings-form__save" id="settingsSaveBtn">Guardar ajustes</button>
           </form>
@@ -632,6 +649,32 @@
             </div>
           </header>
           <div class="new-order-card__step" id="newOrderAccountStep">
+            <div class="new-order-card__setup">
+              <label class="new-order-card__field" for="newOrderMesaNombre">
+                <span class="new-order-card__field-label">Nombre de la mesa <span class="new-order-card__optional">(opcional)</span></span>
+                <input
+                  type="text"
+                  class="new-order-card__input"
+                  id="newOrderMesaNombre"
+                  maxlength="60"
+                  placeholder="Ej: El de la gorra, La de Carlos"
+                  autocomplete="off"
+                >
+              </label>
+              <div class="new-order-card__field">
+                <label class="new-order-card__field-label" for="newOrderMeseroSelect">Mesero</label>
+                <select class="new-order-card__select" id="newOrderMeseroSelect" hidden></select>
+                <input
+                  type="text"
+                  class="new-order-card__input"
+                  id="newOrderMeseroText"
+                  maxlength="60"
+                  placeholder="Nombre del mesero"
+                  autocomplete="off"
+                  hidden
+                >
+              </div>
+            </div>
             <p class="new-order-card__step-title">Seleccioná la cuenta</p>
             <ul class="new-order-card__accounts" id="newOrderAccountList"></ul>
           </div>
@@ -655,6 +698,34 @@
           </div>
           </div>
         </article>
+      </div>
+    </div>
+
+    <!-- Modal editar nombre de mesa -->
+    <div class="modal" id="mesaNameModal" hidden aria-hidden="true">
+      <div class="modal__backdrop" data-close-mesa-name></div>
+      <div class="modal__box modal__box--compact" role="dialog" aria-labelledby="mesaNameModalTitle">
+        <header class="modal__head">
+          <h2 class="modal__title" id="mesaNameModalTitle">Nombre de la mesa</h2>
+          <button type="button" class="modal__close" data-close-mesa-name aria-label="Cerrar">×</button>
+        </header>
+        <form class="mesa-name-form" id="mesaNameForm">
+          <label class="new-order-card__field" for="mesaNameInput">
+            <span class="new-order-card__field-label">Nombre personalizado</span>
+            <input
+              type="text"
+              class="new-order-card__input"
+              id="mesaNameInput"
+              maxlength="60"
+              placeholder="Ej: El de la gorra"
+              autocomplete="off"
+            >
+          </label>
+          <div class="mesa-name-form__actions">
+            <button type="button" class="mesa-card__btn mesa-card__btn--view" id="mesaNameClearBtn">Quitar nombre</button>
+            <button type="submit" class="mesa-card__btn mesa-card__btn--new">Guardar</button>
+          </div>
+        </form>
       </div>
     </div>
 

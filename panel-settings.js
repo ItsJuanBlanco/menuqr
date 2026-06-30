@@ -394,6 +394,7 @@ async function loadRestaurantSettings() {
     const data = await fetchRestaurantSettings();
     setRestaurantGlobals({ restaurant: { ...RESTAURANTE, ...data } });
     populateSettingsForm(data);
+    await loadMeserosSettings();
   } catch (error) {
     console.error(error);
     showToast(error.message || 'No se pudieron cargar los ajustes.', 'error');
@@ -626,8 +627,162 @@ function bindSettingsForm() {
   });
 }
 
+/* ── Meseros ── */
+let settingsMeseros = [];
+let settingsMeserosBound = false;
+
+async function fetchRestaurantMeseros() {
+  const { data, error } = await supabaseClient
+    .from('meseros')
+    .select('id, nombre, activo')
+    .eq('restaurante_id', RESTAURANTE_ID)
+    .order('nombre', { ascending: true });
+
+  if (error) throw error;
+  return data || [];
+}
+
+function renderMeserosSettingsList() {
+  const list = document.getElementById('settingsMeserosList');
+  const empty = document.getElementById('settingsMeserosEmpty');
+  if (!list) return;
+
+  if (!settingsMeseros.length) {
+    list.innerHTML = '';
+    if (empty) empty.hidden = false;
+    return;
+  }
+
+  if (empty) empty.hidden = true;
+
+  list.innerHTML = settingsMeseros
+    .map((mesero) => {
+      const inactive = mesero.activo === false;
+      return `
+        <li class="settings-meseros__item${inactive ? ' settings-meseros__item--inactive' : ''}">
+          <div class="settings-meseros__info">
+            <span class="settings-meseros__name">${escapeHtml(mesero.nombre || 'Sin nombre')}</span>
+            ${inactive ? '<span class="settings-meseros__badge">Inactivo</span>' : ''}
+          </div>
+          <div class="settings-meseros__actions">
+            <button
+              type="button"
+              class="settings-meseros__btn"
+              data-toggle-mesero="${mesero.id}"
+              data-mesero-active="${inactive ? 'true' : 'false'}"
+            >${inactive ? 'Activar' : 'Desactivar'}</button>
+            <button type="button" class="settings-meseros__btn settings-meseros__btn--danger" data-delete-mesero="${mesero.id}">
+              Eliminar
+            </button>
+          </div>
+        </li>
+      `;
+    })
+    .join('');
+}
+
+async function loadMeserosSettings() {
+  try {
+    settingsMeseros = await fetchRestaurantMeseros();
+    renderMeserosSettingsList();
+  } catch (error) {
+    console.error(error);
+    showToast(error.message || 'No se pudieron cargar los meseros.', 'error');
+  }
+}
+
+async function addSettingsMesero(event) {
+  event.preventDefault();
+
+  const input = document.getElementById('settingsMeseroNameInput');
+  const nombre = input?.value?.trim();
+  if (!nombre) {
+    showToast('Ingresá el nombre del mesero.', 'error');
+    return;
+  }
+
+  try {
+    const { error } = await supabaseClient.from('meseros').insert({
+      restaurante_id: RESTAURANTE_ID,
+      nombre,
+      activo: true,
+    });
+
+    if (error) throw error;
+
+    if (input) input.value = '';
+    await loadMeserosSettings();
+    showToast('Mesero agregado', 'success');
+  } catch (error) {
+    console.error(error);
+    showToast(error.message || 'No se pudo agregar el mesero.', 'error');
+  }
+}
+
+async function toggleSettingsMesero(meseroId, makeActive) {
+  try {
+    const { error } = await supabaseClient
+      .from('meseros')
+      .update({ activo: makeActive })
+      .eq('id', meseroId)
+      .eq('restaurante_id', RESTAURANTE_ID);
+
+    if (error) throw error;
+    await loadMeserosSettings();
+    showToast(makeActive ? 'Mesero activado' : 'Mesero desactivado', 'success');
+  } catch (error) {
+    console.error(error);
+    showToast(error.message || 'No se pudo actualizar el mesero.', 'error');
+  }
+}
+
+async function deleteSettingsMesero(meseroId) {
+  const mesero = settingsMeseros.find((entry) => entry.id === meseroId);
+  const label = mesero?.nombre || 'este mesero';
+  if (!window.confirm(`¿Eliminar a ${label}? Esta acción no se puede deshacer.`)) return;
+
+  try {
+    const { error } = await supabaseClient
+      .from('meseros')
+      .delete()
+      .eq('id', meseroId)
+      .eq('restaurante_id', RESTAURANTE_ID);
+
+    if (error) throw error;
+    await loadMeserosSettings();
+    showToast('Mesero eliminado', 'success');
+  } catch (error) {
+    console.error(error);
+    showToast(error.message || 'No se pudo eliminar el mesero.', 'error');
+  }
+}
+
+function bindMeserosSettings() {
+  if (settingsMeserosBound) return;
+
+  document.getElementById('settingsMeseroForm')?.addEventListener('submit', (event) => {
+    void addSettingsMesero(event);
+  });
+
+  document.getElementById('settingsMeserosList')?.addEventListener('click', (event) => {
+    const toggleBtn = event.target.closest('[data-toggle-mesero]');
+    if (toggleBtn) {
+      void toggleSettingsMesero(toggleBtn.dataset.toggleMesero, toggleBtn.dataset.meseroActive === 'true');
+      return;
+    }
+
+    const deleteBtn = event.target.closest('[data-delete-mesero]');
+    if (deleteBtn) {
+      void deleteSettingsMesero(deleteBtn.dataset.deleteMesero);
+    }
+  });
+
+  settingsMeserosBound = true;
+}
+
 function initSettingsPanel() {
   bindSettingsForm();
+  bindMeserosSettings();
   if (RESTAURANTE) populateSettingsForm(RESTAURANTE);
 }
 
