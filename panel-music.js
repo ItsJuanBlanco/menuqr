@@ -1,14 +1,22 @@
 let musicQueue = [];
 let musicPollTimer = null;
 let musicListBound = false;
+let musicSubTabsBound = false;
 let musicUpdating = new Set();
+let musicActiveSubPanel = 'cola';
 
 const MUSIC_POLL_MS = 5000;
+const MUSIC_HISTORY_ESTADOS = new Set(['sonando', 'rechazada', 'reproducida']);
 const MUSIC_ESTADO_LABELS = {
   pendiente: 'Nuevo',
   sonando: 'En cola',
-  reproducida: 'Listo',
+  reproducida: 'En cola',
   rechazada: 'Rechazada',
+};
+
+const MUSIC_PANEL_HINTS = {
+  cola: 'Del más antiguo al más reciente. La primera es la próxima.',
+  historia: 'Canciones que ya pasaste a cola o rechazaste, de la más reciente a la más antigua.',
 };
 
 function isMusicPanelEnabled() {
@@ -33,16 +41,6 @@ function getMusicMesaLabel(entry) {
   return `Mesa ${mesa.numero}`;
 }
 
-function updateMusicTabBadgeFromQueue() {
-  const pending = musicQueue.filter((entry) => entry.estado === 'pendiente').length;
-  updatePanelTabBadge(
-    'tabMusica',
-    pending,
-    `${pending} canción${pending !== 1 ? 'es' : ''} pendiente${pending !== 1 ? 's' : ''}`,
-    pending > 0 ? 'pendiente' : ''
-  );
-}
-
 function getMusicCreatedAt(entry) {
   return entry.created || entry.created_at;
 }
@@ -54,90 +52,118 @@ function compareMusicQueueEntries(a, b) {
   return String(a.id).localeCompare(String(b.id));
 }
 
+function compareMusicHistoryEntries(a, b) {
+  return compareMusicQueueEntries(b, a);
+}
+
 function sortMusicQueue(entries = []) {
   return [...entries].sort(compareMusicQueueEntries);
 }
 
-function buildMusicCardActions(entry, busy) {
-  const estado = entry.estado || 'pendiente';
-  const disabled = busy ? ' disabled' : '';
-
-  if (estado === 'pendiente') {
-    return `
-      <div class="music-card__actions">
-        <button type="button" class="music-card__btn music-card__btn--queue" data-music-action="sonando" data-music-id="${entry.id}"${disabled}>
-          En cola
-        </button>
-        <button type="button" class="music-card__btn music-card__btn--reject" data-music-action="rechazada" data-music-id="${entry.id}"${disabled}>
-          Rechazar
-        </button>
-      </div>
-    `;
-  }
-
-  if (estado === 'sonando') {
-    return `
-      <div class="music-card__actions">
-        <button type="button" class="music-card__btn music-card__btn--done" data-music-action="reproducida" data-music-id="${entry.id}"${disabled}>
-          Listo
-        </button>
-        <button type="button" class="music-card__btn music-card__btn--reject" data-music-action="rechazada" data-music-id="${entry.id}"${disabled}>
-          Rechazar
-        </button>
-      </div>
-    `;
-  }
-
-  return '';
+function sortMusicHistory(entries = []) {
+  return [...entries].sort(compareMusicHistoryEntries);
 }
 
-function renderMusicQueue() {
-  const list = document.getElementById('musicQueueList');
-  const empty = document.getElementById('musicEmpty');
+function getPendingMusicEntries() {
+  return sortMusicQueue(musicQueue.filter((entry) => (entry.estado || 'pendiente') === 'pendiente'));
+}
+
+function getHistoryMusicEntries() {
+  return sortMusicHistory(musicQueue.filter((entry) => MUSIC_HISTORY_ESTADOS.has(entry.estado || '')));
+}
+
+function updateMusicTabBadgeFromQueue() {
+  const pending = getPendingMusicEntries().length;
+  updatePanelTabBadge(
+    'tabMusica',
+    pending,
+    `${pending} canción${pending !== 1 ? 'es' : ''} pendiente${pending !== 1 ? 's' : ''}`,
+    pending > 0 ? 'pendiente' : ''
+  );
+}
+
+function buildMusicCardActions(entry, busy) {
+  if ((entry.estado || 'pendiente') !== 'pendiente') return '';
+
+  const disabled = busy ? ' disabled' : '';
+
+  return `
+    <div class="music-card__actions">
+      <button type="button" class="music-card__btn music-card__btn--queue" data-music-action="sonando" data-music-id="${entry.id}"${disabled}>
+        En cola
+      </button>
+      <button type="button" class="music-card__btn music-card__btn--reject" data-music-action="rechazada" data-music-id="${entry.id}"${disabled}>
+        Rechazar
+      </button>
+    </div>
+  `;
+}
+
+function buildMusicCardMarkup(entry, { showActions = false } = {}) {
+  const estado = entry.estado || 'pendiente';
+  const artista = String(entry.artista || '').trim();
+  const cancion = escapeHtml(entry.cancion || 'Sin título');
+  const busy = musicUpdating.has(entry.id);
+  const actions = showActions ? buildMusicCardActions(entry, busy) : '';
+  const artistHtml = artista
+    ? escapeHtml(artista)
+    : '<span class="music-card__artist-muted">Artista no indicado</span>';
+
+  return `
+    <article class="music-card music-card--${estado}" data-music-id="${entry.id}">
+      <div class="music-card__head">
+        <div>
+          <h3 class="music-card__title">${cancion}</h3>
+          <p class="music-card__artist">${artistHtml}</p>
+        </div>
+        <span class="music-card__status">${escapeHtml(getMusicEstadoLabel(estado))}</span>
+      </div>
+      <div class="music-card__meta">
+        <span>${escapeHtml(getMusicMesaLabel(entry))}</span>
+        <span>${formatMusicTime(getMusicCreatedAt(entry))}</span>
+      </div>
+      ${actions}
+    </article>
+  `;
+}
+
+function renderMusicList(listId, emptyId, entries, { showActions = false } = {}) {
+  const list = document.getElementById(listId);
+  const empty = document.getElementById(emptyId);
   if (!list) return;
 
-  if (!musicQueue.length) {
+  if (!entries.length) {
     list.innerHTML = '';
     if (empty) empty.hidden = false;
-    updateMusicTabBadgeFromQueue();
     return;
   }
 
   if (empty) empty.hidden = true;
+  list.innerHTML = entries.map((entry) => buildMusicCardMarkup(entry, { showActions })).join('');
+}
 
-  list.innerHTML = musicQueue
-    .map((entry) => {
-      const estado = entry.estado || 'pendiente';
-      const isDone = estado === 'reproducida' || estado === 'rechazada';
-      const artista = String(entry.artista || '').trim();
-      const cancion = escapeHtml(entry.cancion || 'Sin título');
-      const busy = musicUpdating.has(entry.id);
-      const actions = isDone ? '' : buildMusicCardActions(entry, busy);
-
-      const artistHtml = artista
-        ? escapeHtml(artista)
-        : '<span class="music-card__artist-muted">Artista no indicado</span>';
-
-      return `
-        <article class="music-card music-card--${estado}" data-music-id="${entry.id}">
-          <div class="music-card__head">
-            <div>
-              <h3 class="music-card__title">${cancion}</h3>
-              <p class="music-card__artist">${artistHtml}</p>
-            </div>
-            <span class="music-card__status">${escapeHtml(getMusicEstadoLabel(estado))}</span>
-          </div>
-          <div class="music-card__meta">
-            <span>${escapeHtml(getMusicMesaLabel(entry))}</span>
-            <span>${formatMusicTime(getMusicCreatedAt(entry))}</span>
-          </div>
-          ${actions}
-        </article>
-      `;
-    })
-    .join('');
-
+function renderMusicQueue() {
+  renderMusicList('musicQueueList', 'musicEmpty', getPendingMusicEntries(), { showActions: true });
+  renderMusicList('musicHistoryList', 'musicHistoryEmpty', getHistoryMusicEntries(), { showActions: false });
   updateMusicTabBadgeFromQueue();
+}
+
+function switchMusicSubPanel(panelId) {
+  musicActiveSubPanel = panelId;
+
+  document.querySelectorAll('[data-music-panel]').forEach((btn) => {
+    const active = btn.dataset.musicPanel === panelId;
+    btn.classList.toggle('music-panel__tab--active', active);
+    btn.setAttribute('aria-selected', active ? 'true' : 'false');
+  });
+
+  document.querySelectorAll('[data-music-section]').forEach((section) => {
+    const active = section.dataset.musicSection === panelId;
+    section.hidden = !active;
+  });
+
+  const hint = document.getElementById('musicPanelHint');
+  if (hint) hint.textContent = MUSIC_PANEL_HINTS[panelId] || MUSIC_PANEL_HINTS.cola;
 }
 
 async function loadMusicQueue() {
@@ -161,7 +187,7 @@ async function loadMusicQueue() {
 
   if (error) throw error;
 
-  musicQueue = sortMusicQueue(data || []);
+  musicQueue = data || [];
   renderMusicQueue();
 }
 
@@ -224,6 +250,7 @@ function applyMusicPanelVisibility() {
     return;
   }
 
+  switchMusicSubPanel(musicActiveSubPanel);
   startMusicPolling();
 }
 
@@ -244,8 +271,22 @@ function bindMusicQueueActions() {
   });
 }
 
+function bindMusicSubTabs() {
+  const tabs = document.querySelector('.music-panel__tabs');
+  if (!tabs || musicSubTabsBound) return;
+  musicSubTabsBound = true;
+
+  tabs.addEventListener('click', (event) => {
+    const btn = event.target.closest('[data-music-panel]');
+    if (!btn) return;
+    switchMusicSubPanel(btn.dataset.musicPanel);
+  });
+}
+
 function initMusicPanel() {
   bindMusicQueueActions();
+  bindMusicSubTabs();
+  switchMusicSubPanel('cola');
 }
 
 document.addEventListener('DOMContentLoaded', initMusicPanel);

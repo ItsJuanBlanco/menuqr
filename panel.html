@@ -202,15 +202,29 @@
       <section class="panel-view" id="viewMusica" role="tabpanel" aria-labelledby="tabMusica" hidden>
         <div class="music-panel">
           <div class="music-panel__head">
-            <h2 class="music-panel__title">Cola de canciones</h2>
-            <p class="music-panel__hint">Del más antiguo al más reciente. La primera de la lista es la próxima.</p>
+            <h2 class="music-panel__title">Pedidos de canciones</h2>
+            <p class="music-panel__hint" id="musicPanelHint">Del más antiguo al más reciente. La primera es la próxima.</p>
           </div>
-          <div class="panel-empty" id="musicEmpty" hidden>
-            <span class="panel-empty__icon" aria-hidden="true">🎵</span>
-            <p class="panel-empty__title">Sin canciones pedidas</p>
-            <p class="panel-empty__text">Los pedidos de mesas aparecerán aquí automáticamente.</p>
+          <nav class="music-panel__tabs" role="tablist" aria-label="Secciones de música">
+            <button type="button" class="music-panel__tab music-panel__tab--active" data-music-panel="cola" role="tab" aria-selected="true">Música</button>
+            <button type="button" class="music-panel__tab" data-music-panel="historia" role="tab" aria-selected="false">Historia</button>
+          </nav>
+          <div class="music-panel__section" data-music-section="cola">
+            <div class="panel-empty" id="musicEmpty" hidden>
+              <span class="panel-empty__icon" aria-hidden="true">🎵</span>
+              <p class="panel-empty__title">Sin canciones nuevas</p>
+              <p class="panel-empty__text">Los pedidos de mesas aparecerán aquí automáticamente.</p>
+            </div>
+            <div class="music-queue" id="musicQueueList"></div>
           </div>
-          <div class="music-queue" id="musicQueueList"></div>
+          <div class="music-panel__section" data-music-section="historia" hidden>
+            <div class="panel-empty" id="musicHistoryEmpty" hidden>
+              <span class="panel-empty__icon" aria-hidden="true">📋</span>
+              <p class="panel-empty__title">Sin historial</p>
+              <p class="panel-empty__text">Acá verás las canciones que ya pasaste a cola o rechazaste.</p>
+            </div>
+            <div class="music-queue" id="musicHistoryList"></div>
+          </div>
         </div>
       </section>
 
