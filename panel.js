@@ -80,19 +80,32 @@ async function saveSessionCargoServicio(sesionId, cargoServicio) {
   if (error) throw error;
 }
 
-function getPagarBaseUrl() {
-  return `${LISTOAPP_BASE_URL}/pagar`;
+function normalizeSplitPaymentMonto(monto) {
+  const value = Math.round(Number(monto));
+  if (!Number.isFinite(value) || value <= 0) {
+    throw new Error('El monto no es válido.');
+  }
+  return value;
 }
 
-function buildPagarUrl(monto, sesionId, cargoServicio = 0, parte = null) {
+function buildPanelSplitPaymentUrl(mesaNumero, monto, splitCode) {
+  const slug = encodeURIComponent(RESTAURANTE_SLUG || '');
+  const mesa = encodeURIComponent(String(mesaNumero));
   const params = new URLSearchParams({
-    monto: String(monto),
-    sesion: sesionId,
+    split: splitCode,
+    monto: String(normalizeSplitPaymentMonto(monto)),
   });
-  if (cargoServicio > 0) params.set('servicio', String(cargoServicio));
-  if (parte) params.set('parte', String(parte));
-  if (RESTAURANTE_SLUG) params.set('slug', RESTAURANTE_SLUG);
-  return `${getPagarBaseUrl()}?${params.toString()}`;
+  return `${LISTOAPP_BASE_URL}/${slug}?mesa=${mesa}&${params.toString()}`;
+}
+
+async function buildPanelSplitPaymentUrlForSession({ mesaNumero, sesionId, monto }) {
+  if (!sesionId) throw new Error('Falta la sesión para generar el QR.');
+  if (mesaNumero == null || mesaNumero === '') {
+    throw new Error('Falta la mesa para generar el QR.');
+  }
+
+  const splitCode = await ensureSessionSplitCode(sesionId);
+  return buildPanelSplitPaymentUrl(mesaNumero, monto, splitCode);
 }
 
 function getPanelSplitShare(subtotal, splitCount, serviceEnabled = true) {
@@ -2442,7 +2455,7 @@ function getSelectedSplitPaymentSession() {
   };
 }
 
-function renderSplitPaymentQr(share, partNumber) {
+async function renderSplitPaymentQr(share) {
   const box = document.getElementById('splitPaymentQrBox');
   const canvas = document.getElementById('splitPaymentQrCanvas');
   if (!box || !canvas || typeof QRCode === 'undefined') return;
@@ -2455,19 +2468,26 @@ function renderSplitPaymentQr(share, partNumber) {
 
   box.hidden = false;
   canvas.innerHTML = '';
-  new QRCode(canvas, {
-    text: buildPagarUrl(
-      share.shareTotal,
-      splitPaymentState.sesionId,
-      share.shareServicio,
-      partNumber
-    ),
-    width: 220,
-    height: 220,
-    colorDark: '#0f172a',
-    colorLight: '#ffffff',
-    correctLevel: QRCode.CorrectLevel.M,
-  });
+
+  try {
+    const url = await buildPanelSplitPaymentUrlForSession({
+      mesaNumero: splitPaymentState.mesaNum,
+      sesionId: splitPaymentState.sesionId,
+      monto: share.shareTotal,
+    });
+
+    new QRCode(canvas, {
+      text: url,
+      width: 220,
+      height: 220,
+      colorDark: '#0f172a',
+      colorLight: '#ffffff',
+      correctLevel: QRCode.CorrectLevel.M,
+    });
+  } catch (error) {
+    console.error(error);
+    canvas.textContent = error.message || 'No se pudo generar el QR.';
+  }
 }
 
 async function refreshSplitPaymentModal() {
@@ -2537,7 +2557,7 @@ async function refreshSplitPaymentModal() {
     qrBtn.disabled = splitPaymentState.submitting || isComplete || share.shareTotal <= 0;
   }
 
-  renderSplitPaymentQr(share, nextPart);
+  await renderSplitPaymentQr(share);
 }
 
 function closeSplitPaymentModal() {
@@ -2683,6 +2703,7 @@ function openPaymentQrModalBulk() {
     sesionId: primarySession.id,
     sessionLabel: `Todas las cuentas · Mesa ${mesaNum}`,
     sessionTotal: combinedTotal,
+    mesaNumero: mesaNum,
   });
 }
 
@@ -2729,7 +2750,7 @@ function closeDataphoneModal() {
   dataphoneModalState = null;
 }
 
-function renderPaymentQrModal() {
+async function renderPaymentQrModal() {
   if (!paymentQrModalState) return;
 
   const toggle = document.getElementById('paymentQrServiceToggle');
@@ -2748,20 +2769,40 @@ function renderPaymentQrModal() {
   if (!canvas || typeof QRCode === 'undefined') return;
 
   canvas.innerHTML = '';
-  new QRCode(canvas, {
-    text: buildPagarUrl(breakdown.total, paymentQrModalState.sesionId, breakdown.cargoServicio),
-    width: 240,
-    height: 240,
-    colorDark: '#0f172a',
-    colorLight: '#ffffff',
-    correctLevel: QRCode.CorrectLevel.M,
-  });
+
+  try {
+    const url = await buildPanelSplitPaymentUrlForSession({
+      mesaNumero: paymentQrModalState.mesaNumero,
+      sesionId: paymentQrModalState.sesionId,
+      monto: breakdown.total,
+    });
+
+    new QRCode(canvas, {
+      text: url,
+      width: 240,
+      height: 240,
+      colorDark: '#0f172a',
+      colorLight: '#ffffff',
+      correctLevel: QRCode.CorrectLevel.M,
+    });
+  } catch (error) {
+    console.error(error);
+    canvas.textContent = error.message || 'No se pudo generar el QR.';
+  }
 }
 
-function openPaymentQrModal({ sesionId, sessionLabel, sessionTotal }) {
+function openPaymentQrModal({ sesionId, sessionLabel, sessionTotal, mesaNumero }) {
   const total = Number(sessionTotal);
   if (!sesionId || total <= 0) {
     showToast('No hay monto para generar el QR.', 'error');
+    return;
+  }
+
+  const resolvedMesaNumero =
+    mesaNumero ?? accountModalState?.mesaNum ?? splitPaymentState?.mesaNum ?? null;
+
+  if (resolvedMesaNumero == null || resolvedMesaNumero === '') {
+    showToast('No se pudo identificar la mesa para el QR.', 'error');
     return;
   }
 
@@ -2775,12 +2816,13 @@ function openPaymentQrModal({ sesionId, sessionLabel, sessionTotal }) {
     sessionLabel,
     subtotal: total,
     serviceChargeEnabled: true,
+    mesaNumero: resolvedMesaNumero,
   };
 
   document.getElementById('paymentQrTitle').textContent = `QR · ${sessionLabel}`;
   const toggle = document.getElementById('paymentQrServiceToggle');
   if (toggle) toggle.checked = true;
-  renderPaymentQrModal();
+  void renderPaymentQrModal();
 
   const modal = document.getElementById('paymentQrModal');
   modal.hidden = false;
@@ -2805,7 +2847,7 @@ function handleAccountModalAction(event) {
   if (action === 'cobrar-dataphone') {
     openDataphoneModal({ sesionId, sessionLabel, sessionTotal, mesaId, mesaNum });
   } else if (action === 'enviar-qr') {
-    openPaymentQrModal({ sesionId, sessionLabel, sessionTotal });
+    openPaymentQrModal({ sesionId, sessionLabel, sessionTotal, mesaNumero: mesaNum });
   } else if (action === 'cobrar-dataphone-todo') {
     openDataphoneModalBulk();
   } else if (action === 'enviar-qr-todo') {
@@ -2924,7 +2966,9 @@ function initModal() {
   });
 
   document.getElementById('dataphoneServiceToggle')?.addEventListener('change', updateDataphoneModalUI);
-  document.getElementById('paymentQrServiceToggle')?.addEventListener('change', renderPaymentQrModal);
+  document.getElementById('paymentQrServiceToggle')?.addEventListener('change', () => {
+    void renderPaymentQrModal();
+  });
 }
 
 async function confirmSessionPayment(sesionId, mesaId, mesaNum, successMessage = 'Sesión cerrada', options = {}) {
