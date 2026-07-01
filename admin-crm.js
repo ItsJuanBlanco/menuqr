@@ -20,6 +20,18 @@ const CRM_BITACORA_LABELS = {
   reunion: 'Reunión',
 };
 
+const CRM_LOCAL_SELECT =
+  'id, nombre, direccion, nombre_contacto, telefono, whatsapp, plan, valor_mensual, estado, referido_por, link_google, anotaciones, creado_en, actualizado_en';
+
+function crmNormalizeLinkGoogle(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return null;
+  if (!/^https?:\/\//i.test(raw)) {
+    throw new Error('El link de Google debe empezar con http:// o https://');
+  }
+  return raw;
+}
+
 let crmLocales = [];
 let crmUrgentFollowUps = [];
 let crmLoaded = false;
@@ -284,7 +296,7 @@ async function fetchCrmLocales() {
   const client = crmAssertClient();
   const { data, error } = await client
     .from('locales')
-    .select('id, nombre, direccion, nombre_contacto, telefono, whatsapp, plan, valor_mensual, estado, referido_por, creado_en, actualizado_en')
+    .select(CRM_LOCAL_SELECT)
     .order('nombre', { ascending: true });
 
   if (error) throw error;
@@ -330,7 +342,7 @@ async function createCrmLocal() {
     const { data, error } = await client
       .from('locales')
       .insert({ nombre: 'Nuevo local', estado: 'prospecto' })
-      .select('id, nombre, direccion, nombre_contacto, telefono, whatsapp, plan, valor_mensual, estado, referido_por, creado_en, actualizado_en')
+      .select(CRM_LOCAL_SELECT)
       .single();
 
     if (error) throw error;
@@ -387,6 +399,8 @@ function fillCrmInfoForm(local) {
   document.getElementById('crmValorMensual').value = local.valor_mensual ?? '';
   document.getElementById('crmEstado').value = crmNormalizeEstado(local.estado);
   populateCrmReferidoSelect(local.referido_por || '');
+  document.getElementById('crmLinkGoogle').value = local.link_google || '';
+  document.getElementById('crmAnotaciones').value = local.anotaciones || '';
 }
 
 async function loadCrmRequisitos(localId) {
@@ -550,6 +564,17 @@ async function saveCrmInfoForm(event) {
   const errorEl = document.getElementById('crmInfoError');
   const btn = document.getElementById('crmInfoSaveBtn');
 
+  let linkGoogle = null;
+  try {
+    linkGoogle = crmNormalizeLinkGoogle(document.getElementById('crmLinkGoogle')?.value);
+  } catch (error) {
+    if (errorEl) {
+      errorEl.textContent = error.message;
+      errorEl.hidden = false;
+    }
+    return;
+  }
+
   const payload = {
     nombre: document.getElementById('crmNombre')?.value?.trim() || 'Sin nombre',
     direccion: document.getElementById('crmDireccion')?.value?.trim() || null,
@@ -560,6 +585,8 @@ async function saveCrmInfoForm(event) {
     valor_mensual: Number(document.getElementById('crmValorMensual')?.value) || null,
     estado: crmNormalizeEstado(document.getElementById('crmEstado')?.value),
     referido_por: document.getElementById('crmReferidoPor')?.value || null,
+    link_google: linkGoogle,
+    anotaciones: document.getElementById('crmAnotaciones')?.value?.trim() || null,
   };
 
   if (btn) {
@@ -574,7 +601,7 @@ async function saveCrmInfoForm(event) {
       .from('locales')
       .update(payload)
       .eq('id', crmActiveLocalId)
-      .select('id, nombre, direccion, nombre_contacto, telefono, whatsapp, plan, valor_mensual, estado, referido_por, creado_en, actualizado_en')
+      .select(CRM_LOCAL_SELECT)
       .single();
 
     if (error) throw error;

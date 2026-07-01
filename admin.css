@@ -979,7 +979,11 @@
   min-width: 110px;
 }
 
-.crm-bitacora-form__text {
+.crm-bitacora-form__text,
+.crm-anotaciones {
+  resize: vertical;
+  min-height: 96px;
+}
   flex: 1 1 100%;
   resize: vertical;
   min-height: 84px;

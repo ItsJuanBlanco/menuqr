@@ -262,6 +262,26 @@
                 <option value="">— Ninguno —</option>
               </select>
             </label>
+            <label class="admin-form__field">
+              <span class="admin-form__label">Link de Google</span>
+              <input
+                type="url"
+                class="admin-form__input"
+                id="crmLinkGoogle"
+                inputmode="url"
+                autocomplete="off"
+                placeholder="https://maps.google.com/… o perfil de Google"
+              >
+            </label>
+            <label class="admin-form__field">
+              <span class="admin-form__label">Anotaciones</span>
+              <textarea
+                class="admin-form__input crm-anotaciones"
+                id="crmAnotaciones"
+                rows="4"
+                placeholder="Notas internas sobre este local…"
+              ></textarea>
+            </label>
             <p class="admin-form__error" id="crmInfoError" hidden role="alert"></p>
             <button type="submit" class="dataphone-modal__confirm" id="crmInfoSaveBtn">Guardar cambios</button>
           </form>
