@@ -2245,6 +2245,101 @@ button {
   line-height: 1.45;
 }
 
+.payment-qr-modal__service-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 16px;
+  font-size: 0.9375rem;
+  color: var(--text-muted);
+}
+
+.payment-qr-modal__service-toggle input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent);
+}
+
+#paymentQrConfirmReceivedBtn {
+  width: 100%;
+  margin-top: 16px;
+}
+
+.panel-own-pay {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.panel-own-pay__empty {
+  margin: 0;
+  text-align: center;
+  font-size: 0.875rem;
+  color: var(--text-muted);
+}
+
+.panel-own-pay__amount {
+  margin: 0 0 4px;
+  font-size: 2rem;
+  font-weight: 800;
+  text-align: center;
+  color: var(--accent);
+  letter-spacing: -0.02em;
+}
+
+.panel-own-pay__amount--modal {
+  margin-bottom: 16px;
+}
+
+.panel-own-pay__block {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--bg-card) 88%, #fff 12%);
+  border: 1px solid var(--border);
+}
+
+.panel-own-pay__label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.panel-own-pay__value {
+  font-size: 1.0625rem;
+  font-weight: 700;
+  line-height: 1.35;
+  word-break: break-word;
+}
+
+.panel-own-pay__qr {
+  width: min(100%, 260px);
+  max-height: 260px;
+  margin: 0 auto;
+  object-fit: contain;
+  border-radius: 12px;
+  padding: 12px;
+  background: #fff;
+}
+
+.panel-own-pay__btn,
+.modal__pay-btn--secondary {
+  width: 100%;
+}
+
+.split-payment__qr-canvas .panel-own-pay {
+  width: 100%;
+}
+
+.split-payment__qr-canvas .panel-own-pay__qr {
+  width: min(100%, 220px);
+  max-height: 220px;
+}
+
 /* QR mesas */
 .mesa-qr-toolbar {
   display: flex;

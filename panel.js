@@ -117,6 +117,167 @@ function getPanelSplitShare(subtotal, splitCount, serviceEnabled = true) {
   };
 }
 
+function usesPanelRestaurantQrPayment() {
+  return RESTAURANTE?.metodo_pago === 'qr_propio';
+}
+
+function getPanelRestaurantPaymentLink() {
+  return RESTAURANTE?.link_pago?.trim() || '';
+}
+
+function getPanelRestaurantBancolombiaLink() {
+  const raw = RESTAURANTE?.link_bancolombia?.trim() || '';
+  if (!raw || !/^https?:\/\//i.test(raw)) return '';
+  return raw;
+}
+
+function getPanelRestaurantPaymentQrUrl() {
+  return RESTAURANTE?.qr_pago_url?.trim() || '';
+}
+
+function getPanelRestaurantNequiNumber() {
+  return String(RESTAURANTE?.numero_nequi || '').replace(/\D/g, '');
+}
+
+function formatPanelNequiDisplay(number) {
+  const digits = String(number || getPanelRestaurantNequiNumber()).replace(/\D/g, '');
+  if (!digits) return '';
+  if (digits.length === 10) return `+57${digits}`;
+  if (digits.startsWith('57') && digits.length === 12) return `+${digits}`;
+  return digits.startsWith('+') ? digits : `+${digits}`;
+}
+
+function getPanelRestaurantBancolombiaAccount() {
+  return RESTAURANTE?.numero_cuenta_bancolombia?.trim() || '';
+}
+
+function hasPanelRestaurantPaymentMethods() {
+  return !!(
+    getPanelRestaurantPaymentQrUrl() ||
+    getPanelRestaurantPaymentLink() ||
+    getPanelRestaurantBancolombiaLink() ||
+    getPanelRestaurantNequiNumber() ||
+    getPanelRestaurantBancolombiaAccount()
+  );
+}
+
+function openPanelRestaurantNequiLink() {
+  const digits = getPanelRestaurantNequiNumber();
+  if (!digits) {
+    showToast('No hay número Nequi configurado.', 'error');
+    return;
+  }
+
+  const phoneNumber = digits.length === 12 && digits.startsWith('57') ? digits.slice(2) : digits;
+  window.open(
+    `https://neqlink.nequi.com.co/cobro?phoneNumber=${encodeURIComponent(phoneNumber)}`,
+    '_blank',
+    'noopener,noreferrer'
+  );
+}
+
+function openPanelRestaurantPaymentLink() {
+  const link = getPanelRestaurantPaymentLink();
+  if (!link) {
+    showToast('No hay link de pago configurado.', 'error');
+    return;
+  }
+
+  window.open(link, '_blank', 'noopener,noreferrer');
+}
+
+function openPanelRestaurantBancolombiaLink() {
+  const link = getPanelRestaurantBancolombiaLink();
+  if (!link) {
+    showToast('No hay link de Bancolombia configurado.', 'error');
+    return;
+  }
+
+  window.open(link, '_blank', 'noopener,noreferrer');
+}
+
+function handlePanelRestaurantPayAction(event) {
+  const btn = event.target.closest('[data-panel-pay-action]');
+  if (!btn) return;
+
+  const action = btn.dataset.panelPayAction;
+  if (action === 'nequi') openPanelRestaurantNequiLink();
+  else if (action === 'link-pago') openPanelRestaurantPaymentLink();
+  else if (action === 'link-bancolombia') openPanelRestaurantBancolombiaLink();
+}
+
+function renderRestaurantOwnPaymentInfo(monto, options = {}) {
+  const { includeAmount = true } = options;
+  const qrUrl = getPanelRestaurantPaymentQrUrl();
+  const link = getPanelRestaurantPaymentLink();
+  const bancolombiaLink = getPanelRestaurantBancolombiaLink();
+  const nequi = getPanelRestaurantNequiNumber();
+  const account = getPanelRestaurantBancolombiaAccount();
+  const amountLabel = Number(monto) > 0 ? formatCOP(monto) : '';
+
+  if (!hasPanelRestaurantPaymentMethods()) {
+    return `<p class="panel-own-pay__empty">El restaurante no configuró métodos de pago propios.</p>`;
+  }
+
+  const blocks = [];
+
+  if (includeAmount && amountLabel) {
+    blocks.push(`<p class="panel-own-pay__amount">${escapeHtml(amountLabel)}</p>`);
+  }
+
+  if (qrUrl) {
+    blocks.push(`
+      <div class="panel-own-pay__block">
+        <img class="panel-own-pay__qr" src="${escapeHtml(qrUrl)}" alt="QR de pago del restaurante">
+      </div>
+    `);
+  }
+
+  if (nequi) {
+    blocks.push(`
+      <div class="panel-own-pay__block">
+        <span class="panel-own-pay__label">Nequi</span>
+        <strong class="panel-own-pay__value">Nequi: ${escapeHtml(formatPanelNequiDisplay(nequi))}</strong>
+        <button type="button" class="modal__pay-btn modal__pay-btn--secondary panel-own-pay__btn" data-panel-pay-action="nequi">
+          Abrir Nequi
+        </button>
+      </div>
+    `);
+  }
+
+  if (account) {
+    blocks.push(`
+      <div class="panel-own-pay__block">
+        <span class="panel-own-pay__label">Cuenta Bancolombia</span>
+        <strong class="panel-own-pay__value">${escapeHtml(account)}</strong>
+      </div>
+    `);
+  }
+
+  if (link) {
+    blocks.push(`
+      <button type="button" class="modal__pay-btn modal__pay-btn--secondary panel-own-pay__btn" data-panel-pay-action="link-pago">
+        Abrir link de pago
+      </button>
+    `);
+  }
+
+  if (bancolombiaLink) {
+    blocks.push(`
+      <button type="button" class="modal__pay-btn modal__pay-btn--secondary panel-own-pay__btn" data-panel-pay-action="link-bancolombia">
+        Abrir link Bancolombia
+      </button>
+    `);
+  }
+
+  return `<div class="panel-own-pay">${blocks.join('')}</div>`;
+}
+
+function mountRestaurantOwnPaymentInfo(container, monto, options = {}) {
+  if (!container) return;
+  container.innerHTML = renderRestaurantOwnPaymentInfo(monto, options);
+}
+
 async function getSessionApprovedPaymentsTotal(sesionId) {
   const { data, error } = await supabaseClient
     .from('pagos_grupo')
@@ -2446,7 +2607,8 @@ function getSelectedSplitPaymentSession() {
 async function renderSplitPaymentQr(share) {
   const box = document.getElementById('splitPaymentQrBox');
   const canvas = document.getElementById('splitPaymentQrCanvas');
-  if (!box || !canvas || typeof QRCode === 'undefined') return;
+  const hintEl = document.getElementById('splitPaymentQrHint');
+  if (!box || !canvas) return;
 
   if (share.shareTotal <= 0 || splitPaymentState.paidTotal >= share.breakdown.total) {
     box.hidden = true;
@@ -2456,6 +2618,23 @@ async function renderSplitPaymentQr(share) {
 
   box.hidden = false;
   canvas.innerHTML = '';
+
+  if (usesPanelRestaurantQrPayment()) {
+    mountRestaurantOwnPaymentInfo(canvas, share.shareTotal, { includeAmount: false });
+    if (hintEl) {
+      hintEl.textContent = 'Mostrá estos datos de pago para que transfieran su parte.';
+    }
+    return;
+  }
+
+  if (typeof QRCode === 'undefined') {
+    canvas.textContent = 'No se pudo cargar el generador de QR.';
+    return;
+  }
+
+  if (hintEl) {
+    hintEl.textContent = 'QR para que paguen su parte con Wompi';
+  }
 
   try {
     const url = await buildPanelSplitPaymentUrlForSession({
@@ -2543,6 +2722,7 @@ async function refreshSplitPaymentModal() {
 
   if (qrBtn) {
     qrBtn.disabled = splitPaymentState.submitting || isComplete || share.shareTotal <= 0;
+    qrBtn.textContent = usesPanelRestaurantQrPayment() ? 'Mostrar pago' : 'Mostrar QR';
   }
 
   await renderSplitPaymentQr(share);
@@ -2696,6 +2876,8 @@ function openPaymentQrModalBulk() {
     sessionLabel: `Todas las cuentas · Mesa ${mesaNum}`,
     sessionTotal: combinedTotal,
     mesaNumero: mesaNum,
+    mesaId: accountModalState.mesaId,
+    mesaNum,
   });
 }
 
@@ -2753,6 +2935,23 @@ async function renderPaymentQrModal() {
     paymentQrModalState.serviceChargeEnabled
   );
 
+  const ownSection = document.getElementById('paymentQrOwnSection');
+  const wompiSection = document.getElementById('paymentQrWompiSection');
+  const isOwnPayment = usesPanelRestaurantQrPayment();
+
+  if (ownSection) ownSection.hidden = !isOwnPayment;
+  if (wompiSection) wompiSection.hidden = isOwnPayment;
+
+  if (isOwnPayment) {
+    document.getElementById('paymentQrTitle').textContent = `Pago · ${paymentQrModalState.sessionLabel}`;
+    const amountEl = document.getElementById('paymentQrOwnAmount');
+    if (amountEl) amountEl.textContent = formatCOP(breakdown.total);
+    mountRestaurantOwnPaymentInfo(document.getElementById('paymentQrOwnMethods'), breakdown.total, {
+      includeAmount: false,
+    });
+    return;
+  }
+
   document.getElementById('paymentQrSubtotal').textContent = formatCOP(breakdown.subtotal);
   document.getElementById('paymentQrServiceAmount').textContent = formatCOP(breakdown.cargoServicio);
   document.getElementById('paymentQrTotal').textContent = formatCOP(breakdown.total);
@@ -2783,7 +2982,7 @@ async function renderPaymentQrModal() {
   }
 }
 
-function openPaymentQrModal({ sesionId, sessionLabel, sessionTotal, mesaNumero }) {
+function openPaymentQrModal({ sesionId, sessionLabel, sessionTotal, mesaNumero, mesaId, mesaNum }) {
   const total = Number(sessionTotal);
   if (!sesionId || total <= 0) {
     showToast('No hay monto para generar el QR.', 'error');
@@ -2791,20 +2990,28 @@ function openPaymentQrModal({ sesionId, sessionLabel, sessionTotal, mesaNumero }
   }
 
   const resolvedMesaNumero =
-    mesaNumero ?? accountModalState?.mesaNum ?? splitPaymentState?.mesaNum ?? null;
+    mesaNumero ?? mesaNum ?? accountModalState?.mesaNum ?? splitPaymentState?.mesaNum ?? null;
+  const resolvedMesaId = mesaId ?? accountModalState?.mesaId ?? null;
 
   if (resolvedMesaNumero == null || resolvedMesaNumero === '') {
     showToast('No se pudo identificar la mesa para el QR.', 'error');
     return;
   }
 
-  if (typeof QRCode === 'undefined') {
+  if (!usesPanelRestaurantQrPayment() && typeof QRCode === 'undefined') {
     showToast('No se pudo cargar el generador de QR.', 'error');
+    return;
+  }
+
+  if (usesPanelRestaurantQrPayment() && !hasPanelRestaurantPaymentMethods()) {
+    showToast('El restaurante no configuró métodos de pago propios.', 'error');
     return;
   }
 
   paymentQrModalState = {
     sesionId,
+    mesaId: resolvedMesaId,
+    mesaNum: resolvedMesaNumero,
     sessionLabel,
     subtotal: total,
     serviceChargeEnabled: true,
@@ -2839,7 +3046,14 @@ function handleAccountModalAction(event) {
   if (action === 'cobrar-dataphone') {
     openDataphoneModal({ sesionId, sessionLabel, sessionTotal, mesaId, mesaNum });
   } else if (action === 'enviar-qr') {
-    openPaymentQrModal({ sesionId, sessionLabel, sessionTotal, mesaNumero: mesaNum });
+    openPaymentQrModal({
+      sesionId,
+      sessionLabel,
+      sessionTotal,
+      mesaNumero: mesaNum,
+      mesaId,
+      mesaNum,
+    });
   } else if (action === 'cobrar-dataphone-todo') {
     openDataphoneModalBulk();
   } else if (action === 'enviar-qr-todo') {
@@ -2968,6 +3182,43 @@ function initModal() {
   document.getElementById('dataphoneServiceToggle')?.addEventListener('change', updateDataphoneModalUI);
   document.getElementById('paymentQrServiceToggle')?.addEventListener('change', () => {
     void renderPaymentQrModal();
+  });
+
+  document.getElementById('paymentQrModal')?.addEventListener('click', handlePanelRestaurantPayAction);
+  document.getElementById('splitPaymentModal')?.addEventListener('click', handlePanelRestaurantPayAction);
+
+  document.getElementById('paymentQrConfirmReceivedBtn')?.addEventListener('click', async () => {
+    if (!paymentQrModalState?.sesionId) return;
+
+    const toggle = document.getElementById('paymentQrServiceToggle');
+    if (toggle) paymentQrModalState.serviceChargeEnabled = toggle.checked;
+
+    const breakdown = getPanelPaymentBreakdown(
+      paymentQrModalState.subtotal,
+      paymentQrModalState.serviceChargeEnabled
+    );
+    const btn = document.getElementById('paymentQrConfirmReceivedBtn');
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = 'Confirmando…';
+    }
+
+    try {
+      await confirmSessionPayment(
+        paymentQrModalState.sesionId,
+        paymentQrModalState.mesaId,
+        paymentQrModalState.mesaNum,
+        'Cobro confirmado',
+        { cargoServicio: breakdown.cargoServicio }
+      );
+      closePaymentQrModal();
+      closeAccountModal();
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = 'Confirmar pago recibido';
+      }
+    }
   });
 }
 

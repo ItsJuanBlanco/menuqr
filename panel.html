@@ -527,7 +527,7 @@
         </label>
         <div class="split-payment__qr" id="splitPaymentQrBox">
           <div class="split-payment__qr-canvas" id="splitPaymentQrCanvas"></div>
-          <p class="split-payment__qr-hint">QR para que paguen su parte con Wompi</p>
+          <p class="split-payment__qr-hint" id="splitPaymentQrHint">QR para que paguen su parte con Wompi</p>
         </div>
         <div class="modal__account-pay-grid">
           <button type="button" class="modal__pay-btn modal__pay-btn--dataphone" id="splitPaymentDataphoneBtn">
@@ -568,7 +568,7 @@
       </div>
     </div>
 
-    <!-- Modal QR de pago Wompi -->
+    <!-- Modal QR de pago / pago propio -->
     <div class="modal" id="paymentQrModal" hidden aria-hidden="true">
       <div class="modal__backdrop" data-close-payment-qr></div>
       <div class="modal__box modal__box--payment-qr" role="dialog" aria-labelledby="paymentQrTitle">
@@ -576,28 +576,36 @@
           <h2 class="modal__title" id="paymentQrTitle">QR de pago</h2>
           <button type="button" class="modal__close" data-close-payment-qr aria-label="Cerrar">×</button>
         </header>
-        <dl class="panel-pay-summary payment-qr-modal__summary">
-          <div class="panel-pay-summary__row">
-            <dt>Subtotal</dt>
-            <dd id="paymentQrSubtotal">$0</dd>
-          </div>
-          <div class="panel-pay-summary__row panel-pay-summary__row--service" id="paymentQrServiceRow">
-            <dt>
-              <label class="panel-pay-summary__service-label">
-                <input type="checkbox" id="paymentQrServiceToggle" checked>
-                <span>Servicio (10%)</span>
-              </label>
-            </dt>
-            <dd id="paymentQrServiceAmount">$0</dd>
-          </div>
-          <div class="panel-pay-summary__divider" aria-hidden="true"></div>
-          <div class="panel-pay-summary__row panel-pay-summary__row--total">
-            <dt>Total</dt>
-            <dd id="paymentQrTotal">$0</dd>
-          </div>
-        </dl>
-        <div class="payment-qr-modal__canvas" id="paymentQrCanvas"></div>
-        <p class="payment-qr-modal__hint">El cliente escanea este QR y paga con Wompi desde su celular.</p>
+        <label class="payment-qr-modal__service-toggle panel-pay-summary__service-label">
+          <input type="checkbox" id="paymentQrServiceToggle" checked>
+          <span>Incluir servicio (10%)</span>
+        </label>
+        <div id="paymentQrOwnSection" hidden>
+          <p class="panel-own-pay__amount panel-own-pay__amount--modal" id="paymentQrOwnAmount">$0</p>
+          <div id="paymentQrOwnMethods"></div>
+          <button type="button" class="modal__pay-btn modal__pay-btn--dataphone" id="paymentQrConfirmReceivedBtn">
+            Confirmar pago recibido
+          </button>
+        </div>
+        <div id="paymentQrWompiSection">
+          <dl class="panel-pay-summary payment-qr-modal__summary">
+            <div class="panel-pay-summary__row">
+              <dt>Subtotal</dt>
+              <dd id="paymentQrSubtotal">$0</dd>
+            </div>
+            <div class="panel-pay-summary__row panel-pay-summary__row--service">
+              <dt>Servicio (10%)</dt>
+              <dd id="paymentQrServiceAmount">$0</dd>
+            </div>
+            <div class="panel-pay-summary__divider" aria-hidden="true"></div>
+            <div class="panel-pay-summary__row panel-pay-summary__row--total">
+              <dt>Total</dt>
+              <dd id="paymentQrTotal">$0</dd>
+            </div>
+          </dl>
+          <div class="payment-qr-modal__canvas" id="paymentQrCanvas"></div>
+          <p class="payment-qr-modal__hint">El cliente escanea este QR y paga con Wompi desde su celular.</p>
+        </div>
       </div>
     </div>
 
