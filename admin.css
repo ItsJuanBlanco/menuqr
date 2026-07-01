@@ -1013,3 +1013,289 @@
     flex-direction: column;
   }
 }
+
+/* ── Mis Gastos ── */
+.admin-gastos {
+  padding-top: 16px;
+}
+
+.gastos-summary {
+  margin-bottom: 20px;
+}
+
+.gastos-summary__hint {
+  margin: 0 0 12px;
+  font-size: 0.9375rem;
+  color: var(--text-muted);
+  text-transform: capitalize;
+}
+
+.gastos-summary__grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.gastos-summary-card {
+  padding: 18px 16px;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+.gastos-summary-card__label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.gastos-summary-card__value {
+  display: block;
+  margin-top: 8px;
+  font-size: 1.5rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--text);
+}
+
+.gastos-summary-card__value--accent {
+  color: #ff6b00;
+}
+
+.gastos-summary-card__value--positive {
+  color: #059669;
+}
+
+.gastos-summary-card__value--negative {
+  color: #dc2626;
+}
+
+.gastos-summary-card__meta {
+  display: block;
+  margin-top: 6px;
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+}
+
+.gastos-toolbar {
+  margin-bottom: 16px;
+}
+
+.gastos-month-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.gastos-month-filter__input {
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: #fff;
+  font: inherit;
+  color: var(--text);
+}
+
+.gastos-loading,
+.gastos-error {
+  padding: 12px 0;
+  font-size: 0.9375rem;
+  color: var(--text-muted);
+}
+
+.gastos-error {
+  color: #dc2626;
+}
+
+.gastos-layout {
+  display: grid;
+  grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.gastos-form-card,
+.gastos-list-card {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 20px;
+}
+
+.gastos-form-card__title,
+.gastos-list-card__title {
+  margin: 0 0 16px;
+  font-size: 1.0625rem;
+  font-weight: 700;
+}
+
+.gastos-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.gastos-form__field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.gastos-form__optional {
+  font-style: normal;
+  font-weight: 500;
+}
+
+.gastos-form__input,
+.gastos-form__textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: #fff;
+  font: inherit;
+  color: var(--text);
+}
+
+.gastos-form__textarea {
+  resize: vertical;
+  min-height: 84px;
+}
+
+.gastos-form__error {
+  margin: 0;
+  font-size: 0.875rem;
+  color: #dc2626;
+}
+
+.gastos-form__submit {
+  width: 100%;
+  justify-content: center;
+  background: #ff6b00;
+  border-color: #ff6b00;
+  color: #fff;
+}
+
+.gastos-form__submit:hover {
+  filter: brightness(0.96);
+}
+
+.gastos-empty {
+  padding: 32px 12px;
+  text-align: center;
+}
+
+.gastos-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.gastos-item {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.gastos-item:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.gastos-item__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+
+.gastos-item__date {
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+}
+
+.gastos-item__concept {
+  margin: 0;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.gastos-item__notes {
+  margin: 6px 0 0;
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+  line-height: 1.45;
+}
+
+.gastos-item__amount {
+  flex-shrink: 0;
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--text);
+}
+
+.gastos-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.gastos-badge--tools {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.gastos-badge--marketing {
+  background: #f3e8ff;
+  color: #7e22ce;
+}
+
+.gastos-badge--transport {
+  background: #d1fae5;
+  color: #047857;
+}
+
+.gastos-badge--other {
+  background: #f4f4f5;
+  color: #52525b;
+}
+
+@media (max-width: 1080px) {
+  .gastos-summary__grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 820px) {
+  .gastos-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .gastos-summary__grid {
+    grid-template-columns: 1fr;
+  }
+}

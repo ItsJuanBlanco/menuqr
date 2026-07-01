@@ -1016,23 +1016,33 @@ async function init() {
 }
 
 function switchAdminTab(tabId) {
-  const restaurantsPanel = document.getElementById('adminRestaurantsPanel');
-  const crmPanel = document.getElementById('adminCrmPanel');
-  const tabRestaurants = document.getElementById('adminTabRestaurants');
-  const tabCrm = document.getElementById('adminTabCrm');
+  const activeTab = ['restaurants', 'crm', 'gastos'].includes(tabId) ? tabId : 'restaurants';
 
-  const isRestaurants = tabId !== 'crm';
+  const panels = {
+    restaurants: document.getElementById('adminRestaurantsPanel'),
+    crm: document.getElementById('adminCrmPanel'),
+    gastos: document.getElementById('adminGastosPanel'),
+  };
 
-  restaurantsPanel?.toggleAttribute('hidden', !isRestaurants);
-  crmPanel?.toggleAttribute('hidden', isRestaurants);
+  const tabs = {
+    restaurants: document.getElementById('adminTabRestaurants'),
+    crm: document.getElementById('adminTabCrm'),
+    gastos: document.getElementById('adminTabGastos'),
+  };
 
-  tabRestaurants?.classList.toggle('admin-tabs__btn--active', isRestaurants);
-  tabCrm?.classList.toggle('admin-tabs__btn--active', !isRestaurants);
-  tabRestaurants?.setAttribute('aria-selected', isRestaurants ? 'true' : 'false');
-  tabCrm?.setAttribute('aria-selected', !isRestaurants ? 'true' : 'false');
+  Object.entries(panels).forEach(([key, panel]) => {
+    const isActive = key === activeTab;
+    panel?.toggleAttribute('hidden', !isActive);
+    tabs[key]?.classList.toggle('admin-tabs__btn--active', isActive);
+    tabs[key]?.setAttribute('aria-selected', isActive ? 'true' : 'false');
+  });
 
-  if (!isRestaurants && typeof loadCrmData === 'function') {
+  if (activeTab === 'crm' && typeof loadCrmData === 'function') {
     void loadCrmData();
+  }
+
+  if (activeTab === 'gastos' && typeof loadGastosData === 'function') {
+    void loadGastosData(true);
   }
 }
 

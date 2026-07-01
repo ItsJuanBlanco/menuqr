@@ -65,6 +65,7 @@
     <nav class="admin-tabs" role="tablist" aria-label="Secciones admin">
       <button type="button" class="admin-tabs__btn admin-tabs__btn--active" id="adminTabRestaurants" data-admin-tab="restaurants" role="tab" aria-selected="true">Restaurantes</button>
       <button type="button" class="admin-tabs__btn" id="adminTabCrm" data-admin-tab="crm" role="tab" aria-selected="false">CRM</button>
+      <button type="button" class="admin-tabs__btn" id="adminTabGastos" data-admin-tab="gastos" role="tab" aria-selected="false">Mis Gastos</button>
     </nav>
 
     <main class="panel-main admin-main" id="adminRestaurantsPanel" role="tabpanel">
@@ -113,6 +114,88 @@
       <p class="crm-error" id="crmError" hidden role="alert"></p>
 
       <div class="crm-kanban" id="crmKanban" hidden></div>
+    </main>
+
+    <main class="panel-main admin-main admin-gastos" id="adminGastosPanel" hidden role="tabpanel">
+      <section class="gastos-summary" aria-label="Resumen del mes">
+        <p class="gastos-summary__hint" id="gastosMonthHint">Resumen del mes</p>
+        <div class="gastos-summary__grid">
+          <article class="gastos-summary-card">
+            <span class="gastos-summary-card__label">Total gastado este mes</span>
+            <strong class="gastos-summary-card__value" id="gastosSummaryTotal">$0</strong>
+          </article>
+          <article class="gastos-summary-card">
+            <span class="gastos-summary-card__label">Mayor categoría</span>
+            <strong class="gastos-summary-card__value" id="gastosSummaryTopCategory">$0</strong>
+            <span class="gastos-summary-card__meta" id="gastosSummaryTopCategoryMeta">Sin gastos registrados</span>
+          </article>
+          <article class="gastos-summary-card">
+            <span class="gastos-summary-card__label">MRC actual</span>
+            <strong class="gastos-summary-card__value gastos-summary-card__value--accent" id="gastosSummaryMrc">$0</strong>
+            <span class="gastos-summary-card__meta">Locales cliente activo</span>
+          </article>
+          <article class="gastos-summary-card">
+            <span class="gastos-summary-card__label">Utilidad neta del mes</span>
+            <strong class="gastos-summary-card__value" id="gastosSummaryUtilidad">$0</strong>
+            <span class="gastos-summary-card__meta">MRC − gastos</span>
+          </article>
+        </div>
+      </section>
+
+      <div class="admin-toolbar gastos-toolbar">
+        <p class="admin-toolbar__hint">Gastos operativos de la plataforma</p>
+        <label class="gastos-month-filter">
+          <span>Mes</span>
+          <input type="month" class="gastos-month-filter__input" id="gastosMonthFilter">
+        </label>
+      </div>
+
+      <div class="gastos-loading" id="gastosLoading" hidden>Cargando gastos…</div>
+      <p class="gastos-error" id="gastosListError" hidden role="alert"></p>
+
+      <div class="gastos-layout">
+        <section class="gastos-form-card" aria-labelledby="gastosFormTitle">
+          <h2 class="gastos-form-card__title" id="gastosFormTitle">Registrar gasto</h2>
+          <form class="gastos-form" id="gastosForm">
+            <label class="gastos-form__field">
+              <span>Concepto</span>
+              <input type="text" class="gastos-form__input" id="gastosConcepto" placeholder="Ej. Suscripción Figma" required>
+            </label>
+            <label class="gastos-form__field">
+              <span>Monto</span>
+              <input type="number" class="gastos-form__input" id="gastosMonto" min="1" step="1" inputmode="numeric" placeholder="50000" required>
+            </label>
+            <label class="gastos-form__field">
+              <span>Categoría</span>
+              <select class="gastos-form__input" id="gastosCategoria" required>
+                <option value="Herramientas">Herramientas</option>
+                <option value="Marketing">Marketing</option>
+                <option value="Transporte">Transporte</option>
+                <option value="Otros">Otros</option>
+              </select>
+            </label>
+            <label class="gastos-form__field">
+              <span>Fecha</span>
+              <input type="date" class="gastos-form__input" id="gastosFecha" required>
+            </label>
+            <label class="gastos-form__field">
+              <span>Notas <em class="gastos-form__optional">(opcional)</em></span>
+              <textarea class="gastos-form__textarea" id="gastosNotas" rows="3" placeholder="Detalle adicional"></textarea>
+            </label>
+            <p class="gastos-form__error" id="gastosFormError" hidden role="alert"></p>
+            <button type="submit" class="menu-toolbar__btn gastos-form__submit" id="gastosSubmitBtn">Registrar gasto</button>
+          </form>
+        </section>
+
+        <section class="gastos-list-card" aria-labelledby="gastosListTitle">
+          <h2 class="gastos-list-card__title" id="gastosListTitle">Gastos del mes</h2>
+          <div class="gastos-empty" id="gastosEmpty" hidden>
+            <p class="panel-empty__title">Sin gastos</p>
+            <p class="panel-empty__text">Todavía no hay gastos registrados para este mes.</p>
+          </div>
+          <ul class="gastos-list" id="gastosList"></ul>
+        </section>
+      </div>
     </main>
   </div>
 
@@ -400,5 +483,6 @@
   <script src="/admin.js"></script>
   <script src="/admin-features.js"></script>
   <script src="/admin-crm.js"></script>
+  <script src="/admin-gastos.js"></script>
 </body>
 </html>
