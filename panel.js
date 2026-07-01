@@ -140,7 +140,7 @@ async function getSessionApprovedPaymentsCount(sesionId) {
   return count || 0;
 }
 
-async function recordSplitPartPayment(sesionId, share, targetTotal) {
+async function recordSplitPartPayment(sesionId, share) {
   const { error } = await supabaseClient.from('pagos_grupo').insert({
     sesion_id: sesionId,
     monto: share.shareTotal,
@@ -153,7 +153,7 @@ async function recordSplitPartPayment(sesionId, share, targetTotal) {
     await saveSessionCargoServicio(sesionId, share.shareServicio);
   }
 
-  return markSessionReadyForConfirmationIfPaid(sesionId, targetTotal);
+  return getSessionApprovedPaymentsTotal(sesionId);
 }
 
 function formatCOP(amount) {
@@ -2631,11 +2631,15 @@ async function collectSplitPaymentPart() {
   }
 
   try {
-    const paidTotal = await recordSplitPartPayment(
-      splitPaymentState.sesionId,
-      share,
-      share.breakdown.total
-    );
+    const paidTotal = await recordSplitPartPayment(splitPaymentState.sesionId, share);
+    console.log('Parte cobrada, sesión sigue activa');
+
+    if (paidTotal >= share.breakdown.total) {
+      await markSessionReadyForConfirmationIfPaid(
+        splitPaymentState.sesionId,
+        share.breakdown.total
+      );
+    }
 
     await fetchMesas();
     await refreshSplitPaymentModal();
@@ -2905,7 +2909,15 @@ function initModal() {
     refreshSplitPaymentModal();
   });
 
-  document.getElementById('splitPaymentDataphoneBtn')?.addEventListener('click', collectSplitPaymentPart);
+  const splitDataphoneBtn = document.getElementById('splitPaymentDataphoneBtn');
+  if (splitDataphoneBtn && !splitDataphoneBtn.dataset.bound) {
+    splitDataphoneBtn.dataset.bound = 'true';
+    splitDataphoneBtn.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      void collectSplitPaymentPart();
+    });
+  }
 
   document.getElementById('splitPaymentShowQrBtn')?.addEventListener('click', () => {
     const box = document.getElementById('splitPaymentQrBox');

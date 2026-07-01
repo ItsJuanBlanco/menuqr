@@ -2278,6 +2278,46 @@ body.music-request-enabled .call-waiter-fab {
   line-height: 1.45;
 }
 
+.restaurant-qr-pay-modal__methods {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
+.restaurant-qr-pay-modal__methods[hidden] {
+  display: none;
+}
+
+.restaurant-qr-pay-modal__method {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--bg-card) 88%, #fff 12%);
+  border: 1px solid var(--border);
+}
+
+.restaurant-qr-pay-modal__method-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.restaurant-qr-pay-modal__method-value {
+  font-size: 1.0625rem;
+  font-weight: 700;
+  line-height: 1.35;
+  word-break: break-word;
+}
+
+.restaurant-qr-pay-modal__method-btn {
+  margin-top: 4px;
+}
+
 .restaurant-qr-pay-modal__link-btn {
   margin-top: 0;
 }
@@ -2293,12 +2333,11 @@ body.music-request-enabled .call-waiter-fab {
 .restaurant-qr-pay-modal__qr-wrap {
   display: flex;
   justify-content: center;
-  margin-bottom: 16px;
 }
 
 .restaurant-qr-pay-modal__qr {
-  width: min(100%, 220px);
-  max-height: 220px;
+  width: min(100%, 260px);
+  max-height: 260px;
   object-fit: contain;
   border-radius: 12px;
   padding: 12px;

@@ -132,6 +132,7 @@ const state = {
   sendingOrder: false,
   waiterCooldown: false,
   paymentPendingConfirmation: false,
+  paymentInProgress: false,
   paymentSubmitting: false,
   splitCount: 2,
   splitGroupCreated: false,
@@ -147,6 +148,7 @@ const state = {
 };
 
 const PAYMENT_PENDING_MESSAGE = 'Pago recibido ✓ El mesero lo confirmará en un momento';
+const RESTAURANT_QR_PAY_WAITING_MESSAGE = 'El mesero confirmará tu pago en un momento';
 
 let paymentSuccessReviewTimer = null;
 let paymentSuccessShown = false;
@@ -690,12 +692,13 @@ async function loadAccountItems() {
 async function loadSessionPaymentStatus() {
   if (!state.sesionId) {
     state.paymentPendingConfirmation = false;
+    state.paymentInProgress = false;
     return;
   }
 
   const { data, error } = await supabaseClient
     .from('sesiones')
-    .select('pago_pendiente_confirmacion, activa')
+    .select('pago_pendiente_confirmacion, pago_en_proceso, activa')
     .eq('id', state.sesionId)
     .maybeSingle();
 
@@ -705,9 +708,11 @@ async function loadSessionPaymentStatus() {
   }
 
   state.paymentPendingConfirmation = data?.pago_pendiente_confirmacion === true;
+  state.paymentInProgress = data?.pago_en_proceso === true && !state.paymentPendingConfirmation;
 
   if (data && data.activa === false) {
     state.paymentPendingConfirmation = false;
+    state.paymentInProgress = false;
   }
 }
 
@@ -836,7 +841,8 @@ async function ensurePaymentAllowed() {
 
 function syncPayButtonDisabled(button, canPayNow) {
   if (!button || button.hidden) return;
-  button.disabled = !canPayNow || state.paymentSubmitting;
+  button.disabled =
+    !canPayNow || state.paymentSubmitting || state.paymentInProgress || state.paymentPendingConfirmation;
 }
 
 const MAX_TIP_PERCENT = 100;
@@ -1040,12 +1046,44 @@ function getRestaurantPaymentLink() {
   return RESTAURANTE?.link_pago?.trim() || '';
 }
 
+function getRestaurantBancolombiaLink() {
+  const raw = RESTAURANTE?.link_bancolombia?.trim() || '';
+  if (!raw || !/^https?:\/\//i.test(raw)) return '';
+  return raw;
+}
+
 function getRestaurantPaymentQrUrl() {
   return RESTAURANTE?.qr_pago_url?.trim() || '';
 }
 
+function getRestaurantNequiNumber() {
+  return String(RESTAURANTE?.numero_nequi || '').replace(/\D/g, '');
+}
+
+function formatRestaurantNequiDisplay(number) {
+  const digits = getRestaurantNequiNumber();
+  if (!digits) return '';
+  if (digits.length === 10) return `+57${digits}`;
+  if (digits.startsWith('57') && digits.length === 12) return `+${digits}`;
+  return digits.startsWith('+') ? digits : `+${digits}`;
+}
+
+function getRestaurantBancolombiaAccount() {
+  return RESTAURANTE?.numero_cuenta_bancolombia?.trim() || '';
+}
+
+function hasRestaurantPaymentMethods() {
+  return !!(
+    getRestaurantPaymentQrUrl() ||
+    getRestaurantPaymentLink() ||
+    getRestaurantBancolombiaLink() ||
+    getRestaurantNequiNumber() ||
+    getRestaurantBancolombiaAccount()
+  );
+}
+
 function canUseRestaurantQrPayment() {
-  return usesRestaurantQrPayment() && (getRestaurantPaymentLink() || getRestaurantPaymentQrUrl());
+  return usesRestaurantQrPayment() && hasRestaurantPaymentMethods();
 }
 
 function openRestaurantPaymentLink() {
@@ -1058,41 +1096,73 @@ function openRestaurantPaymentLink() {
   window.open(link, '_blank', 'noopener,noreferrer');
 }
 
+function openRestaurantBancolombiaLink() {
+  const link = getRestaurantBancolombiaLink();
+  if (!link) {
+    showToast('El restaurante no configuró su link de Bancolombia.', 'error');
+    return;
+  }
+
+  window.open(link, '_blank', 'noopener,noreferrer');
+}
+
+function openRestaurantNequiLink() {
+  const digits = getRestaurantNequiNumber();
+  if (!digits) {
+    showToast('El restaurante no configuró su número Nequi.', 'error');
+    return;
+  }
+
+  const phoneNumber = digits.length === 12 && digits.startsWith('57') ? digits.slice(2) : digits;
+  const url = `https://neqlink.nequi.com.co/cobro?phoneNumber=${encodeURIComponent(phoneNumber)}`;
+  window.open(url, '_blank', 'noopener,noreferrer');
+}
+
 function updateRestaurantQrPayModalUi() {
-  const link = getRestaurantPaymentLink();
   const qrUrl = getRestaurantPaymentQrUrl();
-  const linkBtn = document.getElementById('restaurantQrPayLinkBtn');
-  const divider = document.getElementById('restaurantQrPayDivider');
+  const link = getRestaurantPaymentLink();
+  const bancolombiaLink = getRestaurantBancolombiaLink();
+  const nequiNumber = getRestaurantNequiNumber();
+  const bancolombiaAccount = getRestaurantBancolombiaAccount();
   const qrWrap = document.getElementById('restaurantQrPayQrWrap');
   const imgEl = document.getElementById('restaurantQrPayImage');
+  const linkBtn = document.getElementById('restaurantQrPayLinkBtn');
+  const bancolombiaLinkBtn = document.getElementById('restaurantQrPayBancolombiaLinkBtn');
+  const nequiBlock = document.getElementById('restaurantQrPayNequiBlock');
+  const nequiValue = document.getElementById('restaurantQrPayNequiValue');
+  const accountBlock = document.getElementById('restaurantQrPayAccountBlock');
+  const accountValue = document.getElementById('restaurantQrPayAccountValue');
   const hintEl = document.getElementById('restaurantQrPayHint');
+  const methodsEl = document.getElementById('restaurantQrPayMethods');
 
-  if (linkBtn) linkBtn.hidden = !link;
-  if (divider) divider.hidden = !(link && qrUrl);
   if (qrWrap) qrWrap.hidden = !qrUrl;
   if (imgEl) {
     if (qrUrl) imgEl.src = qrUrl;
     else imgEl.removeAttribute('src');
   }
 
+  if (linkBtn) linkBtn.hidden = !link;
+  if (bancolombiaLinkBtn) bancolombiaLinkBtn.hidden = !bancolombiaLink;
+
+  if (nequiBlock) nequiBlock.hidden = !nequiNumber;
+  if (nequiValue) nequiValue.textContent = nequiNumber ? `Nequi: ${formatRestaurantNequiDisplay(nequiNumber)}` : '';
+
+  if (accountBlock) accountBlock.hidden = !bancolombiaAccount;
+  if (accountValue) accountValue.textContent = bancolombiaAccount;
+
+  if (methodsEl) methodsEl.hidden = !hasRestaurantPaymentMethods();
+
   if (hintEl) {
-    if (link && qrUrl) {
-      hintEl.textContent = 'Abrí el link o escaneá el QR y transferí el monto indicado.';
-    } else if (link) {
-      hintEl.textContent = 'Abrí el link y transferí el monto indicado.';
-    } else {
-      hintEl.textContent = 'Escaneá el QR y transferí el monto indicado.';
-    }
+    hintEl.textContent = hasRestaurantPaymentMethods()
+      ? 'Transferí el monto indicado con uno de estos métodos.'
+      : 'El restaurante aún no configuró métodos de pago.';
   }
 }
 
 let restaurantQrPayState = { amount: 0, extras: {} };
 
 function openRestaurantQrPayModal(amount, extras = {}, hint = '') {
-  if (!canUseRestaurantQrPayment()) {
-    showToast('El restaurante no configuró métodos de pago propios.', 'error');
-    return;
-  }
+  if (!usesRestaurantQrPayment()) return;
 
   restaurantQrPayState = { amount, extras };
   const amountEl = document.getElementById('restaurantQrPayAmount');
@@ -1119,14 +1189,21 @@ function closeRestaurantQrPayModal() {
 }
 
 async function confirmRestaurantQrPayment() {
-  const { amount, extras } = restaurantQrPayState;
-  if (!amount || state.paymentSubmitting) return;
+  if (state.paymentSubmitting || state.paymentInProgress || state.paymentPendingConfirmation) return;
 
-  closeRestaurantQrPayModal();
-  await handleApprovedWompiPayment(amount, `qr-propio-${Date.now()}`, {
-    ...extras,
-    manualConfirmation: true,
-  });
+  state.paymentSubmitting = true;
+
+  try {
+    const started = await markPaymentInProgress();
+    if (!started) return;
+
+    state.paymentInProgress = true;
+    closeRestaurantQrPayModal();
+    renderAccount();
+    showToast(RESTAURANT_QR_PAY_WAITING_MESSAGE, 'success', 5000);
+  } finally {
+    state.paymentSubmitting = false;
+  }
 }
 
 async function startPaymentFlow(amount, options = {}) {
@@ -2115,8 +2192,19 @@ function renderAccount() {
   const groupedDelivered = groupDeliveredItems(delivered);
   const deliveredTotal = getAccountDeliveredTotal();
   const inProgressCount = inProgress.reduce((sum, item) => sum + item.qty, 0);
-  const showPayButton = !state.paymentPendingConfirmation && !isGrupal && items.length > 0;
+  const showPayButton =
+    !state.paymentPendingConfirmation && !state.paymentInProgress && !isGrupal && items.length > 0;
   const canPayNow = deliveredTotal > 0;
+
+  function updatePaymentWaitingMessage() {
+    if (!paymentWaiting) return;
+    const showWaiting = state.paymentPendingConfirmation || state.paymentInProgress;
+    paymentWaiting.hidden = !showWaiting;
+    if (!showWaiting) return;
+    paymentWaiting.textContent = state.paymentPendingConfirmation
+      ? PAYMENT_PENDING_MESSAGE
+      : RESTAURANT_QR_PAY_WAITING_MESSAGE;
+  }
 
   if (items.length === 0) {
     empty.style.display = state.splitJoinAmount ? 'none' : 'block';
@@ -2124,7 +2212,7 @@ function renderAccount() {
     deliveredSection.hidden = true;
     badge.hidden = true;
     if (wompiPayBtn) wompiPayBtn.hidden = true;
-    if (paymentWaiting) paymentWaiting.hidden = !state.paymentPendingConfirmation;
+    updatePaymentWaitingMessage();
     updatePaymentExtrasUI(0);
     updateSplitBillUI(0);
     updateSplitJoinUI();
@@ -2169,13 +2257,13 @@ function renderAccount() {
       .join('');
     document.getElementById('totalAmount').textContent = formatCOP(deliveredTotal);
     totalEl.hidden = false;
-    if (paymentWaiting) paymentWaiting.hidden = !state.paymentPendingConfirmation;
+    updatePaymentWaitingMessage();
     updatePaymentExtrasUI(deliveredTotal);
     updateSplitBillUI(deliveredTotal);
     updateSplitJoinUI();
   } else {
     deliveredSection.hidden = true;
-    if (paymentWaiting) paymentWaiting.hidden = !state.paymentPendingConfirmation;
+    updatePaymentWaitingMessage();
     updatePaymentExtrasUI(0);
     updateSplitBillUI(0);
     updateSplitJoinUI();
@@ -2630,6 +2718,8 @@ function initWompiPayment() {
   });
 
   document.getElementById('restaurantQrPayLinkBtn')?.addEventListener('click', openRestaurantPaymentLink);
+  document.getElementById('restaurantQrPayBancolombiaLinkBtn')?.addEventListener('click', openRestaurantBancolombiaLink);
+  document.getElementById('restaurantQrPayNequiBtn')?.addEventListener('click', openRestaurantNequiLink);
   document.getElementById('splitPaymentLinkBtn')?.addEventListener('click', openRestaurantPaymentLink);
 
   document.querySelectorAll('[data-close-restaurant-qr-pay]').forEach((el) => {

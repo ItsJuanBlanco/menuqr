@@ -421,13 +421,28 @@
           <button type="button" class="restaurant-qr-pay-modal__close" data-close-restaurant-qr-pay aria-label="Cerrar">×</button>
         </header>
         <p class="restaurant-qr-pay-modal__amount" id="restaurantQrPayAmount">$0</p>
-        <p class="restaurant-qr-pay-modal__hint" id="restaurantQrPayHint">Transferí el monto indicado.</p>
-        <button type="button" class="wompi-pay-btn restaurant-qr-pay-modal__link-btn" id="restaurantQrPayLinkBtn" hidden>
-          Abrir link de pago
-        </button>
-        <p class="restaurant-qr-pay-modal__divider" id="restaurantQrPayDivider" hidden>o escaneá el QR</p>
-        <div class="restaurant-qr-pay-modal__qr-wrap" id="restaurantQrPayQrWrap" hidden>
-          <img id="restaurantQrPayImage" class="restaurant-qr-pay-modal__qr" alt="QR de pago del restaurante">
+        <p class="restaurant-qr-pay-modal__hint" id="restaurantQrPayHint">Transferí el monto indicado con uno de estos métodos.</p>
+        <div class="restaurant-qr-pay-modal__methods" id="restaurantQrPayMethods">
+          <div class="restaurant-qr-pay-modal__qr-wrap" id="restaurantQrPayQrWrap" hidden>
+            <img id="restaurantQrPayImage" class="restaurant-qr-pay-modal__qr" alt="QR de pago del restaurante">
+          </div>
+          <div class="restaurant-qr-pay-modal__method" id="restaurantQrPayNequiBlock" hidden>
+            <span class="restaurant-qr-pay-modal__method-label">Nequi</span>
+            <strong class="restaurant-qr-pay-modal__method-value" id="restaurantQrPayNequiValue"></strong>
+            <button type="button" class="wompi-pay-btn restaurant-qr-pay-modal__method-btn" id="restaurantQrPayNequiBtn">
+              Abrir Nequi
+            </button>
+          </div>
+          <div class="restaurant-qr-pay-modal__method" id="restaurantQrPayAccountBlock" hidden>
+            <span class="restaurant-qr-pay-modal__method-label">Cuenta Bancolombia</span>
+            <strong class="restaurant-qr-pay-modal__method-value" id="restaurantQrPayAccountValue"></strong>
+          </div>
+          <button type="button" class="wompi-pay-btn restaurant-qr-pay-modal__link-btn" id="restaurantQrPayLinkBtn" hidden>
+            Abrir link de pago
+          </button>
+          <button type="button" class="wompi-pay-btn restaurant-qr-pay-modal__link-btn" id="restaurantQrPayBancolombiaLinkBtn" hidden>
+            Abrir link Bancolombia
+          </button>
         </div>
         <button type="button" class="wompi-pay-btn" id="restaurantQrPayConfirmBtn">Ya pagué</button>
         <button type="button" class="restaurant-qr-pay-modal__cancel" data-close-restaurant-qr-pay>Cerrar</button>

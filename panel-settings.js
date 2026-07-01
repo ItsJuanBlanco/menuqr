@@ -88,7 +88,7 @@ async function updateRestaurantSettingsFields(fields, successMessage) {
       .update(fields)
       .eq('id', RESTAURANTE_ID)
       .select(
-        'id, slug, nombre, ciudad, logo_url, foto_portada, foto_portada_posicion, color_primario, color_fondo, wompi_public_key, metodo_pago, qr_pago_url, link_pago, link_bancolombia, google_review_url, musica_habilitada, features'
+        'id, slug, nombre, ciudad, logo_url, foto_portada, foto_portada_posicion, color_primario, color_fondo, wompi_public_key, metodo_pago, qr_pago_url, link_pago, link_bancolombia, numero_nequi, numero_cuenta_bancolombia, google_review_url, musica_habilitada, features'
       )
       .single();
 
@@ -153,8 +153,25 @@ function normalizeLinkPago(value) {
 function normalizeLinkBancolombia(value) {
   const raw = String(value || '').trim();
   if (!raw) return null;
-  if (/^https?:\/\//i.test(raw) || /^\d+$/.test(raw)) return raw;
-  throw new Error('El link de Bancolombia debe empezar con http:// o https://, o ser un número de cuenta.');
+  if (!/^https?:\/\//i.test(raw)) {
+    throw new Error('El link de Bancolombia debe empezar con http:// o https://');
+  }
+  return raw;
+}
+
+function normalizeNumeroNequi(value) {
+  const digits = String(value || '').replace(/\D/g, '');
+  if (!digits) return null;
+  if (digits.length < 10) {
+    throw new Error('El número Nequi debe tener al menos 10 dígitos.');
+  }
+  return digits;
+}
+
+function normalizeNumeroCuentaBancolombia(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return null;
+  return raw;
 }
 
 function normalizeGoogleReviewUrl(value) {
@@ -371,6 +388,12 @@ function populateSettingsForm(restaurant) {
   const linkInput = document.getElementById('settingsLinkPago');
   if (linkInput) linkInput.value = restaurant?.link_pago || '';
 
+  const nequiInput = document.getElementById('settingsNumeroNequi');
+  if (nequiInput) nequiInput.value = restaurant?.numero_nequi || '';
+
+  const cuentaInput = document.getElementById('settingsNumeroCuentaBancolombia');
+  if (cuentaInput) cuentaInput.value = restaurant?.numero_cuenta_bancolombia || '';
+
   const bancolombiaInput = document.getElementById('settingsLinkBancolombia');
   if (bancolombiaInput) bancolombiaInput.value = restaurant?.link_bancolombia || '';
 
@@ -382,7 +405,7 @@ async function fetchRestaurantSettings() {
   const { data, error } = await supabaseClient
     .from('restaurantes')
     .select(
-      'id, slug, nombre, ciudad, logo_url, foto_portada, foto_portada_posicion, color_primario, color_fondo, metodo_pago, qr_pago_url, link_pago, link_bancolombia, google_review_url, musica_habilitada, features'
+      'id, slug, nombre, ciudad, logo_url, foto_portada, foto_portada_posicion, color_primario, color_fondo, metodo_pago, qr_pago_url, link_pago, link_bancolombia, numero_nequi, numero_cuenta_bancolombia, google_review_url, musica_habilitada, features'
     )
     .eq('id', RESTAURANTE_ID)
     .single();
@@ -417,15 +440,21 @@ async function saveRestaurantSettings(event) {
   const foto_portada_posicion = normalizeCoverPosition(coverPositionInput?.value);
   const metodo_pago = getSelectedMetodoPago();
   const linkInput = document.getElementById('settingsLinkPago');
+  const nequiInput = document.getElementById('settingsNumeroNequi');
+  const cuentaInput = document.getElementById('settingsNumeroCuentaBancolombia');
   const bancolombiaInput = document.getElementById('settingsLinkBancolombia');
   const googleReviewInput = document.getElementById('settingsGoogleReviewUrl');
   let link_pago = null;
   let link_bancolombia = null;
+  let numero_nequi = null;
+  let numero_cuenta_bancolombia = null;
   let google_review_url = null;
 
   try {
     link_pago = normalizeLinkPago(linkInput?.value);
     link_bancolombia = normalizeLinkBancolombia(bancolombiaInput?.value);
+    numero_nequi = normalizeNumeroNequi(nequiInput?.value);
+    numero_cuenta_bancolombia = normalizeNumeroCuentaBancolombia(cuentaInput?.value);
     google_review_url = normalizeGoogleReviewUrl(googleReviewInput?.value);
   } catch (error) {
     if (errorEl) {
@@ -437,12 +466,21 @@ async function saveRestaurantSettings(event) {
     return;
   }
 
-  if (metodo_pago === 'qr_propio' && !link_pago && !currentQrPagoUrl && !pendingQrPagoFile) {
+  if (
+    metodo_pago === 'qr_propio' &&
+    !link_pago &&
+    !link_bancolombia &&
+    !numero_nequi &&
+    !numero_cuenta_bancolombia &&
+    !currentQrPagoUrl &&
+    !pendingQrPagoFile
+  ) {
     if (errorEl) {
-      errorEl.textContent = 'Agregá un link de pago o subí la imagen del QR.';
+      errorEl.textContent =
+        'Configurá al menos un método de pago propio: QR, Nequi, link o cuenta Bancolombia.';
       errorEl.hidden = false;
     } else {
-      showToast('Agregá un link de pago o subí la imagen del QR.', 'error');
+      showToast('Configurá al menos un método de pago propio.', 'error');
     }
     return;
   }
@@ -490,11 +528,13 @@ async function saveRestaurantSettings(event) {
         qr_pago_url,
         link_pago,
         link_bancolombia,
+        numero_nequi,
+        numero_cuenta_bancolombia,
         google_review_url,
       })
       .eq('id', RESTAURANTE_ID)
       .select(
-        'id, slug, nombre, ciudad, logo_url, foto_portada, foto_portada_posicion, color_primario, color_fondo, wompi_public_key, metodo_pago, qr_pago_url, link_pago, link_bancolombia, google_review_url, musica_habilitada, features'
+        'id, slug, nombre, ciudad, logo_url, foto_portada, foto_portada_posicion, color_primario, color_fondo, wompi_public_key, metodo_pago, qr_pago_url, link_pago, link_bancolombia, numero_nequi, numero_cuenta_bancolombia, google_review_url, musica_habilitada, features'
       )
       .single();
 
