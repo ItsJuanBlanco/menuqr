@@ -401,7 +401,10 @@ function populateSettingsForm(restaurant) {
   if (googleReviewInput) googleReviewInput.value = restaurant?.google_review_url || '';
 
   const cartaConFotosInput = document.getElementById('settingsCartaConFotos');
-  if (cartaConFotosInput) cartaConFotosInput.checked = restaurant?.carta_con_fotos !== false;
+  if (cartaConFotosInput) {
+    cartaConFotosInput.checked =
+      restaurant?.carta_con_fotos === true || restaurant?.carta_con_fotos == null;
+  }
 }
 
 async function fetchRestaurantSettings() {

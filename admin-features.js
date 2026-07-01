@@ -150,8 +150,8 @@ async function saveRestaurantFeatures(restaurantId, flags) {
 function toggleRestaurantDrawer(restaurantId) {
   expandedRestaurantId = expandedRestaurantId === restaurantId ? null : restaurantId;
   if (expandedRestaurantId === restaurantId && adminRestaurantDrawerTab[restaurantId] === 'carta-ia') {
-    const restaurant = restaurants.find((entry) => entry.id === restaurantId);
-    if (restaurant) syncAdminMenuAiCartaConFotos(restaurant);
+    void openAdminMenuAiSection(restaurantId);
+    return;
   }
   renderRestaurants();
 }

@@ -540,6 +540,16 @@
   margin-bottom: 14px;
 }
 
+.admin-menu-ai__preference {
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: #fafafa;
+  border: 1px solid var(--border);
+  font-size: 0.875rem;
+  color: var(--text-muted);
+}
+
 .admin-menu-ai__file-label {
   display: inline-flex;
 }
