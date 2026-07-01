@@ -1,11 +1,28 @@
-const GASTOS_CATEGORIAS = ['Herramientas', 'Marketing', 'Transporte', 'Otros'];
+const GASTOS_CATEGORIAS = ['herramientas', 'marketing', 'transporte', 'otros'];
+
+const GASTOS_CATEGORIA_LABEL = {
+  herramientas: 'Herramientas',
+  marketing: 'Marketing',
+  transporte: 'Transporte',
+  otros: 'Otros',
+};
 
 const GASTOS_CATEGORIA_CLASS = {
-  Herramientas: 'gastos-badge--tools',
-  Marketing: 'gastos-badge--marketing',
-  Transporte: 'gastos-badge--transport',
-  Otros: 'gastos-badge--other',
+  herramientas: 'gastos-badge--tools',
+  marketing: 'gastos-badge--marketing',
+  transporte: 'gastos-badge--transport',
+  otros: 'gastos-badge--other',
 };
+
+function gastosNormalizeCategoria(value) {
+  const key = String(value || 'otros').toLowerCase();
+  return GASTOS_CATEGORIAS.includes(key) ? key : 'otros';
+}
+
+function gastosGetCategoriaLabel(value) {
+  const key = gastosNormalizeCategoria(value);
+  return GASTOS_CATEGORIA_LABEL[key] || GASTOS_CATEGORIA_LABEL.otros;
+}
 
 let gastosItems = [];
 let gastosMrc = 0;
@@ -105,7 +122,7 @@ function gastosSetListError(message) {
 
 function gastosSumByCategory(items) {
   return items.reduce((totals, item) => {
-    const key = item.categoria || 'Otros';
+    const key = gastosNormalizeCategoria(item.categoria);
     totals[key] = (totals[key] || 0) + Number(item.monto);
     return totals;
   }, {});
@@ -170,7 +187,7 @@ function renderGastosSummary() {
   }
   if (categoryMetaEl) {
     categoryMetaEl.textContent =
-      topCategory.total > 0 ? `Categoría: ${topCategory.categoria}` : 'Sin gastos registrados';
+      topCategory.total > 0 ? `Categoría: ${gastosGetCategoriaLabel(topCategory.categoria)}` : 'Sin gastos registrados';
   }
   if (mrcEl) mrcEl.textContent = gastosFormatMoney(gastosMrc);
   if (utilidadEl) {
@@ -194,7 +211,8 @@ function renderGastosList() {
   emptyEl.hidden = true;
   listEl.innerHTML = gastosItems
     .map((item) => {
-      const badgeClass = GASTOS_CATEGORIA_CLASS[item.categoria] || GASTOS_CATEGORIA_CLASS.Otros;
+      const categoria = gastosNormalizeCategoria(item.categoria);
+      const badgeClass = GASTOS_CATEGORIA_CLASS[categoria] || GASTOS_CATEGORIA_CLASS.otros;
       const notesHtml = item.notas
         ? `<p class="gastos-item__notes">${gastosEscape(item.notas)}</p>`
         : '';
@@ -204,7 +222,7 @@ function renderGastosList() {
           <div class="gastos-item__main">
             <div class="gastos-item__head">
               <time class="gastos-item__date" datetime="${gastosEscape(item.fecha)}">${gastosEscape(gastosFormatDate(item.fecha))}</time>
-              <span class="gastos-badge ${badgeClass}">${gastosEscape(item.categoria)}</span>
+              <span class="gastos-badge ${badgeClass}">${gastosEscape(gastosGetCategoriaLabel(categoria))}</span>
             </div>
             <p class="gastos-item__concept">${gastosEscape(item.concepto)}</p>
             ${notesHtml}
