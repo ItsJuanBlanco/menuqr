@@ -437,6 +437,429 @@ function bindAdminSubscriptionActions() {
   });
 }
 
+const adminMenuAiState = {};
+
+function getAdminMenuAiState(restaurantId) {
+  if (!adminMenuAiState[restaurantId]) {
+    adminMenuAiState[restaurantId] = {
+      file: null,
+      previewUrl: null,
+      products: [],
+      generating: false,
+      inserting: false,
+      error: '',
+      status: '',
+    };
+  }
+  return adminMenuAiState[restaurantId];
+}
+
+function revokeAdminMenuAiPreview(restaurantId) {
+  const state = adminMenuAiState[restaurantId];
+  if (state?.previewUrl) {
+    URL.revokeObjectURL(state.previewUrl);
+    state.previewUrl = null;
+  }
+}
+
+function setAdminMenuAiStatus(restaurantId, message, tone = '') {
+  const el = document.getElementById(`adminMenuAiStatus-${restaurantId}`);
+  if (!el) return;
+  if (!message) {
+    el.hidden = true;
+    el.textContent = '';
+    el.className = 'admin-restaurant-drawer__status';
+    return;
+  }
+  el.hidden = false;
+  el.textContent = message;
+  el.className = 'admin-restaurant-drawer__status' + (tone ? ` admin-restaurant-drawer__status--${tone}` : '');
+}
+
+function setAdminMenuAiError(restaurantId, message) {
+  const state = getAdminMenuAiState(restaurantId);
+  state.error = message || '';
+  const el = document.getElementById(`adminMenuAiError-${restaurantId}`);
+  if (!el) return;
+  if (message) {
+    el.textContent = message;
+    el.hidden = false;
+  } else {
+    el.textContent = '';
+    el.hidden = true;
+  }
+}
+
+function normalizeMenuAiProduct(raw, index) {
+  const nombre = String(raw?.nombre || raw?.name || '').trim();
+  const descripcion = String(raw?.descripcion || raw?.description || '').trim();
+  const precio = Math.round(Number(raw?.precio ?? raw?.price));
+  const categoria = String(raw?.categoria || raw?.category || 'Otros').trim() || 'Otros';
+
+  if (!nombre) {
+    throw new Error(`Producto ${index + 1}: falta el nombre.`);
+  }
+
+  if (!Number.isFinite(precio) || precio < 0) {
+    throw new Error(`Producto «${nombre}»: precio inválido.`);
+  }
+
+  return { nombre, descripcion, precio, categoria };
+}
+
+function renderAdminMenuAiProductsTable(restaurantId, products) {
+  if (!products.length) {
+    return '<p class="admin-menu-ai__empty">Todavía no hay productos extraídos.</p>';
+  }
+
+  const rows = products
+    .map(
+      (product, index) => `
+        <tr>
+          <td>
+            <input
+              type="text"
+              class="admin-form__input admin-menu-ai__cell-input"
+              data-menu-ai-field="nombre"
+              data-restaurant-id="${restaurantId}"
+              data-product-index="${index}"
+              value="${escapeHtml(product.nombre)}"
+            >
+          </td>
+          <td>
+            <input
+              type="text"
+              class="admin-form__input admin-menu-ai__cell-input"
+              data-menu-ai-field="descripcion"
+              data-restaurant-id="${restaurantId}"
+              data-product-index="${index}"
+              value="${escapeHtml(product.descripcion)}"
+            >
+          </td>
+          <td>
+            <input
+              type="number"
+              class="admin-form__input admin-menu-ai__cell-input admin-menu-ai__cell-input--price"
+              data-menu-ai-field="precio"
+              data-restaurant-id="${restaurantId}"
+              data-product-index="${index}"
+              value="${Number(product.precio) || 0}"
+              min="0"
+              step="1"
+              inputmode="numeric"
+            >
+          </td>
+          <td>
+            <input
+              type="text"
+              class="admin-form__input admin-menu-ai__cell-input"
+              data-menu-ai-field="categoria"
+              data-restaurant-id="${restaurantId}"
+              data-product-index="${index}"
+              value="${escapeHtml(product.categoria)}"
+            >
+          </td>
+        </tr>
+      `
+    )
+    .join('');
+
+  return `
+    <div class="admin-menu-ai__table-wrap">
+      <table class="admin-menu-ai__table">
+        <thead>
+          <tr>
+            <th>Nombre</th>
+            <th>Descripción</th>
+            <th>Precio</th>
+            <th>Categoría</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+  `;
+}
+
+function renderAdminMenuAiPanel(restaurant) {
+  const state = getAdminMenuAiState(restaurant.id);
+  const busy = state.generating || state.inserting;
+  const previewSrc = state.previewUrl || '';
+  const hasProducts = state.products.length > 0;
+
+  return `
+    <div class="admin-menu-ai" data-restaurant-menu-ai="${restaurant.id}">
+      <p class="admin-restaurant-drawer__hint">
+        Subí una foto de la carta de <strong>${escapeHtml(restaurant.nombre || 'este restaurante')}</strong> y generá productos con IA antes de insertarlos.
+      </p>
+
+      <div class="admin-menu-ai__upload">
+        <label class="admin-menu-ai__file-label">
+          <input
+            type="file"
+            class="admin-menu-ai__file-input"
+            id="adminMenuAiInput-${restaurant.id}"
+            data-menu-ai-input
+            data-restaurant-id="${restaurant.id}"
+            accept="image/*"
+            capture="environment"
+            ${busy ? 'disabled' : ''}
+          >
+          <span class="menu-toolbar__btn admin-menu-ai__file-btn">Elegir foto de carta</span>
+        </label>
+        <div class="admin-menu-ai__preview" id="adminMenuAiPreview-${restaurant.id}" ${previewSrc ? '' : 'hidden'}>
+          <img id="adminMenuAiPreviewImg-${restaurant.id}" src="${escapeHtml(previewSrc)}" alt="Vista previa de la carta">
+        </div>
+      </div>
+
+      <div class="admin-menu-ai__actions">
+        <button
+          type="button"
+          class="menu-toolbar__btn admin-menu-ai__generate"
+          data-action="menu-ai-generate"
+          data-restaurant-id="${restaurant.id}"
+          ${!state.file || busy ? 'disabled' : ''}
+        >${state.generating ? 'Generando…' : 'Generar productos con IA'}</button>
+        ${
+          hasProducts
+            ? `<button
+                type="button"
+                class="dataphone-modal__confirm admin-menu-ai__confirm"
+                data-action="menu-ai-confirm"
+                data-restaurant-id="${restaurant.id}"
+                ${busy ? 'disabled' : ''}
+              >${state.inserting ? 'Insertando…' : 'Confirmar e insertar en carta'}</button>`
+            : ''
+        }
+      </div>
+
+      <p class="admin-menu-ai__error" id="adminMenuAiError-${restaurant.id}" ${state.error ? '' : 'hidden'} role="alert">${escapeHtml(state.error)}</p>
+      <p class="admin-restaurant-drawer__status" id="adminMenuAiStatus-${restaurant.id}" ${state.status ? '' : 'hidden'} role="status">${escapeHtml(state.status)}</p>
+
+      <div class="admin-menu-ai__results" id="adminMenuAiResults-${restaurant.id}">
+        ${hasProducts ? `<p class="admin-menu-ai__results-count">${state.products.length} producto${state.products.length !== 1 ? 's' : ''} detectado${state.products.length !== 1 ? 's' : ''}</p>` : ''}
+        ${renderAdminMenuAiProductsTable(restaurant.id, state.products)}
+      </div>
+    </div>
+  `;
+}
+
+function readAdminMenuAiFileAsBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = String(reader.result || '');
+      const base64 = result.includes(',') ? result.split(',')[1] : result;
+      resolve(base64);
+    };
+    reader.onerror = () => reject(new Error('No se pudo leer la imagen.'));
+    reader.readAsDataURL(file);
+  });
+}
+
+async function callParseMenuImageFunction(imageBase64, mediaType) {
+  const supabaseUrl = typeof SUPABASE_URL !== 'undefined' ? SUPABASE_URL : '';
+  const anonKey = typeof SUPABASE_ANON_KEY !== 'undefined' ? SUPABASE_ANON_KEY : '';
+
+  if (!supabaseUrl || !anonKey) {
+    throw new Error('SUPABASE_URL o SUPABASE_ANON_KEY no están disponibles.');
+  }
+
+  const response = await fetch(`${supabaseUrl}/functions/v1/parse-menu-image`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${anonKey}`,
+      apikey: anonKey,
+    },
+    body: JSON.stringify({
+      image_base64: imageBase64,
+      media_type: mediaType,
+    }),
+  });
+
+  const payload = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    throw new Error(payload.error || 'No se pudo analizar la carta con IA.');
+  }
+
+  if (!Array.isArray(payload)) {
+    throw new Error('La función no devolvió un array de productos.');
+  }
+
+  return payload;
+}
+
+async function generateAdminMenuAiProducts(restaurantId) {
+  const state = getAdminMenuAiState(restaurantId);
+  if (state.generating || !state.file) return;
+
+  state.generating = true;
+  state.error = '';
+  state.status = 'Analizando carta con IA…';
+  renderRestaurants();
+
+  try {
+    const imageBase64 = await readAdminMenuAiFileAsBase64(state.file);
+    const mediaType = state.file.type || 'image/jpeg';
+    const rawProducts = await callParseMenuImageFunction(imageBase64, mediaType);
+
+    if (!rawProducts.length) {
+      throw new Error('No se detectaron productos en la imagen.');
+    }
+
+    state.products = rawProducts.map((product, index) => normalizeMenuAiProduct(product, index));
+    state.status = `${state.products.length} productos listos para revisar.`;
+    showToast(`${state.products.length} productos detectados`, 'success');
+  } catch (error) {
+    console.error(error);
+    state.products = [];
+    state.status = '';
+    setAdminMenuAiError(restaurantId, error.message || 'No se pudieron generar los productos.');
+    showToast(error.message || 'No se pudieron generar los productos.', 'error');
+  } finally {
+    state.generating = false;
+    renderRestaurants();
+  }
+}
+
+async function confirmAdminMenuAiProducts(restaurantId) {
+  const state = getAdminMenuAiState(restaurantId);
+  if (state.inserting || !state.products.length) return;
+
+  state.inserting = true;
+  state.error = '';
+  state.status = 'Insertando productos en la carta…';
+  renderRestaurants();
+
+  try {
+    const products = state.products.map((product, index) => normalizeMenuAiProduct(product, index));
+    const rows = products.map((product) => ({
+      restaurante_id: restaurantId,
+      nombre: product.nombre,
+      descripcion: product.descripcion || '',
+      precio: product.precio,
+      categoria: product.categoria,
+      disponible: true,
+    }));
+
+    const client = assertSupabaseClient();
+    const { error } = await client.from('productos').insert(rows);
+    if (error) throw error;
+
+    revokeAdminMenuAiPreview(restaurantId);
+    adminMenuAiState[restaurantId] = {
+      file: null,
+      previewUrl: null,
+      products: [],
+      generating: false,
+      inserting: false,
+      error: '',
+      status: '',
+    };
+
+    showToast(`${rows.length} producto${rows.length !== 1 ? 's' : ''} insertados en la carta`, 'success');
+  } catch (error) {
+    console.error(error);
+    state.status = '';
+    setAdminMenuAiError(restaurantId, error.message || 'No se pudieron insertar los productos.');
+    showToast(error.message || 'No se pudieron insertar los productos.', 'error');
+  } finally {
+    state.inserting = false;
+    renderRestaurants();
+  }
+}
+
+function handleAdminMenuAiFileChange(restaurantId, fileInput) {
+  const state = getAdminMenuAiState(restaurantId);
+  const file = fileInput.files?.[0];
+
+  revokeAdminMenuAiPreview(restaurantId);
+  state.file = null;
+  state.products = [];
+  state.error = '';
+  state.status = '';
+
+  if (!file) {
+    renderRestaurants();
+    return;
+  }
+
+  if (!file.type.startsWith('image/')) {
+    fileInput.value = '';
+    setAdminMenuAiError(restaurantId, 'Seleccioná un archivo de imagen válido.');
+    renderRestaurants();
+    return;
+  }
+
+  state.file = file;
+  state.previewUrl = URL.createObjectURL(file);
+  renderRestaurants();
+}
+
+function handleAdminMenuAiProductFieldChange(restaurantId, index, field, value) {
+  const state = getAdminMenuAiState(restaurantId);
+  const product = state.products[index];
+  if (!product) return;
+
+  if (field === 'precio') {
+    product.precio = Math.round(Number(value) || 0);
+    return;
+  }
+
+  product[field] = String(value || '').trim();
+}
+
+function bindAdminMenuAiActions() {
+  const list = document.getElementById('adminRestaurantList');
+  if (!list || list.dataset.menuAiBound) return;
+  list.dataset.menuAiBound = 'true';
+
+  list.addEventListener('change', (event) => {
+    const fileInput = event.target.closest('[data-menu-ai-input]');
+    if (fileInput) {
+      handleAdminMenuAiFileChange(fileInput.dataset.restaurantId, fileInput);
+      return;
+    }
+
+    const fieldInput = event.target.closest('[data-menu-ai-field]');
+    if (!fieldInput) return;
+
+    handleAdminMenuAiProductFieldChange(
+      fieldInput.dataset.restaurantId,
+      Number(fieldInput.dataset.productIndex),
+      fieldInput.dataset.menuAiField,
+      fieldInput.value
+    );
+  });
+
+  list.addEventListener('input', (event) => {
+    const fieldInput = event.target.closest('[data-menu-ai-field]');
+    if (!fieldInput) return;
+
+    handleAdminMenuAiProductFieldChange(
+      fieldInput.dataset.restaurantId,
+      Number(fieldInput.dataset.productIndex),
+      fieldInput.dataset.menuAiField,
+      fieldInput.value
+    );
+  });
+
+  list.addEventListener('click', (event) => {
+    const generateBtn = event.target.closest('[data-action="menu-ai-generate"]');
+    if (generateBtn && !generateBtn.disabled) {
+      void generateAdminMenuAiProducts(generateBtn.dataset.restaurantId);
+      return;
+    }
+
+    const confirmBtn = event.target.closest('[data-action="menu-ai-confirm"]');
+    if (confirmBtn && !confirmBtn.disabled) {
+      void confirmAdminMenuAiProducts(confirmBtn.dataset.restaurantId);
+    }
+  });
+}
+
 function isAdminLoggedIn() {
   return localStorage.getItem(ADMIN_SESSION_KEY) === 'true';
 }
@@ -1396,6 +1819,7 @@ async function init() {
   bindLogout();
   bindRestaurantListActions();
   bindAdminSubscriptionActions();
+  bindAdminMenuAiActions();
   bindRestaurantModal();
   bindAdminTabs();
 

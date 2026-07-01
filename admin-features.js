@@ -52,6 +52,15 @@ function renderAdminFeaturePanel(restaurant) {
   `
       : '';
 
+  const cartaIaPanel =
+    typeof renderAdminMenuAiPanel === 'function'
+      ? `
+    <div class="admin-restaurant-drawer__panel${activeDrawerTab === 'carta-ia' ? ' admin-restaurant-drawer__panel--active' : ''}" data-drawer-panel="carta-ia" role="tabpanel" ${activeDrawerTab === 'carta-ia' ? '' : 'hidden'}>
+      ${renderAdminMenuAiPanel(restaurant)}
+    </div>
+  `
+      : '';
+
   return `
     <div class="admin-restaurant-drawer" data-restaurant-drawer="${restaurant.id}">
       <nav class="admin-restaurant-drawer__tabs" role="tablist" aria-label="Secciones del local">
@@ -71,9 +80,18 @@ function renderAdminFeaturePanel(restaurant) {
           role="tab"
           aria-selected="${activeDrawerTab === 'suscripcion' ? 'true' : 'false'}"
         >Suscripción</button>
+        <button
+          type="button"
+          class="admin-restaurant-drawer__tab${activeDrawerTab === 'carta-ia' ? ' admin-restaurant-drawer__tab--active' : ''}"
+          data-drawer-tab="carta-ia"
+          data-restaurant-id="${restaurant.id}"
+          role="tab"
+          aria-selected="${activeDrawerTab === 'carta-ia' ? 'true' : 'false'}"
+        >📸 Carta IA</button>
       </nav>
       ${featuresPanel}
       ${suscripcionPanel}
+      ${cartaIaPanel}
     </div>
   `;
 }
