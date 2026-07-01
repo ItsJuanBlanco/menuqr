@@ -1215,13 +1215,12 @@ async function startPaymentFlow(amount, options = {}) {
     preserveAmount: options.preserveAmount === true,
   });
 
+  const deliveredTotal = getAccountDeliveredTotal();
+
   const allowed = await ensurePaymentAllowed();
   if (!allowed) return;
 
-  if (!options.preserveAmount) {
-    const deliveredTotal = getAccountDeliveredTotal();
-    if (deliveredTotal <= 0) return;
-  }
+  if (!options.preserveAmount && deliveredTotal <= 0) return;
 
   let paymentAmount = amount;
   let paymentOptions = { ...options };
