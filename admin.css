@@ -781,6 +781,31 @@
   color: var(--text-muted);
 }
 
+.crm-zona-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.crm-zona-tabs__btn {
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: #fff;
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.crm-zona-tabs__btn--active {
+  border-color: rgba(234, 88, 12, 0.35);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
 .crm-kanban {
   display: grid;
   grid-template-columns: repeat(6, minmax(220px, 1fr));
@@ -899,6 +924,15 @@
   margin: 6px 0 0;
   font-size: 0.8125rem;
   color: var(--text-muted);
+}
+
+.crm-card__zone {
+  margin: 6px 0 0;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--accent);
 }
 
 .crm-modal {

@@ -23,6 +23,24 @@ const CRM_BITACORA_LABELS = {
 const CRM_LOCAL_SELECT =
   'id, nombre, direccion, nombre_contacto, telefono, whatsapp, plan, valor_mensual, estado, referido_por, link_google, anotaciones, creado_en, actualizado_en';
 
+const CRM_ZONAS = [
+  { key: 'laureles', label: 'Laureles', patterns: ['laureles', 'estadio'] },
+  { key: 'envigado', label: 'Envigado', patterns: ['envigado'] },
+  { key: 'poblado', label: 'El Poblado', patterns: ['el poblado', 'poblado'] },
+  { key: 'belen', label: 'Belén', patterns: ['belen', 'belén'] },
+  { key: 'itagui', label: 'Itagüí', patterns: ['itagui', 'itagüí'] },
+  { key: 'sabaneta', label: 'Sabaneta', patterns: ['sabaneta'] },
+  { key: 'estrella', label: 'La Estrella', patterns: ['la estrella', 'estrella'] },
+  { key: 'bello', label: 'Bello', patterns: ['bello'] },
+  { key: 'guayabal', label: 'Guayabal', patterns: ['guayabal'] },
+  { key: 'suramericana', label: 'Suramericana', patterns: ['suramericana'] },
+  { key: 'buenos-aires', label: 'Buenos Aires', patterns: ['buenos aires'] },
+  { key: 'centro', label: 'Centro', patterns: ['la candelaria', 'centro', 'candelaria'] },
+  { key: 'robledo', label: 'Robledo', patterns: ['robledo'] },
+  { key: 'manrique', label: 'Manrique', patterns: ['manrique'] },
+  { key: 'copacabana', label: 'Copacabana', patterns: ['copacabana'] },
+];
+
 function crmNormalizeLinkGoogle(value) {
   const raw = String(value || '').trim();
   if (!raw) return null;
@@ -39,6 +57,8 @@ let crmLoading = false;
 let crmActiveLocalId = null;
 let crmActiveTab = 'info';
 let crmDragLocalId = null;
+let crmActiveZona = 'all';
+let crmQuickAddMode = false;
 
 function crmAssertClient() {
   if (typeof assertSupabaseClient === 'function') return assertSupabaseClient();
@@ -80,6 +100,148 @@ function crmFormatMoney(value) {
 function crmNormalizeEstado(estado) {
   const value = String(estado || 'prospecto').toLowerCase();
   return CRM_PIPELINE.some((col) => col.key === value) ? value : 'prospecto';
+}
+
+function crmNormalizeSearchText(value) {
+  return String(value || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+}
+
+function crmGetLocalZonaKey(local) {
+  const direccion = crmNormalizeSearchText(local?.direccion);
+  if (!direccion) return 'sin-zona';
+
+  const matches = CRM_ZONAS.filter((zona) =>
+    zona.patterns.some((pattern) => direccion.includes(crmNormalizeSearchText(pattern)))
+  );
+
+  if (!matches.length) return 'sin-zona';
+
+  matches.sort(
+    (a, b) =>
+      Math.max(...b.patterns.map((pattern) => pattern.length)) -
+      Math.max(...a.patterns.map((pattern) => pattern.length))
+  );
+
+  return matches[0].key;
+}
+
+function crmGetLocalZonaLabel(local) {
+  const key = crmGetLocalZonaKey(local);
+  if (key === 'sin-zona') return '';
+  return CRM_ZONAS.find((zona) => zona.key === key)?.label || '';
+}
+
+function crmGetFilteredLocales() {
+  if (crmActiveZona === 'all') return crmLocales;
+  return crmLocales.filter((local) => crmGetLocalZonaKey(local) === crmActiveZona);
+}
+
+function renderCrmZonaTabs() {
+  const nav = document.getElementById('crmZonaTabs');
+  if (!nav) return;
+
+  if (!crmLocales.length) {
+    nav.hidden = true;
+    nav.innerHTML = '';
+    return;
+  }
+
+  const counts = { all: crmLocales.length, 'sin-zona': 0 };
+  crmLocales.forEach((local) => {
+    const key = crmGetLocalZonaKey(local);
+    counts[key] = (counts[key] || 0) + 1;
+  });
+
+  const tabs = [{ key: 'all', label: 'Todos', count: counts.all }];
+
+  CRM_ZONAS.forEach((zona) => {
+    if (counts[zona.key]) {
+      tabs.push({ key: zona.key, label: zona.label, count: counts[zona.key] });
+    }
+  });
+
+  if (counts['sin-zona']) {
+    tabs.push({ key: 'sin-zona', label: 'Sin zona', count: counts['sin-zona'] });
+  }
+
+  nav.hidden = tabs.length <= 2;
+  nav.innerHTML = tabs
+    .map(
+      (tab) => `
+        <button
+          type="button"
+          class="crm-zona-tabs__btn${crmActiveZona === tab.key ? ' crm-zona-tabs__btn--active' : ''}"
+          data-crm-zona="${tab.key}"
+          role="tab"
+          aria-selected="${crmActiveZona === tab.key ? 'true' : 'false'}"
+        >${crmEscape(tab.label)} (${tab.count})</button>
+      `
+    )
+    .join('');
+}
+
+function setCrmQuickAddMode(enabled) {
+  crmQuickAddMode = enabled;
+  const hint = document.getElementById('crmQuickAddHint');
+  const btn = document.getElementById('crmInfoSaveBtn');
+  if (hint) hint.hidden = !enabled;
+  if (btn) btn.textContent = enabled ? 'Guardar prospecto' : 'Guardar cambios';
+}
+
+function resetCrmInfoFormForNewProspect() {
+  document.getElementById('crmNombre').value = '';
+  document.getElementById('crmDireccion').value = '';
+  document.getElementById('crmContacto').value = '';
+  document.getElementById('crmTelefono').value = '';
+  document.getElementById('crmWhatsapp').value = '';
+  document.getElementById('crmPlan').value = '';
+  document.getElementById('crmValorMensual').value = '';
+  document.getElementById('crmEstado').value = 'prospecto';
+  populateCrmReferidoSelect('');
+  document.getElementById('crmLinkGoogle').value = '';
+  document.getElementById('crmAnotaciones').value = '';
+  document.getElementById('crmInfoError')?.setAttribute('hidden', '');
+}
+
+function clearCrmSecondaryPanels() {
+  const requisitos = document.getElementById('crmRequisitosList');
+  const bitacora = document.getElementById('crmBitacoraList');
+  const followups = document.getElementById('crmFollowupsList');
+
+  if (requisitos) requisitos.innerHTML = '<li class="crm-empty-inline">Sin requisitos pendientes.</li>';
+  if (bitacora) bitacora.innerHTML = '<li class="crm-empty-inline">Sin notas registradas.</li>';
+  if (followups) followups.innerHTML = '<li class="crm-empty-inline">Sin follow-ups programados.</li>';
+}
+
+function openNewProspectModal() {
+  crmActiveLocalId = null;
+  setCrmQuickAddMode(true);
+  switchCrmModalTab('info');
+
+  const modal = document.getElementById('crmLocalModal');
+  const title = document.getElementById('crmLocalModalTitle');
+  if (title) title.textContent = 'Nuevo prospecto';
+
+  updateCrmReferralLine(null);
+  resetCrmInfoFormForNewProspect();
+  clearCrmSecondaryPanels();
+
+  modal?.removeAttribute('hidden');
+  modal?.setAttribute('aria-hidden', 'false');
+  document.getElementById('crmNombre')?.focus();
+}
+
+function prepareCrmNextProspect() {
+  crmActiveLocalId = null;
+  setCrmQuickAddMode(true);
+  document.getElementById('crmLocalModalTitle').textContent = 'Nuevo prospecto';
+  updateCrmReferralLine(null);
+  resetCrmInfoFormForNewProspect();
+  clearCrmSecondaryPanels();
+  document.getElementById('crmNombre')?.focus();
 }
 
 function crmGetLocalById(localId) {
@@ -181,9 +343,12 @@ function renderCrmKanban() {
   const board = document.getElementById('crmKanban');
   if (!board) return;
 
+  renderCrmZonaTabs();
+
+  const visibleLocales = crmGetFilteredLocales();
   board.hidden = false;
   board.innerHTML = CRM_PIPELINE.map((column) => {
-    const cards = crmLocales.filter((local) => crmNormalizeEstado(local.estado) === column.key);
+    const cards = visibleLocales.filter((local) => crmNormalizeEstado(local.estado) === column.key);
 
     return `
       <div class="crm-column" data-estado="${column.key}">
@@ -205,6 +370,7 @@ function renderCrmCard(local) {
   const urgentCount = crmCountUrgentForLocal(local.id);
   const whatsapp = local.whatsapp || local.telefono || '';
   const contacto = local.nombre_contacto || '—';
+  const zona = crmGetLocalZonaLabel(local);
 
   return `
     <article
@@ -218,6 +384,7 @@ function renderCrmCard(local) {
           <h4 class="crm-card__name">${crmEscape(local.nombre || 'Sin nombre')}</h4>
           ${urgentCount ? `<span class="crm-card__badge" title="Follow-ups urgentes">${urgentCount}</span>` : ''}
         </div>
+        ${zona ? `<p class="crm-card__zone">${crmEscape(zona)}</p>` : ''}
         <p class="crm-card__contact">${crmEscape(contacto)}</p>
         ${whatsapp ? `<p class="crm-card__phone">${crmEscape(whatsapp)}</p>` : ''}
       </button>
@@ -333,27 +500,6 @@ async function loadCrmData(force = false) {
     setCrmError(error.message || 'No se pudo cargar el CRM.');
   } finally {
     setCrmLoading(false);
-  }
-}
-
-async function createCrmLocal() {
-  try {
-    const client = crmAssertClient();
-    const { data, error } = await client
-      .from('locales')
-      .insert({ nombre: 'Nuevo local', estado: 'prospecto' })
-      .select(CRM_LOCAL_SELECT)
-      .single();
-
-    if (error) throw error;
-
-    crmLocales.unshift(data);
-    renderCrmKanban();
-    showToast('Local creado', 'success');
-    openCrmLocalModal(data.id, 'info');
-  } catch (error) {
-    console.error(error);
-    showToast(error.message || 'No se pudo crear el local.', 'error');
   }
 }
 
@@ -526,6 +672,7 @@ async function openCrmLocalModal(localId, tabId = 'info') {
   if (!local) return;
 
   crmActiveLocalId = localId;
+  setCrmQuickAddMode(false);
   switchCrmModalTab(tabId);
 
   const modal = document.getElementById('crmLocalModal');
@@ -554,12 +701,12 @@ function closeCrmLocalModal() {
   modal?.setAttribute('hidden', '');
   modal?.setAttribute('aria-hidden', 'true');
   crmActiveLocalId = null;
+  setCrmQuickAddMode(false);
   document.getElementById('crmInfoError')?.setAttribute('hidden', '');
 }
 
 async function saveCrmInfoForm(event) {
   event.preventDefault();
-  if (!crmActiveLocalId) return;
 
   const errorEl = document.getElementById('crmInfoError');
   const btn = document.getElementById('crmInfoSaveBtn');
@@ -597,23 +744,46 @@ async function saveCrmInfoForm(event) {
 
   try {
     const client = crmAssertClient();
-    const { data, error } = await client
-      .from('locales')
-      .update(payload)
-      .eq('id', crmActiveLocalId)
-      .select(CRM_LOCAL_SELECT)
-      .single();
+    let data;
 
-    if (error) throw error;
+    if (crmActiveLocalId) {
+      const { data: updated, error } = await client
+        .from('locales')
+        .update(payload)
+        .eq('id', crmActiveLocalId)
+        .select(CRM_LOCAL_SELECT)
+        .single();
 
-    const index = crmLocales.findIndex((local) => local.id === crmActiveLocalId);
+      if (error) throw error;
+      data = updated;
+    } else {
+      const { data: created, error } = await client
+        .from('locales')
+        .insert({ ...payload, estado: payload.estado || 'prospecto' })
+        .select(CRM_LOCAL_SELECT)
+        .single();
+
+      if (error) throw error;
+      data = created;
+    }
+
+    const index = crmLocales.findIndex((local) => local.id === data.id);
     if (index >= 0) crmLocales[index] = data;
-    else crmLocales.push(data);
+    else crmLocales.unshift(data);
 
+    renderCrmKanban();
+
+    if (crmQuickAddMode) {
+      showToast('Prospecto guardado', 'success');
+      prepareCrmNextProspect();
+      return;
+    }
+
+    crmActiveLocalId = data.id;
     document.getElementById('crmLocalModalTitle').textContent = data.nombre || 'Local';
     updateCrmReferralLine(data);
     populateCrmReferidoSelect(data.referido_por || '');
-    renderCrmKanban();
+    fillCrmInfoForm(data);
     showToast('Local actualizado', 'success');
   } catch (error) {
     console.error(error);
@@ -624,7 +794,7 @@ async function saveCrmInfoForm(event) {
   } finally {
     if (btn) {
       btn.disabled = false;
-      btn.textContent = 'Guardar cambios';
+      btn.textContent = crmQuickAddMode ? 'Guardar prospecto' : 'Guardar cambios';
     }
   }
 }
@@ -773,7 +943,14 @@ async function rescheduleCrmFollowUp(followUpId) {
 
 function bindCrmPanelActions() {
   document.getElementById('crmNewLocalBtn')?.addEventListener('click', () => {
-    void createCrmLocal();
+    openNewProspectModal();
+  });
+
+  document.getElementById('crmZonaTabs')?.addEventListener('click', (event) => {
+    const btn = event.target.closest('[data-crm-zona]');
+    if (!btn) return;
+    crmActiveZona = btn.dataset.crmZona || 'all';
+    renderCrmKanban();
   });
 
   document.getElementById('crmUrgentList')?.addEventListener('click', (event) => {
