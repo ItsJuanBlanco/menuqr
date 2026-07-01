@@ -421,6 +421,10 @@ function bindAdminSubscriptionActions() {
       const restaurantId = tabBtn.dataset.restaurantId;
       if (!restaurantId) return;
       adminRestaurantDrawerTab[restaurantId] = tabBtn.dataset.drawerTab || 'features';
+      if (tabBtn.dataset.drawerTab === 'carta-ia') {
+        const restaurant = restaurants.find((entry) => entry.id === restaurantId);
+        if (restaurant) syncAdminMenuAiCartaConFotos(restaurant);
+      }
       renderRestaurants();
       return;
     }
@@ -439,7 +443,7 @@ function bindAdminSubscriptionActions() {
 
 const adminMenuAiState = {};
 
-function getAdminMenuAiState(restaurantId) {
+function getAdminMenuAiState(restaurantId, restaurant) {
   if (!adminMenuAiState[restaurantId]) {
     adminMenuAiState[restaurantId] = {
       file: null,
@@ -449,9 +453,42 @@ function getAdminMenuAiState(restaurantId) {
       inserting: false,
       error: '',
       status: '',
+      cartaConFotos: restaurant?.carta_con_fotos !== false,
     };
   }
   return adminMenuAiState[restaurantId];
+}
+
+function syncAdminMenuAiCartaConFotos(restaurant) {
+  if (!restaurant?.id) return;
+  const state = getAdminMenuAiState(restaurant.id, restaurant);
+  state.cartaConFotos = restaurant.carta_con_fotos !== false;
+}
+
+async function saveAdminMenuAiCartaConFotos(restaurantId, value) {
+  const state = getAdminMenuAiState(restaurantId);
+  state.cartaConFotos = value;
+
+  try {
+    const client = assertSupabaseClient();
+    const { data, error } = await client
+      .from('restaurantes')
+      .update({ carta_con_fotos: value })
+      .eq('id', restaurantId)
+      .select('id, carta_con_fotos')
+      .single();
+
+    if (error) throw error;
+
+    const index = restaurants.findIndex((entry) => entry.id === restaurantId);
+    if (index >= 0) {
+      restaurants[index] = { ...restaurants[index], carta_con_fotos: data.carta_con_fotos };
+    }
+  } catch (error) {
+    console.error(error);
+    showToast(error.message || 'No se pudo guardar la preferencia de carta.', 'error');
+    renderRestaurants();
+  }
 }
 
 function revokeAdminMenuAiPreview(restaurantId) {
@@ -582,16 +619,32 @@ function renderAdminMenuAiProductsTable(restaurantId, products) {
 }
 
 function renderAdminMenuAiPanel(restaurant) {
-  const state = getAdminMenuAiState(restaurant.id);
+  const state = getAdminMenuAiState(restaurant.id, restaurant);
   const busy = state.generating || state.inserting;
   const previewSrc = state.previewUrl || '';
   const hasProducts = state.products.length > 0;
+  const cartaConFotos = state.cartaConFotos !== false;
 
   return `
     <div class="admin-menu-ai" data-restaurant-menu-ai="${restaurant.id}">
       <p class="admin-restaurant-drawer__hint">
         Subí una foto de la carta de <strong>${escapeHtml(restaurant.nombre || 'este restaurante')}</strong> y generá productos con IA antes de insertarlos.
       </p>
+
+      <label class="admin-menu-ai__photos-toggle admin-feature-toggle">
+        <input
+          type="checkbox"
+          data-menu-ai-carta-fotos
+          data-restaurant-id="${restaurant.id}"
+          ${cartaConFotos ? 'checked' : ''}
+          ${busy ? 'disabled' : ''}
+        >
+        <span class="admin-feature-toggle__ui" aria-hidden="true"></span>
+        <span class="admin-feature-toggle__copy">
+          <strong class="admin-feature-toggle__label">¿Esta carta tiene fotos de los productos?</strong>
+          <span class="admin-feature-toggle__desc">Definí si los productos de esta carta incluyen imágenes.</span>
+        </span>
+      </label>
 
       <div class="admin-menu-ai__upload">
         <label class="admin-menu-ai__file-label">
@@ -749,6 +802,7 @@ async function confirmAdminMenuAiProducts(restaurantId) {
     if (error) throw error;
 
     revokeAdminMenuAiPreview(restaurantId);
+    const restaurant = restaurants.find((entry) => entry.id === restaurantId);
     adminMenuAiState[restaurantId] = {
       file: null,
       previewUrl: null,
@@ -757,6 +811,7 @@ async function confirmAdminMenuAiProducts(restaurantId) {
       inserting: false,
       error: '',
       status: '',
+      cartaConFotos: restaurant?.carta_con_fotos !== false,
     };
 
     showToast(`${rows.length} producto${rows.length !== 1 ? 's' : ''} insertados en la carta`, 'success');
@@ -817,6 +872,12 @@ function bindAdminMenuAiActions() {
   list.dataset.menuAiBound = 'true';
 
   list.addEventListener('change', (event) => {
+    const fotosToggle = event.target.closest('[data-menu-ai-carta-fotos]');
+    if (fotosToggle && !fotosToggle.disabled) {
+      void saveAdminMenuAiCartaConFotos(fotosToggle.dataset.restaurantId, fotosToggle.checked);
+      return;
+    }
+
     const fileInput = event.target.closest('[data-menu-ai-input]');
     if (fileInput) {
       handleAdminMenuAiFileChange(fileInput.dataset.restaurantId, fileInput);
@@ -953,7 +1014,7 @@ async function loadRestaurants() {
     const { data, error } = await client
       .from('restaurantes')
       .select(
-        'id, nombre, slug, ciudad, email, activo, created_at, features, musica_habilitada, estado_suscripcion, fecha_inicio_trial, proximo_cobro, valor_mensual'
+        'id, nombre, slug, ciudad, email, activo, created_at, features, musica_habilitada, estado_suscripcion, fecha_inicio_trial, proximo_cobro, valor_mensual, carta_con_fotos'
       )
       .order('created_at', { ascending: false });
 

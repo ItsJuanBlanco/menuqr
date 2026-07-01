@@ -536,6 +536,10 @@
   margin-bottom: 14px;
 }
 
+.admin-menu-ai__photos-toggle {
+  margin-bottom: 14px;
+}
+
 .admin-menu-ai__file-label {
   display: inline-flex;
 }
