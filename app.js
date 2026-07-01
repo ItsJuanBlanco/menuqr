@@ -564,6 +564,7 @@ async function loadMesa() {
 
 function applyProductsFromDb(rows, orderRows = []) {
   const categoriesMap = new Map();
+  const showPhotos = restaurantShowsProductPhotos();
 
   MENU.products = rows.map((row) => {
     const categoryName = row.categoria || 'Otros';
@@ -579,7 +580,7 @@ function applyProductsFromDb(rows, orderRows = []) {
       name: row.nombre,
       description: row.descripcion || '',
       price: Number(row.precio),
-      image: row.imagen_url || MENU.products[0]?.image,
+      image: showPhotos ? row.imagen_url || null : null,
     };
   });
 
@@ -631,7 +632,7 @@ async function seedProductsIfEmpty() {
     descripcion: p.description,
     precio: p.price,
     categoria: categoryById[p.category] || p.category,
-    imagen_url: p.image,
+    imagen_url: restaurantShowsProductPhotos() ? p.image : null,
     disponible: true,
     restaurante_id: RESTAURANTE_ID,
   }));
@@ -1893,6 +1894,7 @@ window.handleProductImageError = handleProductImageError;
 function renderProducts() {
   const container = document.getElementById('products');
   const filtered = MENU.products.filter((p) => p.category === state.activeCategory);
+  const showPhotos = restaurantShowsProductPhotos();
 
   container.innerHTML = filtered
     .map((product) => {
@@ -1921,21 +1923,23 @@ function renderProducts() {
             </label>`
           : '';
 
-      const imageSrc = product.image || PRODUCT_PLACEHOLDER_SVG;
-
-      return `
-        <article class="product-card">
-          <div class="product-card__image-wrap">
+      const imageBlock = showPhotos
+        ? `<div class="product-card__image-wrap">
             <img
               class="product-card__image${!product.image ? ' product-card__image--placeholder' : ''}"
-              src="${imageSrc}"
+              src="${product.image || PRODUCT_PLACEHOLDER_SVG}"
               alt="${escapeHtml(product.name)}"
               loading="lazy"
               width="96"
               height="96"
               onerror="handleProductImageError(this)"
             >
-          </div>
+          </div>`
+        : '';
+
+      return `
+        <article class="product-card${showPhotos ? '' : ' product-card--no-image'}">
+          ${imageBlock}
           <div class="product-card__body">
             <h3 class="product-card__name">${product.name}</h3>
             <p class="product-card__desc">${product.description}</p>

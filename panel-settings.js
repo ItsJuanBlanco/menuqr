@@ -402,8 +402,7 @@ function populateSettingsForm(restaurant) {
 
   const cartaConFotosInput = document.getElementById('settingsCartaConFotos');
   if (cartaConFotosInput) {
-    cartaConFotosInput.checked =
-      restaurant?.carta_con_fotos === true || restaurant?.carta_con_fotos == null;
+    cartaConFotosInput.checked = restaurant?.carta_con_fotos !== false;
   }
 }
 
@@ -496,7 +495,7 @@ async function saveRestaurantSettings(event) {
   if (bgInput) bgInput.value = color_fondo;
   applyCoverPositionPreview(coverPositionToPercent(foto_portada_posicion));
 
-  const carta_con_fotos = cartaConFotosInput?.checked !== false;
+  const carta_con_fotos = cartaConFotosInput?.checked === true;
 
   settingsSaving = true;
   if (saveBtn) saveBtn.disabled = true;

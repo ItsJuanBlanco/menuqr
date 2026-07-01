@@ -328,6 +328,10 @@ ul {
   transition: border-color 0.2s ease;
 }
 
+.product-card--no-image {
+  gap: 0;
+}
+
 .product-card:active {
   border-color: rgba(249, 115, 22, 0.3);
 }

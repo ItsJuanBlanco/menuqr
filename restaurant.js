@@ -91,6 +91,12 @@ function setRestaurantGlobals({ id = RESTAURANTE_ID, slug = RESTAURANTE_SLUG, re
   window.RESTAURANTE = restaurant;
 }
 
+function restaurantShowsProductPhotos(restaurant = RESTAURANTE) {
+  return restaurant?.carta_con_fotos !== false;
+}
+
+window.restaurantShowsProductPhotos = restaurantShowsProductPhotos;
+
 function showRestaurantError() {
   document.title = 'Restaurante no encontrado';
   document.body.innerHTML = `
@@ -315,7 +321,7 @@ async function initRestaurant() {
 
   const { data, error } = await supabaseClient
     .from('restaurantes')
-    .select('id, slug, nombre, ciudad, logo_url, foto_portada, foto_portada_posicion, color_primario, color_fondo, wompi_public_key, metodo_pago, qr_pago_url, link_pago, link_bancolombia, numero_nequi, numero_cuenta_bancolombia, google_review_url, musica_habilitada, features')
+    .select('id, slug, nombre, ciudad, logo_url, foto_portada, foto_portada_posicion, color_primario, color_fondo, wompi_public_key, metodo_pago, qr_pago_url, link_pago, link_bancolombia, numero_nequi, numero_cuenta_bancolombia, google_review_url, musica_habilitada, features, carta_con_fotos')
     .eq('slug', slug)
     .maybeSingle();
 
