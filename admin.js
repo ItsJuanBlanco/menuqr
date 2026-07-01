@@ -445,6 +445,7 @@ function getAdminMenuAiState(restaurantId) {
       file: null,
       previewUrl: null,
       products: [],
+      hasProductPhotos: true,
       generating: false,
       inserting: false,
       error: '',
@@ -490,7 +491,7 @@ function setAdminMenuAiError(restaurantId, message) {
   }
 }
 
-function normalizeMenuAiProduct(raw, index) {
+function normalizeMenuAiProduct(raw, index, { includeImage = false } = {}) {
   const nombre = String(raw?.nombre || raw?.name || '').trim();
   const descripcion = String(raw?.descripcion || raw?.description || '').trim();
   const precio = Math.round(Number(raw?.precio ?? raw?.price));
@@ -504,17 +505,38 @@ function normalizeMenuAiProduct(raw, index) {
     throw new Error(`Producto «${nombre}»: precio inválido.`);
   }
 
-  return { nombre, descripcion, precio, categoria };
+  const product = { nombre, descripcion, precio, categoria };
+
+  if (includeImage) {
+    product.imagen = String(raw?.imagen || raw?.imagen_url || raw?.image || '').trim();
+  }
+
+  return product;
 }
 
-function renderAdminMenuAiProductsTable(restaurantId, products) {
+function renderAdminMenuAiProductsTable(restaurantId, products, hasProductPhotos = false) {
   if (!products.length) {
     return '<p class="admin-menu-ai__empty">Todavía no hay productos extraídos.</p>';
   }
 
+  const imageHeader = hasProductPhotos ? '<th>Imagen (URL)</th>' : '';
   const rows = products
-    .map(
-      (product, index) => `
+    .map((product, index) => {
+      const imageCell = hasProductPhotos
+        ? `<td>
+            <input
+              type="url"
+              class="admin-form__input admin-menu-ai__cell-input"
+              data-menu-ai-field="imagen"
+              data-restaurant-id="${restaurantId}"
+              data-product-index="${index}"
+              value="${escapeHtml(product.imagen || '')}"
+              placeholder="https://…"
+            >
+          </td>`
+        : '';
+
+      return `
         <tr>
           <td>
             <input
@@ -559,9 +581,10 @@ function renderAdminMenuAiProductsTable(restaurantId, products) {
               value="${escapeHtml(product.categoria)}"
             >
           </td>
+          ${imageCell}
         </tr>
-      `
-    )
+      `;
+    })
     .join('');
 
   return `
@@ -573,6 +596,7 @@ function renderAdminMenuAiProductsTable(restaurantId, products) {
             <th>Descripción</th>
             <th>Precio</th>
             <th>Categoría</th>
+            ${imageHeader}
           </tr>
         </thead>
         <tbody>${rows}</tbody>
@@ -612,6 +636,21 @@ function renderAdminMenuAiPanel(restaurant) {
         </div>
       </div>
 
+      <label class="admin-feature-toggle admin-menu-ai__photos-toggle">
+        <input
+          type="checkbox"
+          data-menu-ai-has-photos
+          data-restaurant-id="${restaurant.id}"
+          ${state.hasProductPhotos ? 'checked' : ''}
+          ${busy ? 'disabled' : ''}
+        >
+        <span class="admin-feature-toggle__ui" aria-hidden="true"></span>
+        <span class="admin-feature-toggle__copy">
+          <strong class="admin-feature-toggle__label">¿Esta carta tiene fotos de los productos?</strong>
+          <span class="admin-feature-toggle__desc">Desmarcá si la carta es solo texto. La IA no inventará imágenes y los productos se insertarán sin foto.</span>
+        </span>
+      </label>
+
       <div class="admin-menu-ai__actions">
         <button
           type="button"
@@ -638,7 +677,7 @@ function renderAdminMenuAiPanel(restaurant) {
 
       <div class="admin-menu-ai__results" id="adminMenuAiResults-${restaurant.id}">
         ${hasProducts ? `<p class="admin-menu-ai__results-count">${state.products.length} producto${state.products.length !== 1 ? 's' : ''} detectado${state.products.length !== 1 ? 's' : ''}</p>` : ''}
-        ${renderAdminMenuAiProductsTable(restaurant.id, state.products)}
+        ${renderAdminMenuAiProductsTable(restaurant.id, state.products, state.hasProductPhotos)}
       </div>
     </div>
   `;
@@ -657,7 +696,7 @@ function readAdminMenuAiFileAsBase64(file) {
   });
 }
 
-async function callParseMenuImageFunction(imageBase64, mediaType) {
+async function callParseMenuImageFunction(imageBase64, mediaType, hasProductPhotos = true) {
   const supabaseUrl = typeof SUPABASE_URL !== 'undefined' ? SUPABASE_URL : '';
   const anonKey = typeof SUPABASE_ANON_KEY !== 'undefined' ? SUPABASE_ANON_KEY : '';
 
@@ -675,6 +714,7 @@ async function callParseMenuImageFunction(imageBase64, mediaType) {
     body: JSON.stringify({
       image_base64: imageBase64,
       media_type: mediaType,
+      has_product_photos: hasProductPhotos,
     }),
   });
 
@@ -703,13 +743,15 @@ async function generateAdminMenuAiProducts(restaurantId) {
   try {
     const imageBase64 = await readAdminMenuAiFileAsBase64(state.file);
     const mediaType = state.file.type || 'image/jpeg';
-    const rawProducts = await callParseMenuImageFunction(imageBase64, mediaType);
+    const rawProducts = await callParseMenuImageFunction(imageBase64, mediaType, state.hasProductPhotos);
 
     if (!rawProducts.length) {
       throw new Error('No se detectaron productos en la imagen.');
     }
 
-    state.products = rawProducts.map((product, index) => normalizeMenuAiProduct(product, index));
+    state.products = rawProducts.map((product, index) =>
+      normalizeMenuAiProduct(product, index, { includeImage: state.hasProductPhotos })
+    );
     state.status = `${state.products.length} productos listos para revisar.`;
     showToast(`${state.products.length} productos detectados`, 'success');
   } catch (error) {
@@ -734,7 +776,9 @@ async function confirmAdminMenuAiProducts(restaurantId) {
   renderRestaurants();
 
   try {
-    const products = state.products.map((product, index) => normalizeMenuAiProduct(product, index));
+    const products = state.products.map((product, index) =>
+      normalizeMenuAiProduct(product, index, { includeImage: state.hasProductPhotos })
+    );
     const rows = products.map((product) => ({
       restaurante_id: restaurantId,
       nombre: product.nombre,
@@ -742,6 +786,7 @@ async function confirmAdminMenuAiProducts(restaurantId) {
       precio: product.precio,
       categoria: product.categoria,
       disponible: true,
+      imagen_url: state.hasProductPhotos ? product.imagen || null : null,
     }));
 
     const client = assertSupabaseClient();
@@ -753,6 +798,7 @@ async function confirmAdminMenuAiProducts(restaurantId) {
       file: null,
       previewUrl: null,
       products: [],
+      hasProductPhotos: true,
       generating: false,
       inserting: false,
       error: '',
@@ -820,6 +866,18 @@ function bindAdminMenuAiActions() {
     const fileInput = event.target.closest('[data-menu-ai-input]');
     if (fileInput) {
       handleAdminMenuAiFileChange(fileInput.dataset.restaurantId, fileInput);
+      return;
+    }
+
+    const photosToggle = event.target.closest('[data-menu-ai-has-photos]');
+    if (photosToggle) {
+      const restaurantId = photosToggle.dataset.restaurantId;
+      const aiState = getAdminMenuAiState(restaurantId);
+      aiState.hasProductPhotos = photosToggle.checked;
+      if (!aiState.hasProductPhotos) {
+        aiState.products = aiState.products.map(({ imagen, ...product }) => product);
+      }
+      renderRestaurants();
       return;
     }
 

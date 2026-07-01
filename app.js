@@ -579,7 +579,7 @@ function applyProductsFromDb(rows, orderRows = []) {
       name: row.nombre,
       description: row.descripcion || '',
       price: Number(row.precio),
-      image: row.imagen_url || MENU.products[0]?.image,
+      image: row.imagen_url || null,
     };
   });
 

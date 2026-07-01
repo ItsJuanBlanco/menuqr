@@ -569,6 +569,10 @@
   height: auto;
 }
 
+.admin-menu-ai__photos-toggle {
+  margin-bottom: 14px;
+}
+
 .admin-menu-ai__actions {
   display: flex;
   flex-wrap: wrap;
