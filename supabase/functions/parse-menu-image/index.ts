@@ -1,7 +1,10 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
-const MENU_PROMPT =
+const MENU_PROMPT_WITH_PHOTOS =
   'Analiza esta foto de una carta/menú de restaurante. Extrae TODOS los productos visibles y devuelve ÚNICAMENTE un JSON array (sin texto adicional, sin markdown, sin backticks) con este formato exacto: [{"nombre": "...", "descripcion": "...", "precio": numero_entero, "categoria": "..."}]. Si no hay descripción visible, generar una breve basada en el nombre. Las categorías deben ser generales como Entradas, Platos Fuertes, Bebidas, Postres.';
+
+const MENU_PROMPT_NO_PHOTOS =
+  'Analiza esta foto de una carta/menú de restaurante. Esta carta NO tiene fotos de los productos (solo texto). Extrae TODOS los productos visibles y devuelve ÚNICAMENTE un JSON array (sin texto adicional, sin markdown, sin backticks) con este formato exacto: [{"nombre": "...", "descripcion": "...", "precio": numero_entero, "categoria": "..."}]. NO incluyas campos de imagen (imagen, imagen_url, image, etc.). NO inventes ni asumas URLs ni referencias a imágenes de productos. Si no hay descripción visible, generar una breve basada en el nombre. Las categorías deben ser generales como Entradas, Platos Fuertes, Bebidas, Postres.';
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -34,7 +37,7 @@ serve(async (req) => {
   }
 
   try {
-    const { image_base64, media_type } = await req.json();
+    const { image_base64, media_type, has_product_photos } = await req.json();
 
     if (!image_base64 || typeof image_base64 !== "string") {
       return jsonResponse({ error: "Falta image_base64 en el body." }, 400);
@@ -48,6 +51,9 @@ serve(async (req) => {
     if (!apiKey) {
       return jsonResponse({ error: "ANTHROPIC_API_KEY no está configurada en Supabase." }, 500);
     }
+
+    const includeProductPhotos = has_product_photos !== false;
+    const menuPrompt = includeProductPhotos ? MENU_PROMPT_WITH_PHOTOS : MENU_PROMPT_NO_PHOTOS;
 
     const anthropicResponse = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
@@ -73,7 +79,7 @@ serve(async (req) => {
               },
               {
                 type: "text",
-                text: MENU_PROMPT,
+                text: menuPrompt,
               },
             ],
           },
