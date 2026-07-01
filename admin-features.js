@@ -4,6 +4,7 @@ let featureSaveBusy = new Set();
 function renderAdminFeaturePanel(restaurant) {
   const flags = parseRestaurantFeatures(restaurant);
   const busy = featureSaveBusy.has(restaurant.id);
+  const activeDrawerTab = adminRestaurantDrawerTab[restaurant.id] || 'features';
 
   const toggles = RESTAURANT_FEATURE_DEFS.map(
     (def) => `
@@ -28,27 +29,51 @@ function renderAdminFeaturePanel(restaurant) {
     .map((def) => def.label)
     .join(' · ');
 
+  const featuresPanel = `
+    <div class="admin-restaurant-drawer__panel${activeDrawerTab === 'features' ? ' admin-restaurant-drawer__panel--active' : ''}" data-drawer-panel="features" role="tabpanel" ${activeDrawerTab === 'features' ? '' : 'hidden'}>
+      <p class="admin-restaurant-drawer__hint">
+        Activá o desactivá módulos para <strong>${escapeHtml(restaurant.nombre || 'este local')}</strong>.
+        Los cambios aplican al panel y a la carta del cliente.
+      </p>
+      <div class="admin-feature-list">${toggles}</div>
+      <p class="admin-restaurant-drawer__summary">
+        Activas: ${activeList ? escapeHtml(activeList) : 'ninguna'}
+      </p>
+      <p class="admin-restaurant-drawer__status" id="adminFeatureStatus-${restaurant.id}" hidden role="status"></p>
+    </div>
+  `;
+
+  const suscripcionPanel =
+    typeof renderAdminSubscriptionPanel === 'function'
+      ? `
+    <div class="admin-restaurant-drawer__panel${activeDrawerTab === 'suscripcion' ? ' admin-restaurant-drawer__panel--active' : ''}" data-drawer-panel="suscripcion" role="tabpanel" ${activeDrawerTab === 'suscripcion' ? '' : 'hidden'}>
+      ${renderAdminSubscriptionPanel(restaurant)}
+    </div>
+  `
+      : '';
+
   return `
     <div class="admin-restaurant-drawer" data-restaurant-drawer="${restaurant.id}">
       <nav class="admin-restaurant-drawer__tabs" role="tablist" aria-label="Secciones del local">
         <button
           type="button"
-          class="admin-restaurant-drawer__tab admin-restaurant-drawer__tab--active"
+          class="admin-restaurant-drawer__tab${activeDrawerTab === 'features' ? ' admin-restaurant-drawer__tab--active' : ''}"
+          data-drawer-tab="features"
+          data-restaurant-id="${restaurant.id}"
           role="tab"
-          aria-selected="true"
+          aria-selected="${activeDrawerTab === 'features' ? 'true' : 'false'}"
         >Features</button>
+        <button
+          type="button"
+          class="admin-restaurant-drawer__tab${activeDrawerTab === 'suscripcion' ? ' admin-restaurant-drawer__tab--active' : ''}"
+          data-drawer-tab="suscripcion"
+          data-restaurant-id="${restaurant.id}"
+          role="tab"
+          aria-selected="${activeDrawerTab === 'suscripcion' ? 'true' : 'false'}"
+        >Suscripción</button>
       </nav>
-      <div class="admin-restaurant-drawer__panel" role="tabpanel">
-        <p class="admin-restaurant-drawer__hint">
-          Activá o desactivá módulos para <strong>${escapeHtml(restaurant.nombre || 'este local')}</strong>.
-          Los cambios aplican al panel y a la carta del cliente.
-        </p>
-        <div class="admin-feature-list">${toggles}</div>
-        <p class="admin-restaurant-drawer__summary">
-          Activas: ${activeList ? escapeHtml(activeList) : 'ninguna'}
-        </p>
-        <p class="admin-restaurant-drawer__status" id="adminFeatureStatus-${restaurant.id}" hidden role="status"></p>
-      </div>
+      ${featuresPanel}
+      ${suscripcionPanel}
     </div>
   `;
 }

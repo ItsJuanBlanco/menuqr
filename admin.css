@@ -263,6 +263,7 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  flex-wrap: wrap;
   padding: 0;
   border: 0;
   background: none;
@@ -422,6 +423,116 @@
 
 .admin-restaurant-drawer__status--error {
   color: #dc2626;
+}
+
+.admin-suscripcion-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.admin-suscripcion-badge--none {
+  background: #f4f4f5;
+  color: #71717a;
+}
+
+.admin-suscripcion-badge--trial {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.admin-suscripcion-badge--activo {
+  background: #d1fae5;
+  color: #047857;
+}
+
+.admin-suscripcion-badge--vencido {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.admin-suscripcion-badge--cancelado {
+  background: #18181b;
+  color: #fff;
+}
+
+.admin-suscripcion__empty {
+  margin: 0 0 14px;
+  font-size: 0.875rem;
+  color: var(--text-muted);
+}
+
+.admin-suscripcion__activate {
+  background: #ff6b00;
+  border-color: #ff6b00;
+  color: #fff;
+}
+
+.admin-suscripcion__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px 18px;
+  margin-bottom: 16px;
+}
+
+.admin-suscripcion__field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.admin-suscripcion__field--valor {
+  grid-column: 1 / -1;
+}
+
+.admin-suscripcion__label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.admin-suscripcion__field strong {
+  font-size: 0.9375rem;
+  color: var(--text);
+}
+
+.admin-suscripcion__valor-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 280px;
+}
+
+.admin-suscripcion__currency,
+.admin-suscripcion__currency-suffix {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.admin-suscripcion__valor-input {
+  flex: 1;
+  min-width: 0;
+}
+
+.admin-suscripcion__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+@media (max-width: 640px) {
+  .admin-suscripcion__grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* ── New restaurant modal ── */

@@ -3,6 +3,8 @@ const ADMIN_USER = 'admin';
 const ADMIN_PASS = 'admin123';
 const DEFAULT_MESAS_COUNT = 5;
 const DEFAULT_METODO_PAGO = 'wompi';
+const DEFAULT_VALOR_MENSUAL = 150000;
+const SUSCRIPCION_ESTADOS = ['trial', 'activo', 'vencido', 'cancelado'];
 const ADMIN_ASSETS_BUCKET = 'restaurantes';
 const ALLOWED_PAYMENT_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 
@@ -13,6 +15,8 @@ let restaurantModalMode = 'create';
 let pendingAdminQrPagoFile = null;
 let pendingAdminQrPagoPreviewUrl = null;
 let currentAdminQrPagoUrl = null;
+let adminRestaurantDrawerTab = {};
+let subscriptionBusy = new Set();
 
 function showToast(message, type = '') {
   const toast = document.getElementById('toast');
@@ -52,6 +56,385 @@ function formatDate(isoString) {
     month: 'short',
     year: 'numeric',
   }).format(new Date(isoString));
+}
+
+function formatDateShort(isoDate) {
+  if (!isoDate) return '—';
+  const [year, month, day] = String(isoDate).split('-');
+  if (!year || !month || !day) return '—';
+  return `${day}/${month}/${year}`;
+}
+
+function toISODateLocal(date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+function todayISODateLocal() {
+  return toISODateLocal(new Date());
+}
+
+function parseISODateLocal(isoDate) {
+  const [year, month, day] = String(isoDate || '').split('-').map(Number);
+  return new Date(year, (month || 1) - 1, day || 1);
+}
+
+function addDaysISO(isoDate, days) {
+  const date = parseISODateLocal(isoDate);
+  date.setDate(date.getDate() + days);
+  return toISODateLocal(date);
+}
+
+function daysBetweenISO(fromIso, toIso) {
+  const from = parseISODateLocal(fromIso);
+  const to = parseISODateLocal(toIso);
+  return Math.round((to - from) / 86400000);
+}
+
+function getRestaurantSuscripcionEstado(restaurant) {
+  const estado = restaurant?.estado_suscripcion;
+  return SUSCRIPCION_ESTADOS.includes(estado) ? estado : null;
+}
+
+function getSuscripcionBadgeMeta(estado) {
+  const map = {
+    none: { label: 'Sin suscripción', className: 'admin-suscripcion-badge--none' },
+    trial: { label: 'Trial', className: 'admin-suscripcion-badge--trial' },
+    activo: { label: 'Activo', className: 'admin-suscripcion-badge--activo' },
+    vencido: { label: 'Vencido', className: 'admin-suscripcion-badge--vencido' },
+    cancelado: { label: 'Cancelado', className: 'admin-suscripcion-badge--cancelado' },
+  };
+  return map[estado || 'none'] || map.none;
+}
+
+function renderSuscripcionBadge(estado) {
+  const meta = getSuscripcionBadgeMeta(estado);
+  return `<span class="admin-suscripcion-badge ${meta.className}">${escapeHtml(meta.label)}</span>`;
+}
+
+function formatSuscripcionMoney(value) {
+  const amount = Number(value);
+  const safeAmount = Number.isFinite(amount) ? amount : DEFAULT_VALOR_MENSUAL;
+  return new Intl.NumberFormat('es-CO', {
+    style: 'currency',
+    currency: 'COP',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(safeAmount);
+}
+
+function getSuscripcionValorMensual(restaurant) {
+  const value = Number(restaurant?.valor_mensual);
+  return Number.isFinite(value) && value > 0 ? value : DEFAULT_VALOR_MENSUAL;
+}
+
+function getSuscripcionDiasLabel(restaurant) {
+  const estado = getRestaurantSuscripcionEstado(restaurant);
+  if (!estado) return '—';
+
+  if (estado === 'trial') {
+    if (!restaurant.proximo_cobro) return '—';
+    const restantes = daysBetweenISO(todayISODateLocal(), restaurant.proximo_cobro);
+    if (restantes < 0) return `${Math.abs(restantes)} día${Math.abs(restantes) !== 1 ? 's' : ''} vencido`;
+    if (restantes === 0) return 'Vence hoy';
+    return `${restantes} día${restantes !== 1 ? 's' : ''} restante${restantes !== 1 ? 's' : ''} de trial`;
+  }
+
+  if (restaurant.fecha_inicio_trial) {
+    const dias = daysBetweenISO(restaurant.fecha_inicio_trial, todayISODateLocal()) + 1;
+    return `${dias} día${dias !== 1 ? 's' : ''} como suscriptor`;
+  }
+
+  return '—';
+}
+
+function renderAdminSubscriptionPanel(restaurant) {
+  const estado = getRestaurantSuscripcionEstado(restaurant);
+  const busy = subscriptionBusy.has(restaurant.id);
+  const valorMensual = getSuscripcionValorMensual(restaurant);
+  const hasSuscripcion = Boolean(estado);
+
+  const activateTrialBtn = `
+    <button
+      type="button"
+      class="menu-toolbar__btn admin-suscripcion__activate"
+      data-action="activate-trial"
+      data-id="${restaurant.id}"
+      ${busy ? 'disabled' : ''}
+    >🚀 Activar trial</button>
+  `;
+
+  const detailsHtml = hasSuscripcion
+    ? `
+      <div class="admin-suscripcion__grid">
+        <div class="admin-suscripcion__field">
+          <span class="admin-suscripcion__label">Estado</span>
+          ${renderSuscripcionBadge(estado)}
+        </div>
+        <div class="admin-suscripcion__field">
+          <span class="admin-suscripcion__label">Inicio trial</span>
+          <strong>${escapeHtml(formatDateShort(restaurant.fecha_inicio_trial))}</strong>
+        </div>
+        <div class="admin-suscripcion__field">
+          <span class="admin-suscripcion__label">${estado === 'trial' ? 'Trial' : 'Suscripción'}</span>
+          <strong>${escapeHtml(getSuscripcionDiasLabel(restaurant))}</strong>
+        </div>
+        <div class="admin-suscripcion__field">
+          <span class="admin-suscripcion__label">Próximo cobro</span>
+          <strong>${escapeHtml(formatDateShort(restaurant.proximo_cobro))}</strong>
+        </div>
+        <label class="admin-suscripcion__field admin-suscripcion__field--valor">
+          <span class="admin-suscripcion__label">Valor mensual</span>
+          <div class="admin-suscripcion__valor-row">
+            <span class="admin-suscripcion__currency">$</span>
+            <input
+              type="number"
+              class="admin-form__input admin-suscripcion__valor-input"
+              data-action="update-valor-mensual"
+              data-id="${restaurant.id}"
+              value="${valorMensual}"
+              min="1"
+              step="1000"
+              inputmode="numeric"
+              ${busy ? 'disabled' : ''}
+            >
+            <span class="admin-suscripcion__currency-suffix">COP</span>
+          </div>
+        </label>
+      </div>
+      <div class="admin-suscripcion__actions">
+        ${
+          estado === 'trial' || estado === 'activo' || estado === 'vencido'
+            ? `<button type="button" class="admin-action-btn admin-action-btn--primary" data-action="register-payment" data-id="${restaurant.id}" ${busy ? 'disabled' : ''}>Registrar pago</button>`
+            : ''
+        }
+        ${
+          estado === 'trial' || estado === 'activo'
+            ? `<button type="button" class="admin-action-btn" data-action="mark-expired" data-id="${restaurant.id}" ${busy ? 'disabled' : ''}>Marcar como vencido</button>`
+            : ''
+        }
+        ${
+          estado !== 'cancelado'
+            ? `<button type="button" class="admin-action-btn admin-action-btn--danger" data-action="cancel-subscription" data-id="${restaurant.id}" ${busy ? 'disabled' : ''}>Cancelar suscripción</button>`
+            : ''
+        }
+        ${
+          estado === 'cancelado' || estado === 'vencido'
+            ? activateTrialBtn
+            : ''
+        }
+      </div>
+    `
+    : `
+      <p class="admin-suscripcion__empty">Este local aún no tiene suscripción activa.</p>
+      ${activateTrialBtn}
+    `;
+
+  return `
+    <div class="admin-suscripcion" data-restaurant-suscripcion="${restaurant.id}">
+      <p class="admin-restaurant-drawer__hint">
+        Gestioná el trial y los cobros mensuales de <strong>${escapeHtml(restaurant.nombre || 'este local')}</strong>.
+      </p>
+      ${detailsHtml}
+      <p class="admin-restaurant-drawer__status" id="adminSuscripcionStatus-${restaurant.id}" hidden role="status"></p>
+    </div>
+  `;
+}
+
+function setAdminSuscripcionStatus(restaurantId, message, tone = '') {
+  const el = document.getElementById(`adminSuscripcionStatus-${restaurantId}`);
+  if (!el) return;
+  if (!message) {
+    el.hidden = true;
+    el.textContent = '';
+    el.className = 'admin-restaurant-drawer__status';
+    return;
+  }
+  el.hidden = false;
+  el.textContent = message;
+  el.className = 'admin-restaurant-drawer__status' + (tone ? ` admin-restaurant-drawer__status--${tone}` : '');
+}
+
+function patchRestaurantSuscripcion(restaurantId, patch) {
+  const index = restaurants.findIndex((entry) => entry.id === restaurantId);
+  if (index >= 0) {
+    restaurants[index] = { ...restaurants[index], ...patch };
+  }
+}
+
+async function runSuscripcionAction(restaurantId, action) {
+  if (subscriptionBusy.has(restaurantId)) return;
+
+  subscriptionBusy.add(restaurantId);
+  setAdminSuscripcionStatus(restaurantId, 'Guardando…');
+  renderRestaurants();
+
+  try {
+    const client = assertSupabaseClient();
+    const restaurant = restaurants.find((entry) => entry.id === restaurantId);
+    if (!restaurant) throw new Error('Restaurante no encontrado.');
+
+    if (action === 'activate-trial') {
+      const today = todayISODateLocal();
+      const proximoCobro = addDaysISO(today, 30);
+      const { data, error } = await client
+        .from('restaurantes')
+        .update({
+          fecha_inicio_trial: today,
+          estado_suscripcion: 'trial',
+          proximo_cobro: proximoCobro,
+          valor_mensual: getSuscripcionValorMensual(restaurant),
+        })
+        .eq('id', restaurantId)
+        .select(
+          'id, nombre, slug, ciudad, email, activo, created_at, features, musica_habilitada, estado_suscripcion, fecha_inicio_trial, proximo_cobro, valor_mensual'
+        )
+        .single();
+
+      if (error) throw error;
+      patchRestaurantSuscripcion(restaurantId, data);
+      adminRestaurantDrawerTab[restaurantId] = 'suscripcion';
+      showToast(`Trial activado — vence el ${formatDateShort(proximoCobro)}`, 'success');
+      setAdminSuscripcionStatus(restaurantId, 'Trial activado', 'success');
+    }
+
+    if (action === 'register-payment') {
+      const monto = getSuscripcionValorMensual(restaurant);
+      const today = todayISODateLocal();
+      const baseDate = restaurant.proximo_cobro || today;
+      const proximoCobro = addDaysISO(baseDate, 30);
+
+      const { error: pagoError } = await client.from('pagos_suscripcion').insert({
+        restaurante_id: restaurantId,
+        fecha: today,
+        monto,
+      });
+      if (pagoError) throw pagoError;
+
+      const { data, error } = await client
+        .from('restaurantes')
+        .update({
+          estado_suscripcion: 'activo',
+          proximo_cobro: proximoCobro,
+        })
+        .eq('id', restaurantId)
+        .select(
+          'id, nombre, slug, ciudad, email, activo, created_at, features, musica_habilitada, estado_suscripcion, fecha_inicio_trial, proximo_cobro, valor_mensual'
+        )
+        .single();
+
+      if (error) throw error;
+      patchRestaurantSuscripcion(restaurantId, data);
+      showToast(`Pago registrado · próximo cobro ${formatDateShort(proximoCobro)}`, 'success');
+      setAdminSuscripcionStatus(restaurantId, 'Pago registrado', 'success');
+    }
+
+    if (action === 'mark-expired') {
+      const { data, error } = await client
+        .from('restaurantes')
+        .update({ estado_suscripcion: 'vencido' })
+        .eq('id', restaurantId)
+        .select(
+          'id, nombre, slug, ciudad, email, activo, created_at, features, musica_habilitada, estado_suscripcion, fecha_inicio_trial, proximo_cobro, valor_mensual'
+        )
+        .single();
+
+      if (error) throw error;
+      patchRestaurantSuscripcion(restaurantId, data);
+      showToast('Suscripción marcada como vencida', 'success');
+      setAdminSuscripcionStatus(restaurantId, 'Marcado como vencido', 'success');
+    }
+
+    if (action === 'cancel-subscription') {
+      const { data, error } = await client
+        .from('restaurantes')
+        .update({ estado_suscripcion: 'cancelado' })
+        .eq('id', restaurantId)
+        .select(
+          'id, nombre, slug, ciudad, email, activo, created_at, features, musica_habilitada, estado_suscripcion, fecha_inicio_trial, proximo_cobro, valor_mensual'
+        )
+        .single();
+
+      if (error) throw error;
+      patchRestaurantSuscripcion(restaurantId, data);
+      showToast('Suscripción cancelada', 'success');
+      setAdminSuscripcionStatus(restaurantId, 'Suscripción cancelada', 'success');
+    }
+
+    setTimeout(() => setAdminSuscripcionStatus(restaurantId, ''), 2200);
+  } catch (error) {
+    console.error(error);
+    setAdminSuscripcionStatus(restaurantId, error.message || 'No se pudo actualizar la suscripción.', 'error');
+    showToast(error.message || 'No se pudo actualizar la suscripción.', 'error');
+  } finally {
+    subscriptionBusy.delete(restaurantId);
+    renderRestaurants();
+  }
+}
+
+async function saveSuscripcionValorMensual(restaurantId, rawValue) {
+  const amount = Math.round(Number(rawValue));
+  if (!Number.isFinite(amount) || amount <= 0) {
+    showToast('Ingresá un valor mensual válido.', 'error');
+    renderRestaurants();
+    return;
+  }
+
+  if (subscriptionBusy.has(restaurantId)) return;
+
+  subscriptionBusy.add(restaurantId);
+  setAdminSuscripcionStatus(restaurantId, 'Guardando valor…');
+  renderRestaurants();
+
+  try {
+    const client = assertSupabaseClient();
+    const { data, error } = await client
+      .from('restaurantes')
+      .update({ valor_mensual: amount })
+      .eq('id', restaurantId)
+      .select(
+        'id, nombre, slug, ciudad, email, activo, created_at, features, musica_habilitada, estado_suscripcion, fecha_inicio_trial, proximo_cobro, valor_mensual'
+      )
+      .single();
+
+    if (error) throw error;
+    patchRestaurantSuscripcion(restaurantId, data);
+    setAdminSuscripcionStatus(restaurantId, 'Valor mensual actualizado', 'success');
+    setTimeout(() => setAdminSuscripcionStatus(restaurantId, ''), 2200);
+  } catch (error) {
+    console.error(error);
+    setAdminSuscripcionStatus(restaurantId, error.message || 'No se pudo guardar el valor.', 'error');
+    showToast(error.message || 'No se pudo guardar el valor.', 'error');
+  } finally {
+    subscriptionBusy.delete(restaurantId);
+    renderRestaurants();
+  }
+}
+
+function bindAdminSubscriptionActions() {
+  const list = document.getElementById('adminRestaurantList');
+  if (!list || list.dataset.suscripcionBound) return;
+  list.dataset.suscripcionBound = 'true';
+
+  list.addEventListener('click', (event) => {
+    const tabBtn = event.target.closest('[data-drawer-tab]');
+    if (tabBtn) {
+      const restaurantId = tabBtn.dataset.restaurantId;
+      if (!restaurantId) return;
+      adminRestaurantDrawerTab[restaurantId] = tabBtn.dataset.drawerTab || 'features';
+      renderRestaurants();
+      return;
+    }
+
+    const btn = event.target.closest('[data-action="activate-trial"], [data-action="register-payment"], [data-action="mark-expired"], [data-action="cancel-subscription"]');
+    if (!btn || btn.disabled) return;
+    void runSuscripcionAction(btn.dataset.id, btn.dataset.action);
+  });
+
+  list.addEventListener('change', (event) => {
+    const input = event.target.closest('[data-action="update-valor-mensual"]');
+    if (!input || input.disabled) return;
+    void saveSuscripcionValorMensual(input.dataset.id, input.value);
+  });
 }
 
 function isAdminLoggedIn() {
@@ -146,7 +529,9 @@ async function loadRestaurants() {
     const client = assertSupabaseClient();
     const { data, error } = await client
       .from('restaurantes')
-      .select('id, nombre, slug, ciudad, email, activo, created_at, features, musica_habilitada')
+      .select(
+        'id, nombre, slug, ciudad, email, activo, created_at, features, musica_habilitada, estado_suscripcion, fecha_inicio_trial, proximo_cobro, valor_mensual'
+      )
       .order('created_at', { ascending: false });
 
     if (error) throw error;
@@ -193,6 +578,9 @@ function renderRestaurants() {
         .map((def) => def.label)
         .join(' · ');
 
+      const suscripcionEstado = getRestaurantSuscripcionEstado(restaurant);
+      const suscripcionBadge = renderSuscripcionBadge(suscripcionEstado);
+
       return [
         `
         <tr class="admin-restaurant-row${expanded ? ' admin-restaurant-row--expanded' : ''}">
@@ -206,6 +594,7 @@ function renderRestaurants() {
             >
               <span class="admin-restaurant-name__chevron" aria-hidden="true">${expanded ? '▾' : '▸'}</span>
               <span class="admin-restaurant-name__text">${escapeHtml(restaurant.nombre || '—')}</span>
+              ${suscripcionBadge}
             </button>
             <div class="admin-table__slug">${escapeHtml(restaurant.email || '')}</div>
             ${activeFeatures ? `<div class="admin-restaurant-features">${escapeHtml(activeFeatures)}</div>` : ''}
@@ -1006,6 +1395,7 @@ async function init() {
   bindLogin();
   bindLogout();
   bindRestaurantListActions();
+  bindAdminSubscriptionActions();
   bindRestaurantModal();
   bindAdminTabs();
 
